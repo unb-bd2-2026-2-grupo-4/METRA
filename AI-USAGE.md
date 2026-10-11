@@ -74,3 +74,12 @@ Este arquivo cumpre a [Política de Uso de IA](https://unb-bd2.github.io/PlanoEn
 - **O que foi aproveitado:** Revisão do diagrama arquitetural; manutenção do PostgreSQL 16 na E1 como fonte transacional em 3FN; remoção do MinIO como componente obrigatório; simplificação da E2 para extração analítica via DuckDB e/ou Parquet; manutenção do dbt-duckdb e Star Schema na E3; e reformulação da E4 para consumo direto de dados e métricas a partir do DuckDB ou Parquet, sem dependência obrigatória de Metabase ou ETL reverso.
 - **Como foi verificado:** A atualização foi comparada com a decisão arquitetural registrada no ADR de simplificação da plataforma, garantindo consistência entre o diagrama, a descrição das entregas e a separação de responsabilidades entre PostgreSQL e DuckDB.
 - **Quem revisou:** Davi Camilo
+
+### 10/10/2026 - Implementação mínima da ADR 0002 com DuckDB
+
+- **Ferramenta:** ChatGPT (OpenAI).
+- **Onde:** `src/analise.py`, `requirements-pipeline.txt`, `README.md`, `AI-USAGE.md` e `docs/uso-de-ia.md`.
+- **O que foi pedido:** Implementar o plano mínimo PostgreSQL → DuckDB local → tabelas no terminal, com um único módulo de código, preservando a E1 e evitando componentes adicionais.
+- **O que foi aproveitado:** Carga transacional em modo somente leitura da origem, substituição integral e atômica da tabela DuckDB, indicadores anuais e consolidados de saldo e salário médio nominal de admissão, diferenças capital − interior, denominadores salariais e competências disponíveis; configuração via variáveis libpq e instruções no README.
+- **Como foi verificado:** Migrações e cargas Bronze/OLTP da amostra de 49.178 registros em PostgreSQL 16.15 descartável, com cadastros de teste; conciliação de contagens, códigos, tipos e indicadores com SQL PostgreSQL; reexecução sem duplicação; tentativa de escrita na origem recusada; casos controlados de salários nulos/zero, desligamentos, médias por evento, municípios sentinela, grupos ausentes e arredondamento final; rollback em falha SQL e carga vazia; falha de conexão com saída 1, sem apresentação de resultados antigos. Usados DuckDB 1.5.6 e arquivos temporários, sem testes permanentes; documentação validada com `python3 -m mkdocs build --strict`. A ingestão completa das APIs IBGE/CBO e os benchmarks da ADR não foram reproduzidos.
+- **Quem revisou:** Tiago Antunes

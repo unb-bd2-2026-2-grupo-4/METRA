@@ -130,6 +130,7 @@ E4            | Análises e Visualizações  |
 ├── docker/                 # Arquivos de configuração e Dockerfiles dos serviços
 │   └── ingestao/Dockerfile # Imagem da tarefa de ingestão e carga do pipeline E1
 ├── src/                    # Scripts de ingestão, pipeline e transformações
+│   ├── analise.py          # Carga PostgreSQL -> DuckDB e indicadores no terminal
 │   ├── db/
 │   │   ├── migrar.py       # Aplica migrações pendentes (registradas em public.schema_migracoes)
 │   │   └── migracoes/      # Migrações SQL versionadas
@@ -193,6 +194,30 @@ docker compose run --rm ingestao-bronze
 ```
 
 Acesse o portal de documentação em: [http://localhost:8000](http://localhost:8000).
+
+### Análise local com DuckDB
+
+Após concluir a E1, execute a análise com Python 3.12 local, sem cargas concorrentes:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python3 -m pip install -r requirements-pipeline.txt
+
+# Ajuste conforme as credenciais e a porta do PostgreSQL local.
+export PGHOST=localhost PGPORT=5432 PGDATABASE=metra PGUSER=metra
+read -r -s -p 'Senha do PostgreSQL: ' PGPASSWORD
+export PGPASSWORD
+python3 -m src.analise
+```
+
+As variáveis `PG*` são as mesmas utilizadas pela ingestão Python. O módulo não carrega `.env` automaticamente; as variáveis `POSTGRES_*` do Compose devem ser traduzidas para os valores `PG*` correspondentes. A primeira execução precisa de internet para baixar a extensão `postgres` do DuckDB.
+
+O comando lê PostgreSQL em modo somente leitura e substitui, em uma transação, a tabela analítica de `data/metra.duckdb`. Reexecuções não acumulam registros. Uma falha interrompe a análise com erro e preserva a tabela anterior; o arquivo gerado não é versionado.
+
+As tabelas no terminal comparam capitais e interior por ano e para o período consolidado de 2023–2026. Consideram municípios identificados de DF, GO, MT e MS, usando `is_capital` da origem. O saldo é a soma de `saldo_movimentacao`; a definição operacional de admissão é `saldo_movimentacao = 1`. A média salarial nominal considera apenas salários positivos dessas admissões, excluindo nulos e zeros, inclusive valores ausentes ou negativos convertidos em zero pela E1. A média é calculada sobre eventos, e as diferenças são **capital − interior**, arredondadas somente na apresentação. As quantidades de salários considerados e as competências disponíveis acompanham os resultados; grupos ausentes ou sem salários elegíveis produzem valores nulos.
+
+
 
 ---
 
