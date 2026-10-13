@@ -60,6 +60,7 @@ nav:
   - Engenharia de Dados:
       - Arquitetura da Plataforma: arquitetura.md
       - Camada Bronze: camada-bronze.md
+      - Extração para Parquet e Delta: camada-parquet.md
       - Relacionamento entre as Bases: relacionamentos.md
   - Governança & Decisões:
       - Decisões de Arquitetura (ADR):
