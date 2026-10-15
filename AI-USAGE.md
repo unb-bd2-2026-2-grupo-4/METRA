@@ -113,3 +113,10 @@ Este arquivo cumpre a [Política de Uso de IA](https://unb-bd2.github.io/PlanoEn
 - **Onde:** `src/extracao/exportar_parquet.py` e `docs/camada-parquet.md`.
 - **O que foi aproveitado:** Manutenção de `COMPRESSAO_PADRAO = "snappy"`, vencedor medido, com remoção da indicação de escolha provisória e referência à ADR 0003.
 - **Como foi verificado:** O padrão permaneceu Snappy e o benchmark validou seus arquivos. A escrita Delta e o acesso PostgreSQL não foram executados. Revisão humana pendente de Euller Júlio.
+
+#### Continuação — diário e validação final
+
+- **Onde:** `docs/diario/semana-07.md`, `mkdocs.yml` e este registro.
+- **O que foi aproveitado:** Registro do que foi medido, do resultado inesperado e da decisão, sem atribuir ao integrante uma revisão ainda não realizada.
+- **Como foi verificado:** Benchmark principal completo; casos locais adicionais com valores vazios, salário negativo, códigos com zeros e linhas de entrada repetidas; caminho com apóstrofo; rejeição de origem vazia/ausente, menos de três repetições e zero threads; compilação dos módulos Python, `git diff --check` e geração da documentação com `python -m mkdocs build --strict`. Os testes auxiliares usam dados controlados e não compõem os números da ADR.
+- **Quem revisou:** Euller Júlio.
