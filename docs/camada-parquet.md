@@ -102,4 +102,14 @@ python3 -m src.extracao.exportar_parquet --compressao zstd
 python3 -m src.extracao.materializar_delta --compressao zstd
 ```
 
-O padrão atual é `snappy`, que é o padrão do próprio DuckDB, e é **provisório**. A escolha definitiva depende da comparação de tamanho em disco e de tempo de leitura com as consultas do projeto, que ainda não foi realizada e será registrada em ADR próprio.
+O padrão é `snappy`, mantido após a comparação registrada no [ADR 0003](adr/0003-compressao-parquet.md). Na amostra de 49.178 movimentações, ocupou 960.593 bytes, com medianas de 56,731 ms de escrita e 18,913 ms de leitura. Zstd ocupou menos espaço, mas excedeu a tolerância definida de 25% no custo combinado de escrita e leitura. A leitura medida varre todas as colunas; não equivale à consulta com joins da pergunta central.
+
+Para reproduzir a comparação sem PostgreSQL:
+
+```bash
+python3 -m src.extracao.comparar_compressao --amostra data/caged_centro_oeste_amostra.csv
+```
+
+Para comparar a tabela OLTP populada, execute sem `--amostra`, com as variáveis `PG*` configuradas. O relatório JSON e os arquivos de cada rodada ficam em um diretório exclusivo de `data/lake/benchmarks/`. O benchmark não altera a extração existente.
+
+A decisão foi medida com CSV tipado e campos técnicos reconstruídos, em ambiente compartilhado com cache aquecido; precisa ser reavaliada na carga completa. O padrão compartilhado também é usado por `materializar_delta.py`, mas os tempos do escritor Delta não foram medidos.

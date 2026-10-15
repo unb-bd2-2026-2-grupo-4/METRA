@@ -107,3 +107,9 @@ Este arquivo cumpre a [Política de Uso de IA](https://unb-bd2.github.io/PlanoEn
 - **Onde:** `docs/adr/0003-compressao-parquet.md`, relatório JSON em `docs/adr/evidencias/` e navegação em `mkdocs.yml`.
 - **O que foi aproveitado:** ADR no template de seis passos, números reais da execução e critério de seleção definido no benchmark. Snappy venceu; a limitação do recorte amostral está explícita.
 - **Como foi verificado:** Tabela confrontada com as medianas e tamanhos do JSON; preservação das sete medições por codec e das condições de reprodução. Revisão humana pendente de Euller Júlio.
+
+#### Continuação — padrão de compressão
+
+- **Onde:** `src/extracao/exportar_parquet.py` e `docs/camada-parquet.md`.
+- **O que foi aproveitado:** Manutenção de `COMPRESSAO_PADRAO = "snappy"`, vencedor medido, com remoção da indicação de escolha provisória e referência à ADR 0003.
+- **Como foi verificado:** O padrão permaneceu Snappy e o benchmark validou seus arquivos. A escrita Delta e o acesso PostgreSQL não foram executados. Revisão humana pendente de Euller Júlio.

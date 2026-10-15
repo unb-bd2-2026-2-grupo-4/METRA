@@ -28,8 +28,8 @@ LAKE = Path(__file__).resolve().parents[2] / "data" / "lake"
 DIRETORIO_PARQUET = LAKE / "parquet"
 
 COMPRESSOES = ("snappy", "zstd", "uncompressed")
-# Provisorio: snappy e o padrao do DuckDB (opcao nula). A escolha definitiva sera
-# registrada em ADR a partir da medicao de tamanho e tempo de leitura.
+# Snappy venceu no recorte amostral pelo criterio de tamanho e tempo medidos.
+# Evidencias e gatilhos de revisao: docs/adr/0003-compressao-parquet.md.
 COMPRESSAO_PADRAO = "snappy"
 
 # Tabela -> coluna de particionamento (None = arquivo unico).
