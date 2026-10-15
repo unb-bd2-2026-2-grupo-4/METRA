@@ -101,3 +101,9 @@ Este arquivo cumpre a [Política de Uso de IA](https://unb-bd2.github.io/PlanoEn
 - **O que foi aproveitado:** Benchmark de uncompressed, Snappy e Zstd, cópia única da fonte, particionamento por ano, aquecimento, sete repetições, varredura de todas as colunas, comparação exata dos dados e relatório JSON. Opção local de CSV tipado para reproduzir com a amostra versionada.
 - **Como foi verificado:** Execução com DuckDB 1.5.6 e Python 3.12 sobre as 49.178 linhas da amostra. Os três codecs preservaram schema e multiconjunto de linhas em todas as rodadas. PostgreSQL e Docker indisponíveis neste ambiente: o modo PostgreSQL não foi executado. Os campos de linhagem no modo amostral são reconstruídos e declarados; não se trata de uma exportação do banco populado.
 - **Quem revisou:** Euller Júlio.
+
+#### Continuação — ADR e evidências
+
+- **Onde:** `docs/adr/0003-compressao-parquet.md`, relatório JSON em `docs/adr/evidencias/` e navegação em `mkdocs.yml`.
+- **O que foi aproveitado:** ADR no template de seis passos, números reais da execução e critério de seleção definido no benchmark. Snappy venceu; a limitação do recorte amostral está explícita.
+- **Como foi verificado:** Tabela confrontada com as medianas e tamanhos do JSON; preservação das sete medições por codec e das condições de reprodução. Revisão humana pendente de Euller Júlio.
