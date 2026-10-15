@@ -92,3 +92,12 @@ Este arquivo cumpre a [Política de Uso de IA](https://unb-bd2.github.io/PlanoEn
 - **O que foi aproveitado:** Extração 1:1 das cinco tabelas do schema `oltp` via DuckDB em modo somente leitura, com `movimentacao` particionada por ano, conciliação de contagens e substituição atômica; materialização da tabela Delta com `deltalake` (delta-rs) lida por `delta_scan`; parâmetro `--compressao` com padrão provisório `snappy`; validação que compara a consulta da pergunta central entre PostgreSQL, Parquet e Delta; a escolha de Delta em vez de Iceberg por dispensar catálogo; página de documentação e instruções no README.
 - **Como foi verificado:** Pipeline E1 executado com a amostra de 49.178 registros em PostgreSQL 16 via Docker Compose; extração, materialização e validação executadas com DuckDB 1.5.6 e deltalake 1.6.6 em Python 3.14, com indicadores idênticos nas três fontes e iguais aos de `python3 -m src.analise`; conferência de tipos e de zeros à esquerda nos códigos; reexecução sem acúmulo de registros; senha incorreta com saída 1 e extração anterior preservada; materialização sem Parquet com saída 1; teste direto de que a extensão `delta` do DuckDB 1.5.6 não cria tabelas; documentação validada com `mkdocs build --strict`. Não foi testado com a base completa de 14,7 milhões de registros nem em Python 3.12; nenhuma comparação de compressão foi medida.
 - **Quem revisou:** Lucas Alves
+
+### 15/10/2026 - Comparação de compressão Parquet (E2, Euller Júlio)
+
+- **Ferramenta:** Codex (OpenAI).
+- **Onde:** `src/extracao/comparar_compressao.py`.
+- **O que foi pedido:** Implementar somente o benchmark de compressão, ADR 0003, adoção do vencedor, diário e declaração de IA, com commits atômicos.
+- **O que foi aproveitado:** Benchmark de uncompressed, Snappy e Zstd, cópia única da fonte, particionamento por ano, aquecimento, sete repetições, varredura de todas as colunas, comparação exata dos dados e relatório JSON. Opção local de CSV tipado para reproduzir com a amostra versionada.
+- **Como foi verificado:** Execução com DuckDB 1.5.6 e Python 3.12 sobre as 49.178 linhas da amostra. Os três codecs preservaram schema e multiconjunto de linhas em todas as rodadas. PostgreSQL e Docker indisponíveis neste ambiente: o modo PostgreSQL não foi executado. Os campos de linhagem no modo amostral são reconstruídos e declarados; não se trata de uma exportação do banco populado.
+- **Quem revisou:** Euller Júlio.
