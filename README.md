@@ -125,12 +125,16 @@ E4            | Análises e Visualizações  |
 ├── docker-compose.yml      # Manifesto que sobe todos os serviços locais da plataforma (E1 a E4)
 ├── mkdocs.yml              # Configuração do portal de documentação (Material for MkDocs)
 ├── requirements-docs.txt   # Dependências Python para execução local do MkDocs
-├── requirements-pipeline.txt # Dependências Python da ingestão e das migrações
+├── requirements-pipeline.txt # Dependências Python da ingestão, das migrações e da extração
 ├── .env.example            # Variáveis de ambiente do PostgreSQL (opcional)
 ├── docker/                 # Arquivos de configuração e Dockerfiles dos serviços
 │   └── ingestao/Dockerfile # Imagem da tarefa de ingestão e carga do pipeline E1
 ├── src/                    # Scripts de ingestão, pipeline e transformações
 │   ├── analise.py          # Carga PostgreSQL -> DuckDB e indicadores no terminal
+│   ├── extracao/
+│   │   ├── exportar_parquet.py   # Extração PostgreSQL (oltp) -> Parquet, com compressão configurável
+│   │   ├── materializar_delta.py # Materialização Parquet -> tabela Delta de movimentações
+│   │   └── validar_lake.py       # Confere a pergunta central em PostgreSQL, Parquet e Delta
 │   ├── db/
 │   │   ├── migrar.py       # Aplica migrações pendentes (registradas em public.schema_migracoes)
 │   │   └── migracoes/      # Migrações SQL versionadas
@@ -150,6 +154,7 @@ E4            | Análises e Visualizações  |
     ├── dominio.md          # Detalhamento do domínio, personas e 5 perguntas de gestão
     ├── arquitetura.md      # Visão técnica das camadas e Entregas (E1 a E4)
     ├── camada-bronze.md    # Regras, modelo multi-fontes e validações da camada bronze
+    ├── camada-parquet.md   # Extração para Parquet, tabela Delta e como consultá-las
     ├── uso-de-ia.md        # Política de transparência de IA
     ├── stylesheets/
     │   └── extra.css       # Estilização customizada com texto justificado
@@ -217,7 +222,19 @@ O comando lê PostgreSQL em modo somente leitura e substitui, em uma transação
 
 As tabelas no terminal comparam capitais e interior por ano e para o período consolidado de 2023–2026. Consideram municípios identificados de DF, GO, MT e MS, usando `is_capital` da origem. O saldo é a soma de `saldo_movimentacao`; a definição operacional de admissão é `saldo_movimentacao = 1`. A média salarial nominal considera apenas salários positivos dessas admissões, excluindo nulos e zeros, inclusive valores ausentes ou negativos convertidos em zero pela E1. A média é calculada sobre eventos, e as diferenças são **capital − interior**, arredondadas somente na apresentação. As quantidades de salários considerados e as competências disponíveis acompanham os resultados; grupos ausentes ou sem salários elegíveis produzem valores nulos.
 
+### Extração para Parquet e tabela Delta (E2)
 
+No mesmo ambiente Python, com as variáveis `PG*` exportadas:
+
+```bash
+python3 -m src.extracao.exportar_parquet    # PostgreSQL (oltp) -> data/lake/parquet/
+python3 -m src.extracao.materializar_delta  # Parquet -> data/lake/delta/movimentacao/
+python3 -m src.extracao.validar_lake        # compara PostgreSQL, Parquet e Delta
+```
+
+A extração copia as cinco tabelas do schema `oltp` em modo somente leitura, particiona `movimentacao` por `ano` e concilia a contagem de linhas com a origem. A tabela Delta é gravada com `deltalake` (delta-rs) e lida pelo DuckDB com `delta_scan`. Reexecuções substituem os arquivos sem acumular registros, e nada em `data/lake/` é versionado. A primeira execução precisa de internet para baixar as extensões `postgres` e `delta` do DuckDB.
+
+Os dois primeiros comandos aceitam `--compressao` (`snappy`, `zstd` ou `uncompressed`); o padrão `snappy` é provisório até a comparação de compressão. Detalhes em [`docs/camada-parquet.md`](./docs/camada-parquet.md).
 
 ---
 

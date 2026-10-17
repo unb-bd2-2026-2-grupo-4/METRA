@@ -60,11 +60,13 @@ nav:
   - Engenharia de Dados:
       - Arquitetura da Plataforma: arquitetura.md
       - Camada Bronze: camada-bronze.md
+      - Extração para Parquet e Delta: camada-parquet.md
       - Relacionamento entre as Bases: relacionamentos.md
   - Governança & Decisões:
       - Decisões de Arquitetura (ADR):
           - "ADR 0001: Origem Transacional OLTP": adr/0001-modelagem-sistema-origem.md
           - "ADR 0002: Simplificação com DuckDB": adr/0002-simplificacao-arquitetural-duckdb.md
+          - "ADR 0003: Compressão Parquet": adr/0003-compressao-parquet.md
           # - Template de ADR: adr/template.md
       - Governança e IA: uso-de-ia.md
       - Diário de Bordo:
@@ -74,3 +76,4 @@ nav:
           - Semana 04: diario/semana-04.md
           - Semana 05: diario/semana-05.md
           - Semana 06: diario/semana-06.md
+          - Semana 07: diario/semana-07.md
