@@ -17,8 +17,12 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-metra}
       POSTGRES_USER: ${POSTGRES_USER:-metra}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-metra}
-    # Cargas em lote de milhões de linhas: evita checkpoints forçados a cada 1 GB de WAL.
-    command: postgres -c max_wal_size=4GB
+    command: >
+      postgres
+      -c max_wal_size=4GB
+      -c wal_level=logical
+      -c max_replication_slots=4
+      -c max_wal_senders=4
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
@@ -29,8 +33,6 @@ services:
       timeout: 5s
       retries: 20
 
-  # Tarefa pontual (não sobe com `docker compose up`):
-  #   docker compose run --rm ingestao-bronze
   ingestao-bronze:
     build:
       context: .

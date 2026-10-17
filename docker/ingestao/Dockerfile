@@ -8,4 +8,4 @@ RUN pip install --no-cache-dir -r requirements-pipeline.txt
 COPY src/ src/
 
 # Garante o schema (migrações idempotentes), carrega as fontes Bronze e popula o OLTP (3FN).
-CMD ["python", "src/ingestao/executar_pipeline.py"]
+CMD ["python", "-m", "src.ingestao.executar_pipeline"]
