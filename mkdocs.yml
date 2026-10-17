@@ -1,9 +1,9 @@
 site_name: METRA (Monitoramento e Engenharia de dados do TRAbalho)
 site_description: METRA (Monitoramento e Engenharia de dados do TRAbalho) | Projeto Integrado de Banco de Dados 2 (FCTE/UnB) - Squad G4
 site_author: Squad G4
-site_url: https://unb-bd2-2026-2-grupo-4.github.io/ProjetoIntegrado/
-repo_url: https://github.com/unb-bd2-2026-2-grupo-4/ProjetoIntegrado
-repo_name: unb-bd2-2026-2-grupo-4/ProjetoIntegrado
+site_url: https://unb-bd2-2026-2-grupo-4.github.io/METRA/
+repo_url: https://github.com/unb-bd2-2026-2-grupo-4/METRA
+repo_name: unb-bd2-2026-2-grupo-4/METRA
 
 theme:
   name: material
@@ -18,17 +18,19 @@ theme:
     - search.highlight
   palette:
     - scheme: default
-      primary: indigo
-      accent: indigo
+      primary: teal
+      accent: deep purple
       toggle:
         icon: material/brightness-7
         name: Alternar para modo escuro
     - scheme: slate
-      primary: indigo
-      accent: indigo
+      primary: teal
+      accent: deep purple
       toggle:
         icon: material/brightness-4
         name: Alternar para modo claro
+  font:
+    text: Poppins
 
 extra:
   generator: false
@@ -60,14 +62,15 @@ nav:
   - Engenharia de Dados:
       - Arquitetura da Plataforma: arquitetura.md
       - Camada Bronze: camada-bronze.md
-      - Extração para Parquet e Delta: camada-parquet.md
       - Relacionamento entre as Bases: relacionamentos.md
+      - Captura de Mudanças (CDC): cdc.md
+      - Extração para Parquet e Delta: camada-parquet.md
   - Governança & Decisões:
       - Decisões de Arquitetura (ADR):
           - "ADR 0001: Origem Transacional OLTP": adr/0001-modelagem-sistema-origem.md
           - "ADR 0002: Simplificação com DuckDB": adr/0002-simplificacao-arquitetural-duckdb.md
           - "ADR 0003: Compressão Parquet": adr/0003-compressao-parquet.md
-          # - Template de ADR: adr/template.md
+          - "ADR 004: Estratégia de CDC": adr/0004-cdc-decodificacao-logica.md
       - Governança e IA: uso-de-ia.md
       - Diário de Bordo:
           - Semana 01: diario/semana-01.md

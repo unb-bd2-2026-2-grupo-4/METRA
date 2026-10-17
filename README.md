@@ -3,6 +3,7 @@
 > **Plataforma de Dados do Mercado de Trabalho Formal (Novo CAGED)**  
 > **Projeto Integrado: Banco de Dados 2 (FCTE / Universidade de Brasília)**  
 > **Oferta:** 2026/2 | **Squad G4**
+> **Documentação completa:** https://unb-bd2-2026-2-grupo-4.github.io/METRA/
 
 ---
 
@@ -14,12 +15,20 @@
 
 ## Grupo (Squad G4)
 
-- **Arthur Evangelista**
-- **Davi Camilo**
-- **Euller Júlio**
-- **Lucas Alves**
-- **Tiago Antunes**
-- **Yan Matheus**
+<div align="center">
+  <table>
+    <tr>
+      <td align="center"><a href="https://github.com/arthurevg"><img src="https://github.com/arthurevg.png" width="100px" style="border-radius: 50%;" alt=""/><br /><strong>Arthur Evangelista</strong></a></td>
+      <td align="center"><a href="https://github.com/Davicamilo23"><img src="https://github.com/Davicamilo23.png" width="100px" style="border-radius: 50%;" alt=""/><br /><strong>Davi Camilo</strong></a></td>
+      <td align="center"><a href="https://github.com/Potatoyz908"><img src="https://github.com/Potatoyz908.png" width="100px" style="border-radius: 50%;" alt=""/><br /><strong>Euller Júlio</strong></a></td>
+    </tr>
+    <tr>
+      <td align="center"><a href="https://github.com/LucasAlves71"><img src="https://github.com/LucasAlves71.png" width="100px" style="border-radius: 50%;" alt=""/><br /><strong>Lucas Alves</strong></a></td>
+      <td align="center"><a href="https://github.com/TiagoBalieiro"><img src="https://github.com/TiagoBalieiro.png" width="100px" style="border-radius: 50%;" alt=""/><br /><strong>Tiago Antunes</strong></a></td>
+      <td align="center"><a href="https://github.com/Yanmatheus0812"><img src="https://github.com/Yanmatheus0812.png" width="100px" style="border-radius: 50%;" alt=""/><br /><strong>Yan Matheus</strong></a></td>
+    </tr>
+  </table>
+</div>
 
 ---
 
@@ -183,8 +192,8 @@ E4            | Análises e Visualizações  |
 
 ```bash
 # 1. Clonar o repositório
-git clone https://github.com/unb-bd2-2026-2-grupo-4/ProjetoIntegrado.git
-cd ProjetoIntegrado
+git clone https://github.com/unb-bd2-2026-2-grupo-4/METRA.git
+cd METRA
 
 # 2. Subir a documentação localmente (opcional)
 docker compose up -d docs
@@ -238,8 +247,8 @@ Os dois primeiros comandos aceitam `--compressao` (`snappy`, `zstd` ou `uncompre
 
 ---
 
-## Governança, Ética e Uso de IA
+## Governança, Transparência e Evolução do Projeto
 
-- **Uso de IA:** Este repositório cumpre integralmente a [Política de Uso de IA](https://unb-bd2.github.io/PlanoEnsino/uso-de-ia/) da disciplina. Todas as contribuições de assistentes são documentadas de forma contemporânea no arquivo [`AI-USAGE.md`](./AI-USAGE.md).
 - **ADRs:** Todas as decisões arquiteturais seguem o **Método de Decisão em 6 passos** e ficam versionadas em [`docs/adr/`](./docs/adr/).
+- **Uso de IA:** Este repositório cumpre integralmente a [Política de Uso de IA](https://unb-bd2.github.io/PlanoEnsino/uso-de-ia/) da disciplina. Todas as contribuições de assistentes são documentadas de forma contemporânea no arquivo [`docs/uso-de-ia.md`](./docs/uso-de-ia.md).
 - **Diário de Bordo:** O acompanhamento contínuo de aprendizados, medições e surpresas da Squad é registrado semanalmente em [`docs/diario/`](./docs/diario/).

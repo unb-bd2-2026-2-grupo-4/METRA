@@ -1,6 +1,10 @@
-# Política e Registro de Uso de IA
+# Política e Registro de Uso de IA no projeto
 
 O uso de assistentes e agentes de IA nesta disciplina é **esperado, não apenas tolerado**. O princípio norteador é a **transparência e o entendimento real do raciocínio**, conforme estabelecido na [Política de Uso de IA](https://unb-bd2.github.io/PlanoEnsino/uso-de-ia/) oficial de Banco de Dados 2 (FCTE-UnB).
+
+**Duas regras de forma:** Escreva **no momento do uso**, não na véspera da Entrega: registro reconstruído de memória sai impreciso, e imprecisão aqui é o que a política pune. E versione junto com o código: uma entrada por commit relevante é melhor que um resumo mensal.
+
+**Não precisa registrar** autocompletar de editor, correção ortográfica ou tradução. Registre o que produziu artefato ou mudou uma decisão.
 
 > *"Não há penalidade por usar. Há penalidade por não declarar e por não entender."*
 
@@ -14,9 +18,9 @@ O uso de assistentes e agentes de IA nesta disciplina é **esperado, não apenas
 
 ---
 
-## Registro de Entradas (AI-USAGE)
+## Registro de Entradas
 
-O arquivo [`AI-USAGE.md`](https://github.com/unb-bd2-2026-2-grupo-4/ProjetoIntegrado/blob/main/AI-USAGE.md) na raiz do repositório é o instrumento oficial de auditoria contínua da Squad. Abaixo constam os registros contemporâneos de todas as atividades:
+Abaixo constam os registros de todas as atividades:
 
 ### 15/09/2026 - Planejamento de Arquitetura, Estruturação da Documentação e Planilha Técnica
 - **Ferramenta:** Antigravity (Google DeepMind)
@@ -91,6 +95,33 @@ O arquivo [`AI-USAGE.md`](https://github.com/unb-bd2-2026-2-grupo-4/ProjetoInteg
 - **O que foi aproveitado:** Extração 1:1 das cinco tabelas do schema `oltp` via DuckDB em modo somente leitura, com `movimentacao` particionada por ano, conciliação de contagens e substituição atômica; materialização da tabela Delta com `deltalake` (delta-rs) lida por `delta_scan`; parâmetro `--compressao` com padrão provisório `snappy`; validação que compara a consulta da pergunta central entre PostgreSQL, Parquet e Delta; a escolha de Delta em vez de Iceberg por dispensar catálogo; página de documentação e instruções no README.
 - **Como foi verificado:** Pipeline E1 executado com a amostra de 49.178 registros em PostgreSQL 16 via Docker Compose; extração, materialização e validação executadas com DuckDB 1.5.6 e deltalake 1.6.6 em Python 3.14, com indicadores idênticos nas três fontes e iguais aos de `python3 -m src.analise`; conferência de tipos e de zeros à esquerda nos códigos; reexecução sem acúmulo de registros; senha incorreta com saída 1 e extração anterior preservada; materialização sem Parquet com saída 1; teste direto de que a extensão `delta` do DuckDB 1.5.6 não cria tabelas; documentação validada com `mkdocs build --strict`. Não foi testado com a base completa de 14,7 milhões de registros nem em Python 3.12; nenhuma comparação de compressão foi medida.
 - **Quem revisou:** Lucas Alves
+
+### 15/10/2026 - Comparação de compressão Parquet (E2, tarefa 2)
+
+- **Ferramenta:** Codex (OpenAI).
+- **Onde:** `src/extracao/comparar_compressao.py`.
+- **O que foi pedido:** Implementar somente o benchmark de compressão, ADR 0003, adoção do vencedor, diário e declaração de IA, com commits atômicos.
+- **O que foi aproveitado:** Benchmark de uncompressed, Snappy e Zstd, cópia única da fonte, particionamento por ano, aquecimento, sete repetições, varredura de todas as colunas, comparação exata dos dados e relatório JSON. Opção local de CSV tipado para reproduzir com a amostra versionada.
+- **Como foi verificado:** Execução com DuckDB 1.5.6 e Python 3.12 sobre as 49.178 linhas da amostra. Os três codecs preservaram schema e multiconjunto de linhas em todas as rodadas. PostgreSQL e Docker indisponíveis neste ambiente: o modo PostgreSQL não foi executado. Os campos de linhagem no modo amostral são reconstruídos e declarados; não se trata de uma exportação do banco populado.
+- **Quem revisou:** Euller Júlio.
+
+#### Continuação — ADR e evidências
+
+- **Onde:** `docs/adr/0003-compressao-parquet.md`, relatório JSON em `docs/adr/evidencias/` e navegação em `mkdocs.yml`.
+- **O que foi aproveitado:** ADR no template de seis passos, números reais da execução e critério de seleção definido no benchmark. Snappy venceu; a limitação do recorte amostral está explícita.
+- **Como foi verificado:** Tabela confrontada com as medianas e tamanhos do JSON; preservação das sete medições por codec e das condições de reprodução.
+
+#### Continuação — padrão de compressão
+
+- **Onde:** `src/extracao/exportar_parquet.py` e `docs/camada-parquet.md`.
+- **O que foi aproveitado:** Manutenção de `COMPRESSAO_PADRAO = "snappy"`, vencedor medido, com remoção da indicação de escolha provisória e referência à ADR 0003.
+- **Como foi verificado:** O padrão permaneceu Snappy e o benchmark validou seus arquivos. A escrita Delta e o acesso PostgreSQL não foram executados.
+
+#### Continuação — diário e validação final
+
+- **Onde:** `docs/diario/semana-07.md`, `mkdocs.yml` e este registro.
+- **O que foi aproveitado:** Registro do que foi medido, do resultado inesperado e da decisão, sem atribuir ao integrante uma revisão ainda não realizada.
+- **Como foi verificado:** Benchmark principal completo; casos locais adicionais com valores vazios, salário negativo, códigos com zeros e linhas de entrada repetidas; caminho com apóstrofo; rejeição de origem vazia/ausente, menos de três repetições e zero threads; compilação dos módulos Python, `git diff --check` e geração da documentação com `python -m mkdocs build --strict`. Os testes auxiliares usam dados controlados e não compõem os números da ADR.
 
 ### 17/10/2026 - Implementação de CDC por decodificação lógica do WAL (E2, tarefa 1)
 

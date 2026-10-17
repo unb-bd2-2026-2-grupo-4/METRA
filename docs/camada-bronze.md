@@ -22,7 +22,7 @@ Tudo o que vem depois (modelo transacional 3FN da E1, Parquet da E2, Star Schema
 Para cumprir rigorosamente o critério de **Carga Reprodutível** da Entrega E1 sem exigir downloads manuais externos:
 
 1. **Execução com Volume Completo:** Se os arquivos pesados de microdados históricos (`caged_2023_2024.csv` e `caged_2025_2026.csv`, totalizando ~828 MB) estiverem presentes na pasta `data/`, o pipeline realiza a carga massiva dos mais de 14,7 milhões de registros.
-2. **Execução Automatizada de Terceiros (Fallback Reproduzível):** Caso um avaliador clone o repositório em um ambiente limpo (onde os arquivos de 828 MB são ignorados pelo git), o script `carga_bronze.py` detecta automaticamente a ausência dos arquivos pesados e realiza a ingestão da **amostra representativa versionada** [`data/caged_centro_oeste_amostra.csv`](file:///c:/UnB/BD2/ProjetoIntegrado/data/caged_centro_oeste_amostra.csv) (49.178 linhas, 2,8 MB, cobrindo todos os anos de 2023 a 2026 e as 4 UFs do Centro-Oeste). 
+2. **Execução Automatizada de Terceiros (Fallback Reproduzível):** Caso um avaliador clone o repositório em um ambiente limpo (onde os arquivos de 828 MB são ignorados pelo git), o script `carga_bronze.py` detecta automaticamente a ausência dos arquivos pesados e realiza a ingestão da **amostra representativa versionada** [`data/caged_centro_oeste_amostra.csv`](file:///c:/UnB/BD2/METRA/data/caged_centro_oeste_amostra.csv) (49.178 linhas, 2,8 MB, cobrindo todos os anos de 2023 a 2026 e as 4 UFs do Centro-Oeste). 
 
 Dessa forma, qualquer terceiro consegue reproduzir a carga completa com um único comando Docker, sem intervenção manual.
 

@@ -122,6 +122,6 @@ Como as junções usam as PKs das referências e as FKs obrigatórias da movimen
 
 As definições que sustentam esta página estão em:
 
-- [Migração das referências Bronze](https://github.com/unb-bd2-2026-2-grupo-4/ProjetoIntegrado/blob/main/src/db/migracoes/0002_camada_bronze_referencias.sql)
-- [Migração do modelo OLTP e suas PKs/FKs](https://github.com/unb-bd2-2026-2-grupo-4/ProjetoIntegrado/blob/main/src/db/migracoes/0003_modelo_transacional_oltp.sql)
-- [Transformação e carga Bronze → OLTP](https://github.com/unb-bd2-2026-2-grupo-4/ProjetoIntegrado/blob/main/src/ingestao/carga_oltp.py)
+- [Migração das referências Bronze](https://github.com/unb-bd2-2026-2-grupo-4/METRA/blob/main/src/db/migracoes/0002_camada_bronze_referencias.sql)
+- [Migração do modelo OLTP e suas PKs/FKs](https://github.com/unb-bd2-2026-2-grupo-4/METRA/blob/main/src/db/migracoes/0003_modelo_transacional_oltp.sql)
+- [Transformação e carga Bronze → OLTP](https://github.com/unb-bd2-2026-2-grupo-4/METRA/blob/main/src/ingestao/carga_oltp.py)
