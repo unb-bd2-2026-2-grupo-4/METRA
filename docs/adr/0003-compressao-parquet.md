@@ -1,7 +1,7 @@
 # 0003 - Manter Snappy na extração Parquet após comparação de compressão
 
 - **Status:** aceito para o recorte amostral; revisão com a carga completa prevista abaixo
-- **Data:** 15-10-2026
+- **Data:** 15/10/2026
 - **Responsável pela tarefa:** Euller Júlio 
 
 ## 1. Contexto
