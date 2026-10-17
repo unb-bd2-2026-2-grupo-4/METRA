@@ -1,8 +1,8 @@
 # 0003 - Manter Snappy na extração Parquet após comparação de compressão
 
 - **Status:** aceito para o recorte amostral; revisão com a carga completa prevista abaixo
-- **Data:** 2026-10-15
-- **Responsável pela tarefa:** Euller Júlio (implementação assistida por Codex; revisão humana pendente)
+- **Data:** 15-10-2026
+- **Responsável pela tarefa:** Euller Júlio 
 
 ## 1. Contexto
 
@@ -12,7 +12,7 @@ A amostra versionada contém 49.178 movimentações do Centro-Oeste: 14.834 em 2
 
 ## 2. Alternativas consideradas
 
-### A. Snappy — opção nula
+### A. Snappy
 
 Manter o padrão existente, com compressão e descompressão rápidas. Não exige dependências novas nem mudança no leitor. Foi escolhido pelo critério medido abaixo.
 
@@ -20,7 +20,7 @@ Manter o padrão existente, com compressão e descompressão rápidas. Não exig
 
 Busca maior redução de armazenamento, podendo consumir mais processamento. É suportado pelo mesmo escritor e leitor. Gerou o menor arquivo, mas excedeu a tolerância de tempo neste experimento.
 
-### C. Uncompressed
+### C. Uncompressed — opção nula
 
 Dispensa codec de compressão, mas mantém a codificação colunar do Parquet. É a referência de tamanho e de custo sem compressão; não equivale a CSV bruto. Foi descartado por ocupar mais espaço sem vantagem suficiente de tempo.
 
