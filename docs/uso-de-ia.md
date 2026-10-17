@@ -131,3 +131,10 @@ Abaixo constam os registros de todas as atividades:
 - **O que foi aproveitado:** Configuração do PostgreSQL 16 com `wal_level=logical`, `max_replication_slots` e `max_wal_senders`; criação do slot lógico `metra_cdc_slot`; utilização do `pg_recvlogical` para consumir alterações do WAL; armazenamento dos eventos em `data/cdc/eventos.log`; criação da tabela auxiliar `oltp.cdc_probe` para testar operações sem modificar os dados reais do Novo CAGED; scripts automatizados para preparação, consumo e teste de `INSERT` e `UPDATE`.
 - **Como foi verificado:** Execução dos scripts de CDC no ambiente Docker Compose e conferência do arquivo `data/cdc/eventos.log`. Foi comprovada a captura de um `INSERT` na tabela `oltp.cdc_probe`, registrado na transação 769, e de um `UPDATE` no mesmo registro, registrado na transação 770. Ambos apresentaram os respectivos comandos `BEGIN` e `COMMIT`, demonstrando que as alterações confirmadas no PostgreSQL foram capturadas e propagadas para o arquivo. Verificou-se que a regra `*.log` do `.gitignore` impede o versionamento de novos arquivos de log. Os testes comprovaram a captura e propagação de eventos, mas não validaram o reprocessamento com deduplicação nem a integração com a camada analítica.
 - **Quem revisou:** Davi Camilo
+
+#### Continuação — Atualização da documentação no README
+
+- **Onde:** `README.md`.
+- **O que foi pedido:** Auxílio na atualização e padronização do README do projeto, incluindo a descrição da implementação de CDC e reprocessamento idempotente da E2.
+- **O que foi aproveitado:** Inclusão de instruções para executar os scripts de CDC e replay, com explicações sobre a captura de alterações via `pg_recvlogical`, armazenamento dos eventos e deduplicação com SQLite.
+- **Como foi verificado:** Os textos e comandos foram revisados quanto à clareza, coerência técnica e padronização com as demais seções do README.

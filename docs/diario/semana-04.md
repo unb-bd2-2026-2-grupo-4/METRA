@@ -1,7 +1,7 @@
 # Diário de Bordo - Semana 04
 
 - **Data:** Semana 4 (Semestre 2026/2)
-- **Autor(es):** Lucas Alves (com apoio de IA, registrado no `AI-USAGE.md`)
+- **Autor(es):** Lucas Alves (com apoio de IA, registrado no `uso-de-ia.md`)
 
 ---
 

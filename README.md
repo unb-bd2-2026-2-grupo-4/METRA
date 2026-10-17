@@ -2,7 +2,7 @@
 
 > **Plataforma de Dados do Mercado de Trabalho Formal (Novo CAGED)**  
 > **Projeto Integrado: Banco de Dados 2 (FCTE / Universidade de Brasília)**  
-> **Oferta:** 2026/2 | **Squad G4**
+> **Oferta:** 2026/2 | **Squad G4**  
 > **Documentação completa:** https://unb-bd2-2026-2-grupo-4.github.io/METRA/
 
 ---
@@ -18,14 +18,12 @@
 <div align="center">
   <table>
     <tr>
-      <td align="center"><a href="https://github.com/arthurevg"><img src="https://github.com/arthurevg.png" width="100px" style="border-radius: 50%;" alt=""/><br /><strong>Arthur Evangelista</strong></a></td>
-      <td align="center"><a href="https://github.com/Davicamilo23"><img src="https://github.com/Davicamilo23.png" width="100px" style="border-radius: 50%;" alt=""/><br /><strong>Davi Camilo</strong></a></td>
-      <td align="center"><a href="https://github.com/Potatoyz908"><img src="https://github.com/Potatoyz908.png" width="100px" style="border-radius: 50%;" alt=""/><br /><strong>Euller Júlio</strong></a></td>
-    </tr>
-    <tr>
-      <td align="center"><a href="https://github.com/LucasAlves71"><img src="https://github.com/LucasAlves71.png" width="100px" style="border-radius: 50%;" alt=""/><br /><strong>Lucas Alves</strong></a></td>
-      <td align="center"><a href="https://github.com/TiagoBalieiro"><img src="https://github.com/TiagoBalieiro.png" width="100px" style="border-radius: 50%;" alt=""/><br /><strong>Tiago Antunes</strong></a></td>
-      <td align="center"><a href="https://github.com/Yanmatheus0812"><img src="https://github.com/Yanmatheus0812.png" width="100px" style="border-radius: 50%;" alt=""/><br /><strong>Yan Matheus</strong></a></td>
+      <td align="center"><a href="https://github.com/arthurevg"><img src="https://github.com/arthurevg.png" width="150px" alt=""/><br />Arthur Evangelista</a></td>
+      <td align="center"><a href="https://github.com/Davicamilo23"><img src="https://github.com/Davicamilo23.png" width="150px" alt=""/><br />Davi Camilo</a></td>
+      <td align="center"><a href="https://github.com/Potatoyz908"><img src="https://github.com/Potatoyz908.png" width="150px" alt=""/><br />Euller Júlio</a></td>
+      <td align="center"><a href="https://github.com/LucasAlves71"><img src="https://github.com/LucasAlves71.png" width="150px" alt=""/><br />Lucas Alves</a></td>
+      <td align="center"><a href="https://github.com/TiagoBalieiro"><img src="https://github.com/TiagoBalieiro.png" width="150px" alt=""/><br />Tiago Antunes</a></td>
+      <td align="center"><a href="https://github.com/Yanmatheus0812"><img src="https://github.com/Yanmatheus0812.png" width="150px" alt=""/><br />Yan Matheus</a></td>
     </tr>
   </table>
 </div>
@@ -231,7 +229,30 @@ O comando lê PostgreSQL em modo somente leitura e substitui, em uma transação
 
 As tabelas no terminal comparam capitais e interior por ano e para o período consolidado de 2023–2026. Consideram municípios identificados de DF, GO, MT e MS, usando `is_capital` da origem. O saldo é a soma de `saldo_movimentacao`; a definição operacional de admissão é `saldo_movimentacao = 1`. A média salarial nominal considera apenas salários positivos dessas admissões, excluindo nulos e zeros, inclusive valores ausentes ou negativos convertidos em zero pela E1. A média é calculada sobre eventos, e as diferenças são **capital − interior**, arredondadas somente na apresentação. As quantidades de salários considerados e as competências disponíveis acompanham os resultados; grupos ausentes ou sem salários elegíveis produzem valores nulos.
 
-### Extração para Parquet e tabela Delta (E2)
+### Captura de Mudanças (CDC) e Reprocessamento Idempotente (E2)
+
+Com o PostgreSQL em execução e o schema `oltp` criado, execute na raiz do projeto:
+
+```bash
+bash src/cdc/01_preparar.sh       # Cria a tabela de teste e o slot de replicação lógica
+bash src/cdc/02_consumir.sh       # Captura alterações do WAL e grava em data/cdc/eventos.log
+```
+
+Em outro terminal, execute o teste de captura e o reprocessamento:
+
+```bash
+bash src/cdc/03_testar.sh         # Executa INSERT e UPDATE para validar a captura
+python3 src/cdc/04_reprocessar.py # Processa os eventos com deduplicação
+python3 src/cdc/04_reprocessar.py # Reexecuta e comprova que não há duplicação no destino
+```
+
+O CDC utiliza a **decodificação lógica do WAL do PostgreSQL**, por meio do `pg_recvlogical` e do plugin `test_decoding`, sem depender de Kafka ou Debezium. As alterações confirmadas no banco são capturadas e registradas em `data/cdc/eventos.log`. O teste utiliza a tabela auxiliar `oltp.cdc_probe`, preservando os dados reais do Novo CAGED.
+
+O reprocessamento é realizado por um consumidor Python que identifica cada evento por um hash SHA-256 e utiliza uma chave primária no SQLite (`data/cdc/replay.sqlite3`) para impedir inserções duplicadas. Assim, **executar novamente o consumidor não duplica os eventos já processados no destino**, embora o arquivo de log bruto possa conter eventos repetidos. A solução demonstra idempotência no consumidor, sem garantir *exactly-once* de ponta a ponta.
+
+Os arquivos gerados em `data/cdc/` não são versionados. Detalhes em [`docs/cdc.md`](./docs/cdc.md).
+
+### Extração para Parquet e Tabela Delta (E2)
 
 No mesmo ambiente Python, com as variáveis `PG*` exportadas:
 

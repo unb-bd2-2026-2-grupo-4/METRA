@@ -6,7 +6,7 @@ A extração é 1:1: nenhuma tabela é filtrada, unida ou remodelada. A modelage
 
 ---
 
-## O que é Gerado
+## O que é Gerado?
 
 Tudo é gravado em `data/lake/`, que não é versionado (o `.gitignore` exclui `data/*` e `*.parquet`).
 
@@ -36,7 +36,7 @@ Com a amostra versionada, a extração produz 49.178 movimentações, 5.572 muni
 
 ---
 
-## Por que Delta e não Iceberg
+## Por que Delta e não Iceberg?
 
 A tarefa pede pelo menos uma tabela Delta **ou** Iceberg. A Squad materializa em **Delta Lake**, gravada com a biblioteca `deltalake` (delta-rs):
 

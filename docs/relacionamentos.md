@@ -2,6 +2,8 @@
 
 O **Novo CAGED é a base central**: cada movimentação de admissão ou desligamento informa códigos que permitem consultar três referências. O **IBGE Localidades** identifica o município, a **CBO 2002** identifica a ocupação do trabalhador e o **IBGE CNAE** identifica a atividade econômica. CBO e CNAE descrevem aspectos diferentes: a profissão e a atividade econômica, respectivamente.
 
+---
+
 ## Quais campos ligam as fontes?
 
 Os nomes abaixo são os usados nas tabelas do projeto. O “código do município” é `id_municipio`; o “código CBO” aparece como `cbo_2002` no CAGED e `codigo` na referência CBO.
@@ -15,6 +17,8 @@ Os nomes abaixo são os usados nas tabelas do projeto. O “código do municípi
 Esses pares representam **correspondências de negócio**, não chaves estrangeiras entre as tabelas Bronze. A Bronze preserva os registros de cada fonte, identificados pela chave composta `(id_ingestao, numero_linha)`. O campo `id_ingestao` identifica o lote de origem de cada fonte: ele **não serve para ligar CAGED a IBGE ou CBO**.
 
 A seção econômica também está disponível como `caged_movimentacao.cnae_2_secao` e `ibge_cnae_subclasse.secao_id`. Como uma seção reúne várias subclasses, relacionar movimentações diretamente com todas as subclasses apenas pela seção multiplicaria as linhas. No OLTP, a seção é obtida pela subclasse.
+
+---
 
 ## Como essas ligações ficam no OLTP?
 
@@ -69,6 +73,8 @@ erDiagram
 
 O diagrama apresenta as relações de negócio do schema `oltp` e um subconjunto dos atributos. A linhagem dos arquivos é apresentada na [Camada Bronze](camada-bronze.md#modelo-entidade-relacionamento-da-bronze).
 
+---
+
 ## Padronização dos códigos e limites da integração
 
 As transformações abaixo refletem a implementação de `src/ingestao/carga_oltp.py`:
@@ -86,6 +92,8 @@ Os códigos devem ser tratados como identificadores textuais. O pipeline não re
 Códigos CBO presentes no CAGED e ausentes da referência podem ser cadastrados com título genérico. Subclasses CNAE ausentes podem ser cadastradas como registros administrativos, usando a seção do CAGED ou `Z`; a seção ainda precisa existir para satisfazer a FK. Portanto, **ter correspondência no OLTP não garante que a descrição tenha sido encontrada na fonte oficial**.
 
 Junções diretas na Bronze exigem cuidado: diferentes lotes podem repetir um código, e a CBO pode ter títulos e sinônimos para o mesmo código. Isso pode multiplicar movimentações e distorcer contagens. Para consultas integradas, use as tabelas de domínio do OLTP, cujas PKs garantem um registro por código.
+
+---
 
 ## Exemplo de consulta entre as bases
 
@@ -115,6 +123,8 @@ SELECT m.id_movimentacao,
 ```
 
 Como as junções usam as PKs das referências e as FKs obrigatórias da movimentação, cada movimentação produz uma linha antes do `LIMIT`. Município permite os recortes geográficos; CNAE permite comparar setores; CBO permite comparar ocupações.
+
+---
 
 ## Rastreabilidade e implementação
 

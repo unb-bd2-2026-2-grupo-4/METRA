@@ -1,6 +1,6 @@
 # 0004 - Adoção de pg_recvlogical com test_decoding para CDC por decodificação lógica
 
-- **Status:** proposto
+- **Status:** Aceito
 - **Data:** 17/10/2026
 - **Decisores:** Tiago Antunes e Davi Camilo
 
@@ -15,6 +15,8 @@ O PostgreSQL já gera WAL (*Write-Ahead Log*) para recuperação de transações
 Comparamos três caminhos: Debezium com pgoutput, consumidor próprio com wal2json e `pg_recvlogical` com `test_decoding`. Debezium é um conector de CDC; pg_recvlogical é um cliente de recepção; pgoutput, wal2json e test_decoding são plugins de saída da decodificação lógica.
 
 A escolha deve preservar a simplicidade operacional da ADR 0002. A proposta prioriza captura em arquivo para o contexto acadêmico, mantendo interpretação e aplicação das mudanças como responsabilidades da integração.
+
+---
 
 ## 2. Alternativas consideradas
 
@@ -58,6 +60,8 @@ Utilizar `pg_recvlogical` para receber o fluxo de um slot lógico criado com `te
 | Código próprio de captura | Menor; integração ao destino ainda necessária | Maior | Recepção pronta; interpretação e aplicação próprias |
 | Custo operacional | Runtime e estado do Debezium | Plugin e processo consumidor | Processo pg_recvlogical, arquivos e processamento posterior |
 
+---
+
 ## 3. Medição e Prototipação
 
 ### Base de dados e método de estimativa
@@ -87,6 +91,8 @@ Calculamos `tempo (s) = quantidade de alterações / vazão`. Consideramos backl
 
 Nesse cenário, a captura dos 14,7 milhões de eventos levou aproximadamente **49 minutos em A, 30,6 minutos em B e 24,5 minutos em C**. Esses tempos representam replay de alterações novas; o conteúdo anterior à criação do slot continua exigindo carga inicial.
 
+---
+
 ## 4. Decisão
 
 **Propomos adotar a alternativa C: pg_recvlogical com test_decoding para capturar mudanças do PostgreSQL por decodificação lógica e persistir o fluxo em arquivo.**
@@ -96,6 +102,8 @@ A justificativa central é usar o cliente de recepção do PostgreSQL para reduz
 A implementação deverá definir snapshot inicial consistente com o início do fluxo, persistência e rotação dos arquivos, processamento por transações completas e controle de progresso no destino. A confirmação enviada por pg_recvlogical não comprova que o destino analítico aplicou os eventos: arquivos confirmados precisam ser preservados até o processamento seguro. A captura deverá usar arquivo com sincronização em disco, sem desabilitar fsync; saída para outro processo exige avaliar separadamente a durabilidade.
 
 Esta proposta detalha a captura incremental prevista para a E2 na ADR 0002. Seu custo operacional deverá ser validado para preservar a orientação de simplificação daquela decisão.
+
+---
 
 ## 5. Consequências e Tradeoffs
 
@@ -124,6 +132,8 @@ As responsabilidades de retenção e repetição de eventos são explicadas na [
 - Alterações de esquema precisam de um procedimento próprio; capturar DML não equivale a replicar automaticamente todas as mudanças de DDL no destino.
 
 A escolha é reversível, mas remover slots ou perder o estado de consumo pode exigir reconstruir o destino a partir de um novo snapshot.
+
+---
 
 ## 6. Gatilho de Revisão
 

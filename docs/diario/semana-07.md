@@ -1,8 +1,7 @@
 # Diário de Bordo - Semana 07
 
-- **Data do registro:** 15/10/2026
-- **Responsável pela tarefa:** Euller Júlio
-- **Escopo deste registro:** comparação de compressão da E2, com implementação assistida por Codex; revisão humana pendente.
+- **Data:** Semana 7 (Semestre 2026/2)
+- **Autor(es):** Euller Júlio (com apoio de IA, registrado no `uso-de-ia.md`)
 
 ---
 

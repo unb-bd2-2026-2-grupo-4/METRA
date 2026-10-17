@@ -1,14 +1,18 @@
 # 0003 - Manter Snappy na extração Parquet após comparação de compressão
 
-- **Status:** aceito para o recorte amostral; revisão com a carga completa prevista abaixo
+- **Status:** Aceito para o recorte amostral; revisão com a carga completa prevista abaixo
 - **Data:** 15/10/2026
 - **Responsável pela tarefa:** Euller Júlio 
+
+---
 
 ## 1. Contexto
 
 A E2 extrai `oltp.movimentacao` para Parquet particionado por `ano`. O código usava Snappy provisoriamente. Precisamos escolher com evidência entre espaço ocupado, tempo de escrita em lote e leitura analítica, mantendo o formato aberto e os tipos da origem. Esta ADR trata somente de compressão; complementa, mas não substitui, a decisão sobre mecanismo de ingestão exigida pela [E2](https://unb-bd2.github.io/PlanoEnsino/projeto/e2/).
 
 A amostra versionada contém 49.178 movimentações do Centro-Oeste: 14.834 em 2023, 16.160 em 2024, 16.735 em 2025 e 1.449 em 2026. Não representa todo o volume de produção. Não foi estabelecido SLA pelo grupo; a tolerância de desempenho abaixo é um critério operacional deste experimento, sujeito a revisão.
+
+---
 
 ## 2. Alternativas consideradas
 
@@ -23,6 +27,8 @@ Busca maior redução de armazenamento, podendo consumir mais processamento. É 
 ### C. Uncompressed — opção nula
 
 Dispensa codec de compressão, mas mantém a codificação colunar do Parquet. É a referência de tamanho e de custo sem compressão; não equivale a CSV bruto. Foi descartado por ocupar mais espaço sem vantagem suficiente de tempo.
+
+---
 
 ## 3. Medição e Prototipação
 
@@ -60,9 +66,13 @@ python3 -m src.extracao.comparar_compressao --repeticoes 7 --threads 1
 
 Esse segundo modo anexa PostgreSQL em `READ_ONLY` e copia `movimentacao` em uma transação; não foi executado neste ambiente. Origens vazias são rejeitadas.
 
+---
+
 ## 4. Decisão
 
 **Manter Snappy como `COMPRESSAO_PADRAO`, agora fundamentado no recorte medido.** Reduz o tamanho em 43,0% frente a uncompressed. Zstd economiza mais 42,1% frente a Snappy, mas sua soma de tempos é 55,3% maior: 117,499 ms contra o limite de 94,554 ms. Snappy é o menor arquivo entre os candidatos que atendem à tolerância.
+
+---
 
 ## 5. Consequências e Tradeoffs
 
@@ -81,6 +91,8 @@ Esse segundo modo anexa PostgreSQL em `READ_ONLY` e copia `movimentacao` em uma 
 ### O que se torna irreversível ou restringe o sistema futuro
 
 - A escolha é reversível com `--compressao` e reexportação. Os arquivos existentes mantêm o codec com que foram gravados; mudar o padrão não os converte automaticamente.
+
+---
 
 ## 6. Gatilho de Revisão
 
