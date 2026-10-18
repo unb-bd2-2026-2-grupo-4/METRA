@@ -145,3 +145,13 @@ Abaixo constam os registros de todas as atividades:
 - **O que foi pedido:** Auxílio na elaboração e organização da documentação técnica da implementação de CDC e reprocessamento idempotente, seguindo a ideia adotado nas documentações da Camada Bronze e da extração para Parquet e Delta.
 - **O que foi aproveitado:** Estruturação da documentação com visão geral, arquitetura e diagrama Mermaid, descrição dos scripts, regras de captura e deduplicação, instruções de execução, testes de validação e evidências de funcionamento. Foram detalhados o uso de `pg_recvlogical` com `test_decoding`, a propagação dos eventos para `eventos.log` e o reprocessamento com deduplicação em SQLite, incluindo as limitações da solução.
 - **Como foi verificado:** O conteúdo foi revisado quanto à coerência com a implementação existente e à padronização com as demais páginas do projeto. Foram consideradas as evidências reais de captura de `INSERT` e `UPDATE`, além dos resultados dos testes automatizados de replay.
+
+
+### 17/10/2026 - Apoio à ADR 0004 e esclarecimentos sobre PostgreSQL e CDC
+
+- **Ferramenta:** ChatGPT (OpenAI).
+- **Onde:** `docs/adr/0004-cdc-decodificacao-logica.md`; orientações de terminal fornecidas no chat.
+- **O que foi pedido:** Auxílio para resolver o conflito da porta 5432 no Docker Compose, conectar ao PostgreSQL no container e esclarecer a presença de WAL no projeto; elaboração da estrutura inicial da ADR 0004; e revisão da tabela.
+- **O que foi aproveitado:** Instruções para usar `POSTGRES_PORT=5433`, acessar o banco com `psql` e verificar a biblioteca `test_decoding.so`, o utilitário `pg_recvlogical`, `wal_level` e o carregamento do plugin com um slot temporário. Estruturação da ADR com contexto, alternativas, decisão, consequências e gatilhos de revisão, distinguindo conectores, clientes e plugins. Consulta às documentações oficiais do PostgreSQL, Debezium e wal2json.
+- **Como foi verificado:** Leitura da configuração do Compose, das ADRs e das evidências da ADR 0003;. Não foram executados conexão ao banco, teste do plugin ou benchmark de CDC. As alterações de documentação solicitadas para a ADR ficaram restritas a ela.
+- **Quem revisou:** Tiago Antunes.
