@@ -5,6 +5,7 @@ Uso: python3 src/cdc/04_reprocessar.py [--log data/cdc/eventos.log] [--db data/c
 Somente transações COMMIT são aplicadas; fragmentos incompletos são ignorados.
 """
 import argparse
+from contextlib import closing
 import hashlib
 import json
 import re
@@ -64,7 +65,7 @@ def inicializar(conexao):
 def processar(log: Path, banco: Path):
     banco.parent.mkdir(parents=True, exist_ok=True)
     novos = duplicados = transacoes_confirmadas = 0
-    with sqlite3.connect(banco) as conexao:
+    with closing(sqlite3.connect(banco)) as conexao:
         inicializar(conexao)
         for eventos in transacoes(log):
             # SQLite confirma todos os eventos da transação juntos.
