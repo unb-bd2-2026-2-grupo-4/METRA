@@ -138,3 +138,10 @@ Abaixo constam os registros de todas as atividades:
 - **O que foi pedido:** Auxílio na atualização e padronização do README do projeto, incluindo a descrição da implementação de CDC e reprocessamento idempotente da E2.
 - **O que foi aproveitado:** Inclusão de instruções para executar os scripts de CDC e replay, com explicações sobre a captura de alterações via `pg_recvlogical`, armazenamento dos eventos e deduplicação com SQLite.
 - **Como foi verificado:** Os textos e comandos foram revisados quanto à clareza, coerência técnica e padronização com as demais seções do README.
+
+#### Continuação — Documentação do CDC e Reprocessamento Idempotente (E2, tarefa 1)
+
+- **Onde:** `docs/cdc.md`.
+- **O que foi pedido:** Auxílio na elaboração e organização da documentação técnica da implementação de CDC e reprocessamento idempotente, seguindo a ideia adotado nas documentações da Camada Bronze e da extração para Parquet e Delta.
+- **O que foi aproveitado:** Estruturação da documentação com visão geral, arquitetura e diagrama Mermaid, descrição dos scripts, regras de captura e deduplicação, instruções de execução, testes de validação e evidências de funcionamento. Foram detalhados o uso de `pg_recvlogical` com `test_decoding`, a propagação dos eventos para `eventos.log` e o reprocessamento com deduplicação em SQLite, incluindo as limitações da solução.
+- **Como foi verificado:** O conteúdo foi revisado quanto à coerência com a implementação existente e à padronização com as demais páginas do projeto. Foram consideradas as evidências reais de captura de `INSERT` e `UPDATE`, além dos resultados dos testes automatizados de replay.
