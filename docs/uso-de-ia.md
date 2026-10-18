@@ -1,6 +1,10 @@
-# Política e Registro de Uso de IA
+# Política e Registro de Uso de IA no projeto
 
 O uso de assistentes e agentes de IA nesta disciplina é **esperado, não apenas tolerado**. O princípio norteador é a **transparência e o entendimento real do raciocínio**, conforme estabelecido na [Política de Uso de IA](https://unb-bd2.github.io/PlanoEnsino/uso-de-ia/) oficial de Banco de Dados 2 (FCTE-UnB).
+
+**Duas regras de forma:** Escreva **no momento do uso**, não na véspera da Entrega: registro reconstruído de memória sai impreciso, e imprecisão aqui é o que a política pune. E versione junto com o código: uma entrada por commit relevante é melhor que um resumo mensal.
+
+**Não precisa registrar** autocompletar de editor, correção ortográfica ou tradução. Registre o que produziu artefato ou mudou uma decisão.
 
 > *"Não há penalidade por usar. Há penalidade por não declarar e por não entender."*
 
@@ -14,9 +18,9 @@ O uso de assistentes e agentes de IA nesta disciplina é **esperado, não apenas
 
 ---
 
-## Registro de Entradas (AI-USAGE)
+## Registro de Entradas
 
-O arquivo [`AI-USAGE.md`](https://github.com/unb-bd2-2026-2-grupo-4/ProjetoIntegrado/blob/main/AI-USAGE.md) na raiz do repositório é o instrumento oficial de auditoria contínua da Squad. Abaixo constam os registros contemporâneos de todas as atividades:
+Abaixo constam os registros de todas as atividades:
 
 ### 15/09/2026 - Planejamento de Arquitetura, Estruturação da Documentação e Planilha Técnica
 - **Ferramenta:** Antigravity (Google DeepMind)
@@ -91,3 +95,72 @@ O arquivo [`AI-USAGE.md`](https://github.com/unb-bd2-2026-2-grupo-4/ProjetoInteg
 - **O que foi aproveitado:** Extração 1:1 das cinco tabelas do schema `oltp` via DuckDB em modo somente leitura, com `movimentacao` particionada por ano, conciliação de contagens e substituição atômica; materialização da tabela Delta com `deltalake` (delta-rs) lida por `delta_scan`; parâmetro `--compressao` com padrão provisório `snappy`; validação que compara a consulta da pergunta central entre PostgreSQL, Parquet e Delta; a escolha de Delta em vez de Iceberg por dispensar catálogo; página de documentação e instruções no README.
 - **Como foi verificado:** Pipeline E1 executado com a amostra de 49.178 registros em PostgreSQL 16 via Docker Compose; extração, materialização e validação executadas com DuckDB 1.5.6 e deltalake 1.6.6 em Python 3.14, com indicadores idênticos nas três fontes e iguais aos de `python3 -m src.analise`; conferência de tipos e de zeros à esquerda nos códigos; reexecução sem acúmulo de registros; senha incorreta com saída 1 e extração anterior preservada; materialização sem Parquet com saída 1; teste direto de que a extensão `delta` do DuckDB 1.5.6 não cria tabelas; documentação validada com `mkdocs build --strict`. Não foi testado com a base completa de 14,7 milhões de registros nem em Python 3.12; nenhuma comparação de compressão foi medida.
 - **Quem revisou:** Lucas Alves
+
+### 15/10/2026 - Comparação de compressão Parquet (E2, tarefa 2)
+
+- **Ferramenta:** Codex (OpenAI).
+- **Onde:** `src/extracao/comparar_compressao.py`.
+- **O que foi pedido:** Implementar somente o benchmark de compressão, ADR 0003, adoção do vencedor, diário e declaração de IA, com commits atômicos.
+- **O que foi aproveitado:** Benchmark de uncompressed, Snappy e Zstd, cópia única da fonte, particionamento por ano, aquecimento, sete repetições, varredura de todas as colunas, comparação exata dos dados e relatório JSON. Opção local de CSV tipado para reproduzir com a amostra versionada.
+- **Como foi verificado:** Execução com DuckDB 1.5.6 e Python 3.12 sobre as 49.178 linhas da amostra. Os três codecs preservaram schema e multiconjunto de linhas em todas as rodadas. PostgreSQL e Docker indisponíveis neste ambiente: o modo PostgreSQL não foi executado. Os campos de linhagem no modo amostral são reconstruídos e declarados; não se trata de uma exportação do banco populado.
+- **Quem revisou:** Euller Júlio.
+
+#### Continuação — ADR e evidências
+
+- **Onde:** `docs/adr/0003-compressao-parquet.md`, relatório JSON em `docs/adr/evidencias/` e navegação em `mkdocs.yml`.
+- **O que foi aproveitado:** ADR no template de seis passos, números reais da execução e critério de seleção definido no benchmark. Snappy venceu; a limitação do recorte amostral está explícita.
+- **Como foi verificado:** Tabela confrontada com as medianas e tamanhos do JSON; preservação das sete medições por codec e das condições de reprodução.
+
+#### Continuação — padrão de compressão
+
+- **Onde:** `src/extracao/exportar_parquet.py` e `docs/camada-parquet.md`.
+- **O que foi aproveitado:** Manutenção de `COMPRESSAO_PADRAO = "snappy"`, vencedor medido, com remoção da indicação de escolha provisória e referência à ADR 0003.
+- **Como foi verificado:** O padrão permaneceu Snappy e o benchmark validou seus arquivos. A escrita Delta e o acesso PostgreSQL não foram executados.
+
+#### Continuação - diário e validação final
+
+- **Onde:** `docs/diario/semana-08.md`, `mkdocs.yml` e este registro.
+- **O que foi aproveitado:** Registro do que foi medido, do resultado inesperado e da decisão, sem atribuir ao integrante uma revisão ainda não realizada.
+- **Como foi verificado:** Benchmark principal completo; casos locais adicionais com valores vazios, salário negativo, códigos com zeros e linhas de entrada repetidas; caminho com apóstrofo; rejeição de origem vazia/ausente, menos de três repetições e zero threads; compilação dos módulos Python, `git diff --check` e geração da documentação com `python -m mkdocs build --strict`. Os testes auxiliares usam dados controlados e não compõem os números da ADR.
+
+### 17/10/2026 - Implementação de CDC por decodificação lógica do WAL (E2, tarefa 1)
+
+- **Ferramenta:** ChatGPT (OpenAI).
+- **Onde:** `docker-compose.yml`, `src/cdc/01_preparar.sh`, `src/cdc/02_consumir.sh`, `src/cdc/03_testar.sh`.
+- **O que foi pedido:** Analisar como implementar o CDC (Change Data Capture) no PostgreSQL existente, seguindo a arquitetura do projeto e os requisitos da E2. Foram avaliadas alternativas com Debezium e Kafka, optando-se pela decodificação lógica nativa do PostgreSQL utilizando `pg_recvlogical` e o plugin `test_decoding`, sem necessidade de serviços adicionais, considerando o nível de complexidade do projeto. Também foi solicitada a criação de scripts para configurar o CDC, capturar alterações e comprovar a propagação dos eventos para um arquivo.
+- **O que foi aproveitado:** Configuração do PostgreSQL 16 com `wal_level=logical`, `max_replication_slots` e `max_wal_senders`; criação do slot lógico `metra_cdc_slot`; utilização do `pg_recvlogical` para consumir alterações do WAL; armazenamento dos eventos em `data/cdc/eventos.log`; criação da tabela auxiliar `oltp.cdc_probe` para testar operações sem modificar os dados reais do Novo CAGED; scripts automatizados para preparação, consumo e teste de `INSERT` e `UPDATE`.
+- **Como foi verificado:** Execução dos scripts de CDC no ambiente Docker Compose e conferência do arquivo `data/cdc/eventos.log`. Foi comprovada a captura de um `INSERT` na tabela `oltp.cdc_probe`, registrado na transação 769, e de um `UPDATE` no mesmo registro, registrado na transação 770. Ambos apresentaram os respectivos comandos `BEGIN` e `COMMIT`, demonstrando que as alterações confirmadas no PostgreSQL foram capturadas e propagadas para o arquivo. Verificou-se que a regra `*.log` do `.gitignore` impede o versionamento de novos arquivos de log. Os testes comprovaram a captura e propagação de eventos, mas não validaram o reprocessamento com deduplicação nem a integração com a camada analítica.
+- **Quem revisou:** Davi Camilo
+
+#### Continuação - Atualização da documentação no README
+
+- **Onde:** `README.md`.
+- **O que foi pedido:** Auxílio na atualização e padronização do README do projeto, incluindo a descrição da implementação de CDC e reprocessamento idempotente da E2.
+- **O que foi aproveitado:** Inclusão de instruções para executar os scripts de CDC e replay, com explicações sobre a captura de alterações via `pg_recvlogical`, armazenamento dos eventos e deduplicação com SQLite.
+- **Como foi verificado:** Os textos e comandos foram revisados quanto à clareza, coerência técnica e padronização com as demais seções do README.
+
+#### Continuação - Documentação do CDC e Reprocessamento Idempotente (E2, tarefa 1)
+
+- **Onde:** `docs/cdc.md`.
+- **O que foi pedido:** Auxílio na elaboração e organização da documentação técnica da implementação de CDC e reprocessamento idempotente, seguindo a ideia adotado nas documentações da Camada Bronze e da extração para Parquet e Delta.
+- **O que foi aproveitado:** Estruturação da documentação com visão geral, arquitetura e diagrama Mermaid, descrição dos scripts, regras de captura e deduplicação, instruções de execução, testes de validação e evidências de funcionamento. Foram detalhados o uso de `pg_recvlogical` com `test_decoding`, a propagação dos eventos para `eventos.log` e o reprocessamento com deduplicação em SQLite, incluindo as limitações da solução.
+- **Como foi verificado:** O conteúdo foi revisado quanto à coerência com a implementação existente e à padronização com as demais páginas do projeto. Foram consideradas as evidências reais de captura de `INSERT` e `UPDATE`, além dos resultados dos testes automatizados de replay.
+
+
+### 17/10/2026 - Apoio à ADR 0004 e esclarecimentos sobre PostgreSQL e CDC
+
+- **Ferramenta:** ChatGPT (OpenAI).
+- **Onde:** `docs/adr/0004-cdc-decodificacao-logica.md`; orientações de terminal fornecidas no chat.
+- **O que foi pedido:** Auxílio para resolver o conflito da porta 5432 no Docker Compose, conectar ao PostgreSQL no container e esclarecer a presença de WAL no projeto; elaboração da estrutura inicial da ADR 0004; e revisão da tabela.
+- **O que foi aproveitado:** Instruções para usar `POSTGRES_PORT=5433`, acessar o banco com `psql` e verificar a biblioteca `test_decoding.so`, o utilitário `pg_recvlogical`, `wal_level` e o carregamento do plugin com um slot temporário. Estruturação da ADR com contexto, alternativas, decisão, consequências e gatilhos de revisão, distinguindo conectores, clientes e plugins. Consulta às documentações oficiais do PostgreSQL, Debezium e wal2json.
+- **Como foi verificado:** Leitura da configuração do Compose, das ADRs e das evidências da ADR 0003;. Não foram executados conexão ao banco, teste do plugin ou benchmark de CDC. As alterações de documentação solicitadas para a ADR ficaram restritas a ela.
+- **Quem revisou:** Tiago Antunes.
+
+### 18/10/2026 - Revisão de conformidade da E2, correção de bug SQLite no Windows, tratamento de dado atrasado e Diários 07 a 09
+
+- **Ferramenta:** Antigravity (Google DeepMind).
+- **Onde:** `src/cdc/04_reprocessar.py`, `tests/test_cdc_replay.py`, `docs/camada-parquet.md`, `docs/cdc.md`, `docs/adr/0004-cdc-decodificacao-logica.md`, `docs/diario/semana-07.md`, `docs/diario/semana-08.md`, `docs/diario/semana-09.md`, `mkdocs.yml`, `README.md` e `docs/uso-de-ia.md`.
+- **O que foi pedido:** Auditar todo o repositório frente aos requisitos da Entrega E2, corrigir o bloqueio de arquivo nos testes em ambiente Windows, explicitar e testar o tratamento de dados atrasados e reprocessamento de janela, e auxiliar na documentação dos diários de bordo das Semanas 07, 08 e 09.
+- **O que foi aproveitado:** Fechamento explícito da conexão SQLite com `contextlib.closing` em `04_reprocessar.py`; adição do teste unitário `test_dado_atrasado_e_reprocessamento_janela`; documentação das regras de roteamento por tempo do evento (`ano`) e reprocessamento de janela em `docs/camada-parquet.md` e `docs/cdc.md`; alinhamento cronológico dos diários das Semanas 07 (apresentação E1 e ADR 0002), 08 (Parquet, Delta Lake e ADR 0003) e 09 (CDC lógico, replay idempotente e ADR 0004); atualização do `README.md` e `ADR 0004`.
+- **Como foi verificado:** Leitura e análise de todos os arquivos modificados pela IA, execução da suíte de testes unitários no Windows (`python -m unittest discover -s tests -p "test_cdc_replay.py" -v` com 3 testes aprovados em 0,21s) e validação do build estrito da documentação (`python -m mkdocs build --strict`).
+- **Quem revisou:** Arthur Evangelista.

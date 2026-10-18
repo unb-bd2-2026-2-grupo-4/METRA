@@ -4,6 +4,8 @@
 
 O domínio escolhido pela Squad G4 é o **Mercado de Trabalho Formal Brasileiro**, com foco nos dados de contratação, desligamento e remuneração registrados no **Novo CAGED** (Cadastro Geral de Empregados e Desempregados), complementados por tabelas auxiliares do **IBGE** (municípios e microrregiões) e do **MTE** (Classificação Brasileira de Ocupações — CBO 2002).
 
+---
+
 ## O Problema
 
 Trabalhadores que buscam emprego ou transição profissional encontram severas barreiras para identificar com precisão quando e onde a contratação com carteira assinada está aquecendo ou esfriando. Ao mesmo tempo, gestores públicos e pesquisadores de políticas de emprego carecem de ferramentas unificadas para mensurar discrepâncias salariais e de rotatividade segundo recortes de raça/cor, gênero, nível de instrução e faixa etária. Como resultado, decisões cruciais de recolocação ou de alocação de incentivos econômicos governamentais continuam sendo pautadas em percepções subjetivas.

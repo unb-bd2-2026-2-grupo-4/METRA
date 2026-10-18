@@ -52,6 +52,24 @@ O recorte do projeto concentra-se no **Mercado de Trabalho Formal da Região Cen
     
     Esquema físico para recepção de dados brutos, dicionário de campos e scripts de carga automatizados.
 
+-   **[Relacionamento entre as Bases](relacionamentos.md)**
+    
+    ---
+    
+    Integração entre Novo CAGED, IBGE e CBO 2002, com mapeamento das chaves de relacionamento, cardinalidades e modelo de dados transacional.
+
+-   **[Captura de Mudanças (CDC)](cdc.md)**
+    
+    ---
+    
+    Captura de alterações no PostgreSQL por decodificação lógica do WAL, propagação de eventos e reprocessamento idempotente com deduplicação.
+
+-   **[Extração para Parquet e Delta](camada-parquet.md)**
+    
+    ---
+    
+    Extração dos dados transacionais para formatos analíticos abertos, com particionamento, compressão, validação de integridade e materialização em Delta Lake.
+
 -   **[Decisões de Arquitetura (ADRs)](adr/0001-modelagem-sistema-origem.md)**
     
     ---

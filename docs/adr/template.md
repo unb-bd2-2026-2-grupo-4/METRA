@@ -1,7 +1,7 @@
 # NNNN - [Título: a decisão, em uma frase afirmativa]
 
 - **Status:** proposto | aceito | substituído por [ADR-NNNN] | revogado
-- **Data:** AAAA-MM-DD
+- **Data:** DD/MM/AAAA
 - **Decisores:** [membros da Squad que participaram da deliberação]
 
 ---

@@ -2,7 +2,8 @@
 
 > **Plataforma de Dados do Mercado de Trabalho Formal (Novo CAGED)**  
 > **Projeto Integrado: Banco de Dados 2 (FCTE / Universidade de Brasília)**  
-> **Oferta:** 2026/2 | **Squad G4**
+> **Oferta:** 2026/2 | **Squad G4**  
+> **Documentação completa:** https://unb-bd2-2026-2-grupo-4.github.io/METRA/
 
 ---
 
@@ -14,12 +15,18 @@
 
 ## Grupo (Squad G4)
 
-- **Arthur Evangelista**
-- **Davi Camilo**
-- **Euller Júlio**
-- **Lucas Alves**
-- **Tiago Antunes**
-- **Yan Matheus**
+<div align="center">
+  <table>
+    <tr>
+      <td align="center"><a href="https://github.com/arthurevg"><img src="https://github.com/arthurevg.png" width="150px" alt=""/><br />Arthur Evangelista</a></td>
+      <td align="center"><a href="https://github.com/Davicamilo23"><img src="https://github.com/Davicamilo23.png" width="150px" alt=""/><br />Davi Camilo</a></td>
+      <td align="center"><a href="https://github.com/Potatoyz908"><img src="https://github.com/Potatoyz908.png" width="150px" alt=""/><br />Euller Júlio</a></td>
+      <td align="center"><a href="https://github.com/LucasAlves71"><img src="https://github.com/LucasAlves71.png" width="150px" alt=""/><br />Lucas Alves</a></td>
+      <td align="center"><a href="https://github.com/TiagoBalieiro"><img src="https://github.com/TiagoBalieiro.png" width="150px" alt=""/><br />Tiago Antunes</a></td>
+      <td align="center"><a href="https://github.com/Yanmatheus0812"><img src="https://github.com/Yanmatheus0812.png" width="150px" alt=""/><br />Yan Matheus</a></td>
+    </tr>
+  </table>
+</div>
 
 ---
 
@@ -131,7 +138,13 @@ E4            | Análises e Visualizações  |
 │   └── ingestao/Dockerfile # Imagem da tarefa de ingestão e carga do pipeline E1
 ├── src/                    # Scripts de ingestão, pipeline e transformações
 │   ├── analise.py          # Carga PostgreSQL -> DuckDB e indicadores no terminal
+│   ├── cdc/
+│   │   ├── 01_preparar.sh        # Configura tabela de teste oltp.cdc_probe e slot lógico
+│   │   ├── 02_consumir.sh        # Captura eventos do WAL via pg_recvlogical
+│   │   ├── 03_testar.sh          # Gera INSERT e UPDATE confirmados na origem
+│   │   └── 04_reprocessar.py     # Consumidor idempotente com deduplicação em SQLite
 │   ├── extracao/
+│   │   ├── comparar_compressao.py # Benchmark reproduzível de codecs Parquet (ADR 0003)
 │   │   ├── exportar_parquet.py   # Extração PostgreSQL (oltp) -> Parquet, com compressão configurável
 │   │   ├── materializar_delta.py # Materialização Parquet -> tabela Delta de movimentações
 │   │   └── validar_lake.py       # Confere a pergunta central em PostgreSQL, Parquet e Delta
@@ -147,6 +160,8 @@ E4            | Análises e Visualizações  |
 │       ├── carga_cbo.py         # Ingestão da base CBO 2002 no bronze
 │       ├── carga_oltp.py        # Promoção e normalização Bronze -> OLTP 3FN
 │       └── executar_pipeline.py # Orquestrador sequencial de ponta a ponta
+├── tests/
+│   └── test_cdc_replay.py  # Testes unitários de replay idempotente, transações incompletas e dados atrasados
 ├── data/                   # Diretório de dados (inclui amostra versionada de 2.8 MB)
 │   └── caged_centro_oeste_amostra.csv # Amostra representativa reproduzível (49.178 linhas)
 └── docs/
@@ -154,20 +169,28 @@ E4            | Análises e Visualizações  |
     ├── dominio.md          # Detalhamento do domínio, personas e 5 perguntas de gestão
     ├── arquitetura.md      # Visão técnica das camadas e Entregas (E1 a E4)
     ├── camada-bronze.md    # Regras, modelo multi-fontes e validações da camada bronze
+    ├── relacionamentos.md  # Chaves e cardinalidades entre CAGED, IBGE, CBO e CNAE
+    ├── cdc.md              # Captura de mudanças via WAL lógico e reprocessamento idempotente
     ├── camada-parquet.md   # Extração para Parquet, tabela Delta e como consultá-las
     ├── uso-de-ia.md        # Política de transparência de IA
     ├── stylesheets/
     │   └── extra.css       # Estilização customizada com texto justificado
     ├── adr/                # Registros de Decisões de Arquitetura (Método de Decisão em 6 passos)
     │   ├── template.md     # Template oficial Nygard padronizado para os ADRs
-    │   └── 0001-modelagem-sistema-origem.md # Decisão 3FN Insert-Only e multi-fontes
+    │   ├── 0001-modelagem-sistema-origem.md          # Decisão 3FN Insert-Only e multi-fontes
+    │   ├── 0002-simplificacao-arquitetural-duckdb.md # Simplificação com DuckDB
+    │   ├── 0003-compressao-parquet.md                # Benchmark e escolha de compressão Snappy
+    │   └── 0004-cdc-decodificacao-logica.md          # Estratégia de CDC com pg_recvlogical
     └── diario/             # Diários de bordo semanais da Squad G4
         ├── semana-01.md    # Formação da Squad e alinhamento dos critérios de avaliação
         ├── semana-02.md    # Escolha do domínio, personas e as 5 perguntas de gestão
         ├── semana-03.md    # Engenharia de Dados aplicada ao projeto e mapeamento de riscos
         ├── semana-04.md    # Perfil dos dados brutos e carga da camada bronze no PostgreSQL
         ├── semana-05.md    # Arquitetura do METRA, complexidade acidental e feedback docente
-        └── semana-06.md    # Validação da E1, Dagster, banco vetorial e refinamento do MER
+        ├── semana-06.md    # Validação da E1, Dagster, banco vetorial e refinamento do MER
+        ├── semana-07.md    # Apresentação da E1, simplificação com DuckDB e ADR 0002
+        ├── semana-08.md    # Extração Parquet, tabela Delta Lake e benchmark de compressão (ADR 0003)
+        └── semana-09.md    # CDC por decodificação lógica, replay idempotente e ADR 0004
 ```
 
 ---
@@ -183,8 +206,8 @@ E4            | Análises e Visualizações  |
 
 ```bash
 # 1. Clonar o repositório
-git clone https://github.com/unb-bd2-2026-2-grupo-4/ProjetoIntegrado.git
-cd ProjetoIntegrado
+git clone https://github.com/unb-bd2-2026-2-grupo-4/METRA.git
+cd METRA
 
 # 2. Subir a documentação localmente (opcional)
 docker compose up -d docs
@@ -220,9 +243,32 @@ As variáveis `PG*` são as mesmas utilizadas pela ingestão Python. O módulo n
 
 O comando lê PostgreSQL em modo somente leitura e substitui, em uma transação, a tabela analítica de `data/metra.duckdb`. Reexecuções não acumulam registros. Uma falha interrompe a análise com erro e preserva a tabela anterior; o arquivo gerado não é versionado.
 
-As tabelas no terminal comparam capitais e interior por ano e para o período consolidado de 2023–2026. Consideram municípios identificados de DF, GO, MT e MS, usando `is_capital` da origem. O saldo é a soma de `saldo_movimentacao`; a definição operacional de admissão é `saldo_movimentacao = 1`. A média salarial nominal considera apenas salários positivos dessas admissões, excluindo nulos e zeros, inclusive valores ausentes ou negativos convertidos em zero pela E1. A média é calculada sobre eventos, e as diferenças são **capital − interior**, arredondadas somente na apresentação. As quantidades de salários considerados e as competências disponíveis acompanham os resultados; grupos ausentes ou sem salários elegíveis produzem valores nulos.
+As tabelas no terminal comparam capitais e interior por ano e para o período consolidado de 2023-2026. Consideram municípios identificados de DF, GO, MT e MS, usando `is_capital` da origem. O saldo é a soma de `saldo_movimentacao`; a definição operacional de admissão é `saldo_movimentacao = 1`. A média salarial nominal considera apenas salários positivos dessas admissões, excluindo nulos e zeros, inclusive valores ausentes ou negativos convertidos em zero pela E1. A média é calculada sobre eventos, e as diferenças são **capital - interior**, arredondadas somente na apresentação. As quantidades de salários considerados e as competências disponíveis acompanham os resultados; grupos ausentes ou sem salários elegíveis produzem valores nulos.
 
-### Extração para Parquet e tabela Delta (E2)
+### Captura de Mudanças (CDC) e Reprocessamento Idempotente (E2)
+
+Com o PostgreSQL em execução e o schema `oltp` criado, execute na raiz do projeto:
+
+```bash
+bash src/cdc/01_preparar.sh       # Cria a tabela de teste e o slot de replicação lógica
+bash src/cdc/02_consumir.sh       # Captura alterações do WAL e grava em data/cdc/eventos.log
+```
+
+Em outro terminal, execute o teste de captura e o reprocessamento:
+
+```bash
+bash src/cdc/03_testar.sh         # Executa INSERT e UPDATE para validar a captura
+python3 src/cdc/04_reprocessar.py # Processa os eventos com deduplicação
+python3 src/cdc/04_reprocessar.py # Reexecuta e comprova que não há duplicação no destino
+```
+
+O CDC utiliza a **decodificação lógica do WAL do PostgreSQL**, por meio do `pg_recvlogical` e do plugin `test_decoding`, sem depender de Kafka ou Debezium. As alterações confirmadas no banco são capturadas e registradas em `data/cdc/eventos.log`. O teste utiliza a tabela auxiliar `oltp.cdc_probe`, preservando os dados reais do Novo CAGED.
+
+O reprocessamento é realizado por um consumidor Python que identifica cada evento por um hash SHA-256 e utiliza uma chave primária no SQLite (`data/cdc/replay.sqlite3`) para impedir inserções duplicadas. Assim, **executar novamente o consumidor não duplica os eventos já processados no destino**, embora o arquivo de log bruto possa conter eventos repetidos. A solução demonstra idempotência no consumidor, tratamento de transações incompletas e incorporação de dados atrasados em janelas reprocessadas, sem afirmar *exactly-once* de ponta a ponta.
+
+Os arquivos gerados em `data/cdc/` não são versionados. Detalhes em [`docs/cdc.md`](./docs/cdc.md).
+
+### Extração para Parquet e Tabela Delta (E2)
 
 No mesmo ambiente Python, com as variáveis `PG*` exportadas:
 
@@ -232,14 +278,14 @@ python3 -m src.extracao.materializar_delta  # Parquet -> data/lake/delta/movimen
 python3 -m src.extracao.validar_lake        # compara PostgreSQL, Parquet e Delta
 ```
 
-A extração copia as cinco tabelas do schema `oltp` em modo somente leitura, particiona `movimentacao` por `ano` e concilia a contagem de linhas com a origem. A tabela Delta é gravada com `deltalake` (delta-rs) e lida pelo DuckDB com `delta_scan`. Reexecuções substituem os arquivos sem acumular registros, e nada em `data/lake/` é versionado. A primeira execução precisa de internet para baixar as extensões `postgres` e `delta` do DuckDB.
+A extração copia as cinco tabelas do schema `oltp` em modo somente leitura, particiona `movimentacao` por `ano` (roteando pelo tempo do evento para absorver dados atrasados na competência correta) e concilia a contagem de linhas com a origem. A tabela Delta é gravada com `deltalake` (delta-rs) e lida pelo DuckDB com `delta_scan`. Reexecuções substituem os arquivos sem acumular registros, e nada em `data/lake/` é versionado. A primeira execução precisa de internet para baixar as extensões `postgres` e `delta` do DuckDB.
 
-Os dois primeiros comandos aceitam `--compressao` (`snappy`, `zstd` ou `uncompressed`); o padrão `snappy` é provisório até a comparação de compressão. Detalhes em [`docs/camada-parquet.md`](./docs/camada-parquet.md).
+Os dois primeiros comandos aceitam `--compressao` (`snappy`, `zstd` ou `uncompressed`); o padrão `snappy` foi validado por benchmark reproduzível conforme documentado no [`ADR 0003`](./docs/adr/0003-compressao-parquet.md). Detalhes em [`docs/camada-parquet.md`](./docs/camada-parquet.md).
 
 ---
 
-## Governança, Ética e Uso de IA
+## Governança, Transparência e Evolução do Projeto
 
-- **Uso de IA:** Este repositório cumpre integralmente a [Política de Uso de IA](https://unb-bd2.github.io/PlanoEnsino/uso-de-ia/) da disciplina. Todas as contribuições de assistentes são documentadas de forma contemporânea no arquivo [`AI-USAGE.md`](./AI-USAGE.md).
 - **ADRs:** Todas as decisões arquiteturais seguem o **Método de Decisão em 6 passos** e ficam versionadas em [`docs/adr/`](./docs/adr/).
+- **Uso de IA:** Este repositório cumpre integralmente a [Política de Uso de IA](https://unb-bd2.github.io/PlanoEnsino/uso-de-ia/) da disciplina. Todas as contribuições de assistentes são documentadas de forma contemporânea no arquivo [`docs/uso-de-ia.md`](./docs/uso-de-ia.md).
 - **Diário de Bordo:** O acompanhamento contínuo de aprendizados, medições e surpresas da Squad é registrado semanalmente em [`docs/diario/`](./docs/diario/).
