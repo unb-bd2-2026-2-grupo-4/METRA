@@ -1,0 +1,23 @@
+/* Justificação dos blocos de texto solicitada pela Squad */
+.md-typeset p,
+.md-typeset li,
+.md-typeset blockquote {
+    text-align: justify;
+    text-justify: inter-word;
+    hyphens: auto;
+}
+
+/* Títulos, tabelas e código mantêm alinhamento padrão */
+.md-typeset h1,
+.md-typeset h2,
+.md-typeset h3,
+.md-typeset h4,
+.md-typeset h5,
+.md-typeset h6 {
+    text-align: left;
+}
+
+.md-typeset code,
+.md-typeset pre {
+    text-align: left;
+}

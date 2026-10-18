@@ -1,0 +1,2056 @@
+
+<!doctype html>
+<html lang="pt" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="METRA (Monitoramento e Engenharia de dados do TRAbalho) | Projeto Integrado de Banco de Dados 2 (FCTE/UnB) - Squad G4">
+      
+      
+        <meta name="author" content="Squad G4">
+      
+      
+        <link rel="canonical" href="https://unb-bd2-2026-2-grupo-4.github.io/METRA/cdc/">
+      
+      
+        <link rel="prev" href="../relacionamentos/">
+      
+      
+        <link rel="next" href="../camada-parquet/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Captura de Mudanças (CDC) - METRA (Monitoramento e Engenharia de dados do TRAbalho)</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Poppins:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Poppins";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="teal" data-md-color-accent="deep-purple">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#captura-de-mudancas-cdc-e-reprocessamento-idempotente" class="md-skip">
+          Pular para conteúdo
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Cabeçalho">
+    <a href=".." title="METRA (Monitoramento e Engenharia de dados do TRAbalho)" class="md-header__button md-logo" aria-label="METRA (Monitoramento e Engenharia de dados do TRAbalho)" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            METRA (Monitoramento e Engenharia de dados do TRAbalho)
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Captura de Mudanças (CDC)
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="teal" data-md-color-accent="deep-purple"  aria-label="Alternar para modo escuro"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Alternar para modo escuro" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="teal" data-md-color-accent="deep-purple"  aria-label="Alternar para modo claro"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Alternar para modo claro" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Buscar" placeholder="Buscar" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Pesquisar">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Limpar" aria-label="Limpar" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Inicializando busca
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/unb-bd2-2026-2-grupo-4/METRA" title="Ir para repositório" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    unb-bd2-2026-2-grupo-4/METRA
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Abas" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href=".." class="md-tabs__link">
+          
+  
+  
+  Visão Geral
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../arquitetura/" class="md-tabs__link">
+          
+  
+  
+  Engenharia de Dados
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../adr/0001-modelagem-sistema-origem/" class="md-tabs__link">
+          
+  
+  
+  Governança & Decisões
+
+        </a>
+      </li>
+    
+  
+
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navegação" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="METRA (Monitoramento e Engenharia de dados do TRAbalho)" class="md-nav__button md-logo" aria-label="METRA (Monitoramento e Engenharia de dados do TRAbalho)" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    METRA (Monitoramento e Engenharia de dados do TRAbalho)
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/unb-bd2-2026-2-grupo-4/METRA" title="Ir para repositório" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    unb-bd2-2026-2-grupo-4/METRA
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_1" id="__nav_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Visão Geral
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Visão Geral
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Início
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dominio/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Domínio e Gestão
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engenharia de Dados
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Engenharia de Dados
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../arquitetura/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Arquitetura da Plataforma
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../camada-bronze/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Camada Bronze
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../relacionamentos/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Relacionamento entre as Bases
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Captura de Mudanças (CDC)
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Captura de Mudanças (CDC)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Índice">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Índice
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#arquitetura-e-fluxo-de-dados" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Arquitetura e fluxo de dados
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#arquivos-e-artefatos" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Arquivos e artefatos
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#decisoes-e-regras-da-implementacao" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Decisões e regras da implementação
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Decisões e regras da implementação">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#modelo-do-destino-de-replay" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Modelo do destino de replay
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#como-executar" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Como executar
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Como executar">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-habilitar-a-decodificacao-logica" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Habilitar a decodificação lógica
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-preparar-tabela-e-slot" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Preparar tabela e slot
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-iniciar-a-captura-terminal-a" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Iniciar a captura — Terminal A
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-gerar-alteracoes-terminal-b" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Gerar alterações — Terminal B
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-consultar-os-eventos-capturados" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Consultar os eventos capturados
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#6-processar-o-log-pela-primeira-vez" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Processar o log pela primeira vez
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#7-reprocessar-exatamente-o-mesmo-arquivo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Reprocessar exatamente o mesmo arquivo
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#evidencia-observada-no-cdc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Evidência observada no CDC
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#testes-automatizados" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Testes automatizados
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tratamento-de-dado-atrasado-e-reprocessamento-de-janela" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tratamento de dado atrasado e reprocessamento de janela
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#semantica-de-entrega-e-limitacoes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Semântica de entrega e limitações
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../camada-parquet/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extração para Parquet e Delta
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Governança & Decisões
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Governança & Decisões
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_1" id="__nav_3_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decisões de Arquitetura (ADR)
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Decisões de Arquitetura (ADR)
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0001-modelagem-sistema-origem/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0001: Origem Transacional OLTP
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0002-simplificacao-arquitetural-duckdb/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0002: Simplificação com DuckDB
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0003-compressao-parquet/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0003: Compressão Parquet
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0004-cdc-decodificacao-logica/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0004: Estratégia de CDC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../uso-de-ia/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Governança e IA
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Diário de Bordo
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Diário de Bordo
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diario/semana-01/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Semana 01
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diario/semana-02/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Semana 02
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diario/semana-03/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Semana 03
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diario/semana-04/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Semana 04
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diario/semana-05/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Semana 05
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diario/semana-06/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Semana 06
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diario/semana-07/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Semana 07
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diario/semana-08/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Semana 08
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diario/semana-09/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Semana 09
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Índice">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Índice
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#arquitetura-e-fluxo-de-dados" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Arquitetura e fluxo de dados
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#arquivos-e-artefatos" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Arquivos e artefatos
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#decisoes-e-regras-da-implementacao" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Decisões e regras da implementação
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Decisões e regras da implementação">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#modelo-do-destino-de-replay" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Modelo do destino de replay
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#como-executar" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Como executar
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Como executar">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-habilitar-a-decodificacao-logica" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Habilitar a decodificação lógica
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-preparar-tabela-e-slot" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Preparar tabela e slot
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-iniciar-a-captura-terminal-a" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Iniciar a captura — Terminal A
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-gerar-alteracoes-terminal-b" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Gerar alterações — Terminal B
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-consultar-os-eventos-capturados" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Consultar os eventos capturados
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#6-processar-o-log-pela-primeira-vez" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Processar o log pela primeira vez
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#7-reprocessar-exatamente-o-mesmo-arquivo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Reprocessar exatamente o mesmo arquivo
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#evidencia-observada-no-cdc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Evidência observada no CDC
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#testes-automatizados" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Testes automatizados
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tratamento-de-dado-atrasado-e-reprocessamento-de-janela" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tratamento de dado atrasado e reprocessamento de janela
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#semantica-de-entrega-e-limitacoes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Semântica de entrega e limitações
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="captura-de-mudancas-cdc-e-reprocessamento-idempotente">Captura de Mudanças (CDC) e Reprocessamento Idempotente</h1>
+<p>A captura de mudanças (<em>Change Data Capture</em>, <strong>CDC</strong>) é o mecanismo da Entrega E2 do <strong>METRA</strong> responsável por observar modificações confirmadas no banco transacional (<strong>PostgreSQL 16</strong>, schema <code>oltp</code>) e disponibilizá-las a um destino externo. A implementação utiliza <strong>decodificação lógica do WAL</strong> (<em>Write-Ahead Log</em>) por meio do <code>pg_recvlogical</code> e do plugin <code>test_decoding</code>.</p>
+<p>A saída bruta é registrada em <code>data/cdc/eventos.log</code>. Um consumidor Python separado permite <strong>reprocessar os eventos</strong> e <strong>impedir a inserção repetida de eventos com a mesma identidade</strong> no destino de demonstração (<code>data/cdc/replay.sqlite3</code>). Essa separação permite evidenciar tanto a propagação das mudanças quanto o comportamento em caso de replay.</p>
+<hr />
+<h2 id="arquitetura-e-fluxo-de-dados">Arquitetura e fluxo de dados</h2>
+<pre class="mermaid"><code>flowchart TD
+    A[PostgreSQL 16 — OLTP] --&gt;|INSERT / UPDATE confirmados| B[WAL com wal_level=logical]
+    B --&gt; C[Slot lógico metra_cdc_slot]
+    C --&gt; D[pg_recvlogical + test_decoding]
+    D --&gt;|tee -a| E[data/cdc/eventos.log]
+    E --&gt; F[04_reprocessar.py]
+    F --&gt; G{evento_id já existe?}
+    G --&gt;|Não| H[INSERT em eventos_aplicados]
+    G --&gt;|Sim| I[Ignorar duplicata]
+    H --&gt; J[(data/cdc/replay.sqlite3)]
+    I --&gt; J</code></pre>
+<p>O <code>pg_recvlogical</code> acompanha o slot de replicação e emite eventos textuais. O script de consumo grava essa saída em um arquivo local. Já o consumidor de replay lê o arquivo completo sob demanda e mantém o conjunto de eventos únicos aplicados no SQLite.</p>
+<p><strong>O que cada componente faz:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Componente</th>
+<th>Responsabilidade</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>PostgreSQL / WAL</td>
+<td>Registrar alterações transacionais que possam ser decodificadas logicamente.</td>
+</tr>
+<tr>
+<td>Slot <code>metra_cdc_slot</code></td>
+<td>Manter o estado de leitura necessário ao consumidor lógico.</td>
+</tr>
+<tr>
+<td>Plugin <code>test_decoding</code></td>
+<td>Representar transações e mudanças em texto legível, para demonstração.</td>
+</tr>
+<tr>
+<td><code>pg_recvlogical</code></td>
+<td>Consumir a sequência de eventos a partir do slot.</td>
+</tr>
+<tr>
+<td><code>eventos.log</code></td>
+<td>Persistir localmente a saída <strong>bruta</strong>, sem deduplicação.</td>
+</tr>
+<tr>
+<td><code>04_reprocessar.py</code></td>
+<td>Interpretar transações completas, identificar eventos e aplicar deduplicação.</td>
+</tr>
+<tr>
+<td><code>replay.sqlite3</code></td>
+<td>Guardar um registro de cada evento aceito, com chave primária única.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="arquivos-e-artefatos">Arquivos e artefatos</h2>
+<table>
+<thead>
+<tr>
+<th>Arquivo</th>
+<th>Finalidade</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>docker-compose.yml</code></td>
+<td>Configurar PostgreSQL para decodificação lógica do WAL.</td>
+</tr>
+<tr>
+<td><code>src/cdc/01_preparar.sh</code></td>
+<td>Verificar o WAL lógico, criar <code>oltp.cdc_probe</code> e, se necessário, o slot.</td>
+</tr>
+<tr>
+<td><code>src/cdc/02_consumir.sh</code></td>
+<td>Iniciar <code>pg_recvlogical</code> e anexar eventos a <code>data/cdc/eventos.log</code>.</td>
+</tr>
+<tr>
+<td><code>src/cdc/03_testar.sh</code></td>
+<td>Gerar um <code>INSERT</code> e um <code>UPDATE</code> de teste no OLTP.</td>
+</tr>
+<tr>
+<td><code>src/cdc/04_reprocessar.py</code></td>
+<td>Reprocessar o arquivo de eventos com deduplicação no SQLite.</td>
+</tr>
+<tr>
+<td><code>tests/test_cdc_replay.py</code></td>
+<td>Testar o reenvio do mesmo log e o descarte de transações incompletas.</td>
+</tr>
+<tr>
+<td><code>data/cdc/eventos.log</code></td>
+<td>Log bruto gerado em execução; não versionado.</td>
+</tr>
+<tr>
+<td><code>data/cdc/replay.sqlite3</code></td>
+<td>Banco local de demonstração; não versionado.</td>
+</tr>
+</tbody>
+</table>
+<p>Os arquivos de execução do CDC e a lógica de replay são independentes dos módulos de exportação Parquet e materialização Delta da E2.</p>
+<hr />
+<h2 id="decisoes-e-regras-da-implementacao">Decisões e regras da implementação</h2>
+<table>
+<thead>
+<tr>
+<th>Regra</th>
+<th>Como é tratada</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>CDC baseado no WAL</strong></td>
+<td>PostgreSQL opera com <code>wal_level=logical</code> e alterações são lidas por <code>pg_recvlogical</code>.</td>
+</tr>
+<tr>
+<td><strong>Propagação para arquivo</strong></td>
+<td>O script <code>02_consumir.sh</code> usa <code>tee -a data/cdc/eventos.log</code>.</td>
+</tr>
+<tr>
+<td><strong>Teste isolado</strong></td>
+<td>A tabela <code>oltp.cdc_probe</code> recebe dados artificiais, sem alterar as movimentações oficiais do Novo CAGED.</td>
+</tr>
+<tr>
+<td><strong>Transações completas</strong></td>
+<td>O consumidor aplica somente blocos <code>BEGIN ... COMMIT</code> com o mesmo XID.</td>
+</tr>
+<tr>
+<td><strong>Identidade do evento</strong></td>
+<td>Hash SHA-256 de XID, índice da alteração na transação, tabela, operação e detalhes textuais.</td>
+</tr>
+<tr>
+<td><strong>Deduplicação no destino</strong></td>
+<td><code>evento_id</code> é chave primária em <code>eventos_aplicados</code>; <code>INSERT OR IGNORE</code> descarta um evento já registrado.</td>
+</tr>
+<tr>
+<td><strong>Atomicidade no SQLite</strong></td>
+<td>A inserção dos eventos de uma transação decodificada ocorre dentro de uma transação SQLite.</td>
+</tr>
+<tr>
+<td><strong>Reexecução</strong></td>
+<td>Reler o mesmo arquivo não acrescenta ao SQLite registros de eventos já existentes.</td>
+</tr>
+<tr>
+<td><strong>Persistência</strong></td>
+<td>O banco SQLite é mantido entre execuções, permitindo reconhecer reentregas.</td>
+</tr>
+</tbody>
+</table>
+<p>A identidade calculada é estável <strong>para a repetição das mesmas linhas do log</strong>, mas não deve ser considerada uma identidade global de eventos para uso em produção. XIDs podem ser reutilizados ao longo do tempo; mudanças na formatação ou na origem podem comprometer essa identificação.</p>
+<h3 id="modelo-do-destino-de-replay">Modelo do destino de replay</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="k">IF</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">EXISTS</span><span class="w"> </span><span class="n">eventos_aplicados</span><span class="w"> </span><span class="p">(</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">    </span><span class="n">evento_id</span><span class="w"> </span><span class="nb">TEXT</span><span class="w"> </span><span class="k">PRIMARY</span><span class="w"> </span><span class="k">KEY</span><span class="p">,</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="n">xid</span><span class="w"> </span><span class="nb">TEXT</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">    </span><span class="n">indice</span><span class="w"> </span><span class="nb">INTEGER</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">    </span><span class="n">tabela</span><span class="w"> </span><span class="nb">TEXT</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">    </span><span class="n">operacao</span><span class="w"> </span><span class="nb">TEXT</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">    </span><span class="n">detalhes</span><span class="w"> </span><span class="nb">TEXT</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="p">);</span>
+</code></pre></div>
+<p>Cada linha representa uma mudança capturada, <strong>não a linha de negócio já atualizada em uma tabela analítica</strong>. O destino registra eventos únicos; não executa <code>MERGE</code>, <code>UPDATE</code> ou <code>DELETE</code> em Parquet ou Delta.</p>
+<hr />
+<h2 id="como-executar">Como executar</h2>
+<p>Os comandos abaixo devem ser executados <strong>na raiz do repositório</strong>, com Docker Compose e Python 3 disponíveis. O serviço PostgreSQL do Compose deve se chamar <code>postgres</code>, como na implementação enviada.</p>
+<h3 id="1-habilitar-a-decodificacao-logica">1. Habilitar a decodificação lógica</h3>
+<p>No serviço <code>postgres</code> de <code>docker-compose.yml</code>, preserve a configuração já existente de WAL e habilite a leitura lógica, por exemplo:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">&gt;</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="no">postgres</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span><span class="no">-c max_wal_size=4GB</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span><span class="no">-c wal_level=logical</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">  </span><span class="no">-c max_replication_slots=4</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">  </span><span class="no">-c max_wal_senders=4</span>
+</code></pre></div>
+<p>Recrie apenas o contêiner para aplicar os parâmetros:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>docker<span class="w"> </span>compose<span class="w"> </span>up<span class="w"> </span>-d<span class="w"> </span>--force-recreate<span class="w"> </span>postgres
+</code></pre></div>
+<p><strong>Não execute <code>docker compose down -v</code></strong>, pois a remoção de volumes pode apagar os dados persistidos na E1.</p>
+<h3 id="2-preparar-tabela-e-slot">2. Preparar tabela e slot</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>bash<span class="w"> </span>src/cdc/01_preparar.sh
+</code></pre></div>
+<p>O script verifica se <code>wal_level</code> está definido como <code>logical</code>, cria a tabela <code>oltp.cdc_probe</code> caso ela não exista e cria o slot <code>metra_cdc_slot</code> com <code>test_decoding</code> caso ainda não exista.</p>
+<p>Para consultar o estado do slot:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>-T<span class="w"> </span>postgres<span class="w"> </span>psql<span class="w"> </span>-U<span class="w"> </span>metra<span class="w"> </span>-d<span class="w"> </span>metra<span class="w"> </span>-c<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="s2">"SELECT slot_name, plugin, slot_type, active, confirmed_flush_lsn FROM pg_replication_slots WHERE slot_name = 'metra_cdc_slot';"</span>
+</code></pre></div>
+<blockquote>
+<p>Os comandos acima usam o usuário e banco <code>metra</code>, que são os padrões dos scripts fornecidos. Ajuste-os caso o Compose tenha credenciais diferentes.</p>
+</blockquote>
+<h3 id="3-iniciar-a-captura-terminal-a">3. Iniciar a captura — Terminal A</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>bash<span class="w"> </span>src/cdc/02_consumir.sh
+</code></pre></div>
+<p>Mantenha esse terminal aberto. As mudanças capturadas aparecem na saída padrão e são anexadas a <code>data/cdc/eventos.log</code>.</p>
+<h3 id="4-gerar-alteracoes-terminal-b">4. Gerar alterações — Terminal B</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>bash<span class="w"> </span>src/cdc/03_testar.sh
+</code></pre></div>
+<p>Esse script executa operações <code>INSERT</code> e <code>UPDATE</code> em <code>oltp.cdc_probe</code> com uma descrição específica da execução. A tabela foi criada para não modificar dados reais do CAGED.</p>
+<h3 id="5-consultar-os-eventos-capturados">5. Consultar os eventos capturados</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>cat<span class="w"> </span>data/cdc/eventos.log
+</code></pre></div>
+<p>Para mostrar apenas as mudanças da tabela de demonstração:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>grep<span class="w"> </span><span class="s1">'table oltp.cdc_probe:'</span><span class="w"> </span>data/cdc/eventos.log
+</code></pre></div>
+<h3 id="6-processar-o-log-pela-primeira-vez">6. Processar o log pela primeira vez</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>python3<span class="w"> </span>src/cdc/04_reprocessar.py
+</code></pre></div>
+<p>Por padrão, o consumidor lê <code>data/cdc/eventos.log</code> e utiliza <code>data/cdc/replay.sqlite3</code> como destino. Também é possível indicar outros caminhos:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>python3<span class="w"> </span>src/cdc/04_reprocessar.py<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="w">  </span>--log<span class="w"> </span>data/cdc/eventos.log<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">  </span>--db<span class="w"> </span>data/cdc/replay.sqlite3
+</code></pre></div>
+<p>Se o arquivo tiver <strong>exatamente dois eventos confirmados</strong> e o SQLite ainda estiver vazio, a saída esperada será:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="p">{</span><span class="nt">"transacoes_confirmadas"</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="nt">"novos"</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="nt">"duplicados"</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nt">"total_destino"</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">}</span>
+</code></pre></div>
+<h3 id="7-reprocessar-exatamente-o-mesmo-arquivo">7. Reprocessar exatamente o mesmo arquivo</h3>
+<p>Sem apagar <code>eventos.log</code> nem <code>replay.sqlite3</code>, repita:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>python3<span class="w"> </span>src/cdc/04_reprocessar.py
+</code></pre></div>
+<p>Com o mesmo arquivo e sem novos eventos, a saída esperada passa a ser:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="p">{</span><span class="nt">"transacoes_confirmadas"</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="nt">"novos"</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nt">"duplicados"</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="nt">"total_destino"</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">}</span>
+</code></pre></div>
+<p>O arquivo foi relido, mas a contagem de eventos únicos no destino permaneceu em dois. <strong>É essa comparação entre as duas execuções que demonstra o replay idempotente.</strong> Se houver mais eventos no log real, os números serão diferentes (a propriedade a verificar é que a segunda execução não aumenta <code>total_destino</code> quando a entrada não mudou).</p>
+<hr />
+<h2 id="evidencia-observada-no-cdc">Evidência observada no CDC</h2>
+<p>Em um teste realizado, o arquivo <code>eventos.log</code> apresentado pela equipe continha:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>BEGIN 769
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>table oltp.cdc_probe: INSERT: id[bigint]:1 descricao[text]:'metra-1792261417-99158' atualizado_em[timestamp with time zone]:'2026-10-17 18:23:38.457866+00'
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>COMMIT 769
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>BEGIN 770
+<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>table oltp.cdc_probe: UPDATE: id[bigint]:1 descricao[text]:'metra-1792261417-99158-atualizado' atualizado_em[timestamp with time zone]:'2026-10-17 18:23:38.469911+00'
+<a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>COMMIT 770
+</code></pre></div>
+<p>Esse registro comprova a <strong>captura de um <code>INSERT</code> e um <code>UPDATE</code> efetivamente confirmados</strong> e sua propagação até o arquivo local. O sufixo <code>-atualizado</code> mostra a alteração do mesmo registro de teste.</p>
+<p>Os resultados numéricos de replay indicados acima são <strong>saídas esperadas</strong> para esse log de dois eventos; não devem ser descritos como execução observada no computador da equipe antes de rodar o consumidor localmente.</p>
+<hr />
+<h2 id="testes-automatizados">Testes automatizados</h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>python3<span class="w"> </span>-m<span class="w"> </span>unittest<span class="w"> </span>discover<span class="w"> </span>-s<span class="w"> </span>tests<span class="w"> </span>-p<span class="w"> </span><span class="s1">'test_cdc_replay.py'</span><span class="w"> </span>-v
+</code></pre></div>
+<p>O arquivo <code>tests/test_cdc_replay.py</code> contém três testes:</p>
+<table>
+<thead>
+<tr>
+<th>Teste</th>
+<th>Verificação</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>test_replay_mesmo_log_nao_duplicar</code></td>
+<td>Reprocessar duas vezes o mesmo log e anexá-lo novamente não aumenta o total de eventos únicos.</td>
+</tr>
+<tr>
+<td><code>test_ignora_transacao_incompleta</code></td>
+<td>Uma transação com <code>BEGIN</code>, mas sem <code>COMMIT</code>, não é inserida no destino.</td>
+</tr>
+<tr>
+<td><code>test_dado_atrasado_e_reprocessamento_janela</code></td>
+<td>Um evento atrasado (competência <code>ano=2023</code> registrado tardiamente em <code>2025</code>) anexado ao log é incorporado no reprocessamento da janela sem duplicar os eventos anteriores.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Validação efetuada para esta documentação:</strong> os três testes unitários, executados em Python 3 sobre os arquivos de replay fornecidos, passaram (<code>Ran 3 tests ... OK</code>).</p>
+<hr />
+<h2 id="tratamento-de-dado-atrasado-e-reprocessamento-de-janela">Tratamento de dado atrasado e reprocessamento de janela</h2>
+<ul>
+<li><strong>Separação entre tempo do evento e tempo de captura:</strong> no WAL, a ordem de chegada reflete o instante da confirmação da transação (<code>registrado_em</code> / XID), mas o payload carrega os atributos de competência do negócio (<code>ano</code>, <code>mes</code>). Um evento referente a uma competência passada que chega dias ou meses depois não é descartado pelo consumidor de CDC: ele é capturado normalmente na transação em que foi confirmado.</li>
+<li><strong>Reprocessamento de janela sem duplicação:</strong> quando uma janela do arquivo <code>data/cdc/eventos.log</code> precisa ser reprocessada (por exemplo, após a chegada de declarações atrasadas ou retomada de falha), o consumidor <code>04_reprocessar.py</code> varre todo o histórico, descarta por chave primária (<code>evento_id</code> com <code>INSERT OR IGNORE</code>) as transações já aplicadas anteriormente e insere apenas os novos eventos confirmados.</li>
+<li><strong>Propagação para as partições analíticas:</strong> para refletir os eventos atrasados nas tabelas Parquet e Delta Lake, a reexecução dos módulos <code>exportar_parquet.py</code> e <code>materializar_delta.py</code> roteia o registro atrasado pela coluna <code>ano</code> (tempo do evento) diretamente para a partição histórica correspondente (<code>ano=AAAA/</code>), reconstruindo a janela de forma atômica e conciliada.</li>
+</ul>
+<hr />
+<h2 id="semantica-de-entrega-e-limitacoes">Semântica de entrega e limitações</h2>
+<ul>
+<li><strong>A captura bruta não deduplica:</strong> <code>tee -a</code> sempre anexa os textos recebidos. Se a origem reenviar uma alteração, ela pode aparecer repetida em <code>eventos.log</code>.</li>
+<li><strong>Deduplicação é do consumidor:</strong> a restrição <code>PRIMARY KEY</code> e <code>INSERT OR IGNORE</code> impedem a persistência repetida de <strong>eventos identificados como iguais</strong> no SQLite.</li>
+<li><strong>Replay não é uma nova alteração no PostgreSQL:</strong> executar <code>04_reprocessar.py</code> novamente relê o log existente; isso não gera um novo <code>INSERT</code> na tabela OLTP.</li>
+<li><strong>Garantias condicionais:</strong> o destino é idempotente para o cenário de reexecução do mesmo conteúdo, mas não há coordenação transacional entre avanço do slot, gravação em arquivo e escrita no SQLite. Por isso, <strong>não se afirma <code>exactly-once</code> de ponta a ponta</strong>.</li>
+<li><strong>Semântica at-least-once com consumidor idempotente:</strong> o desenho tolera duplicatas no destino de demonstração quando identificadas, alcançando efeito equivalente a <em>effectively-once</em> sobre o log persistido, enquanto a camada analítica Parquet/Delta garante idempotência por substituição atômica e conciliação de contagens.</li>
+<li><strong>Sem sincronização em tempo real com a camada analítica:</strong> o consumidor de CDC demonstra a captura e deduplicação em SQLite; a atualização das tabelas Parquet/Delta ocorre pela reexecução idempotente do lote sobre a origem.</li>
+<li><strong>Plugin de demonstração:</strong> <code>test_decoding</code> gera texto de teste, e não um contrato estruturado de eventos para produção. Para maior robustez, considerar <code>pgoutput</code> com um conector CDC apropriado e metadados de origem estáveis.</li>
+<li><strong>Retenção do WAL:</strong> o slot pode reter arquivos WAL se deixar de consumir; monitorar o uso de disco.</li>
+<li><strong>Transações desconhecidas:</strong> o parser de replay abandona uma transação ao encontrar conteúdo inesperado; os testes cobrem apenas os formatos presentes na implementação atual.</li>
+</ul>
+<p>Consulta útil para monitorar WAL retido:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>-T<span class="w"> </span>postgres<span class="w"> </span>psql<span class="w"> </span>-U<span class="w"> </span>metra<span class="w"> </span>-d<span class="w"> </span>metra<span class="w"> </span>-c<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="w">  </span><span class="s2">"SELECT slot_name, active, pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn)) AS wal_retido FROM pg_replication_slots WHERE slot_name = 'metra_cdc_slot';"</span>
+</code></pre></div>
+<p>Após finalizar <strong>definitivamente</strong> o experimento e parar o consumidor, o slot pode ser removido conscientemente. Não remova o slot se ainda precisar preservar a posição de leitura:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>-T<span class="w"> </span>postgres<span class="w"> </span>pg_recvlogical<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="w">  </span>-U<span class="w"> </span>metra<span class="w"> </span>-d<span class="w"> </span>metra<span class="w"> </span>--slot<span class="o">=</span>metra_cdc_slot<span class="w"> </span>--drop-slot
+</code></pre></div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Voltar para o topo
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "navigation.expand", "content.code.copy", "search.suggest", "search.highlight"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copiado para \u00e1rea de transfer\u00eancia", "clipboard.copy": "Copiar para \u00e1rea de transfer\u00eancia", "search.result.more.one": "mais 1 nesta p\u00e1gina", "search.result.more.other": "# mais nesta p\u00e1gina", "search.result.none": "Nenhum documento encontrado", "search.result.one": "1 documento encontrado", "search.result.other": "# documentos encontrados", "search.result.placeholder": "Digite para iniciar a busca", "search.result.term.missing": "Ausente", "select.version": "Selecione a vers\u00e3o"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
