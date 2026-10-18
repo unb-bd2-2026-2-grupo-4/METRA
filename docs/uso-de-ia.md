@@ -117,9 +117,9 @@ Abaixo constam os registros de todas as atividades:
 - **O que foi aproveitado:** Manutenção de `COMPRESSAO_PADRAO = "snappy"`, vencedor medido, com remoção da indicação de escolha provisória e referência à ADR 0003.
 - **Como foi verificado:** O padrão permaneceu Snappy e o benchmark validou seus arquivos. A escrita Delta e o acesso PostgreSQL não foram executados.
 
-#### Continuação — diário e validação final
+#### Continuação - diário e validação final
 
-- **Onde:** `docs/diario/semana-07.md`, `mkdocs.yml` e este registro.
+- **Onde:** `docs/diario/semana-08.md`, `mkdocs.yml` e este registro.
 - **O que foi aproveitado:** Registro do que foi medido, do resultado inesperado e da decisão, sem atribuir ao integrante uma revisão ainda não realizada.
 - **Como foi verificado:** Benchmark principal completo; casos locais adicionais com valores vazios, salário negativo, códigos com zeros e linhas de entrada repetidas; caminho com apóstrofo; rejeição de origem vazia/ausente, menos de três repetições e zero threads; compilação dos módulos Python, `git diff --check` e geração da documentação com `python -m mkdocs build --strict`. Os testes auxiliares usam dados controlados e não compõem os números da ADR.
 
@@ -132,14 +132,14 @@ Abaixo constam os registros de todas as atividades:
 - **Como foi verificado:** Execução dos scripts de CDC no ambiente Docker Compose e conferência do arquivo `data/cdc/eventos.log`. Foi comprovada a captura de um `INSERT` na tabela `oltp.cdc_probe`, registrado na transação 769, e de um `UPDATE` no mesmo registro, registrado na transação 770. Ambos apresentaram os respectivos comandos `BEGIN` e `COMMIT`, demonstrando que as alterações confirmadas no PostgreSQL foram capturadas e propagadas para o arquivo. Verificou-se que a regra `*.log` do `.gitignore` impede o versionamento de novos arquivos de log. Os testes comprovaram a captura e propagação de eventos, mas não validaram o reprocessamento com deduplicação nem a integração com a camada analítica.
 - **Quem revisou:** Davi Camilo
 
-#### Continuação — Atualização da documentação no README
+#### Continuação - Atualização da documentação no README
 
 - **Onde:** `README.md`.
 - **O que foi pedido:** Auxílio na atualização e padronização do README do projeto, incluindo a descrição da implementação de CDC e reprocessamento idempotente da E2.
 - **O que foi aproveitado:** Inclusão de instruções para executar os scripts de CDC e replay, com explicações sobre a captura de alterações via `pg_recvlogical`, armazenamento dos eventos e deduplicação com SQLite.
 - **Como foi verificado:** Os textos e comandos foram revisados quanto à clareza, coerência técnica e padronização com as demais seções do README.
 
-#### Continuação — Documentação do CDC e Reprocessamento Idempotente (E2, tarefa 1)
+#### Continuação - Documentação do CDC e Reprocessamento Idempotente (E2, tarefa 1)
 
 - **Onde:** `docs/cdc.md`.
 - **O que foi pedido:** Auxílio na elaboração e organização da documentação técnica da implementação de CDC e reprocessamento idempotente, seguindo a ideia adotado nas documentações da Camada Bronze e da extração para Parquet e Delta.
@@ -155,3 +155,12 @@ Abaixo constam os registros de todas as atividades:
 - **O que foi aproveitado:** Instruções para usar `POSTGRES_PORT=5433`, acessar o banco com `psql` e verificar a biblioteca `test_decoding.so`, o utilitário `pg_recvlogical`, `wal_level` e o carregamento do plugin com um slot temporário. Estruturação da ADR com contexto, alternativas, decisão, consequências e gatilhos de revisão, distinguindo conectores, clientes e plugins. Consulta às documentações oficiais do PostgreSQL, Debezium e wal2json.
 - **Como foi verificado:** Leitura da configuração do Compose, das ADRs e das evidências da ADR 0003;. Não foram executados conexão ao banco, teste do plugin ou benchmark de CDC. As alterações de documentação solicitadas para a ADR ficaram restritas a ela.
 - **Quem revisou:** Tiago Antunes.
+
+### 18/10/2026 - Revisão de conformidade da E2, correção de bug SQLite no Windows, tratamento de dado atrasado e Diários 07 a 09
+
+- **Ferramenta:** Antigravity (Google DeepMind).
+- **Onde:** `src/cdc/04_reprocessar.py`, `tests/test_cdc_replay.py`, `docs/camada-parquet.md`, `docs/cdc.md`, `docs/adr/0004-cdc-decodificacao-logica.md`, `docs/diario/semana-07.md`, `docs/diario/semana-08.md`, `docs/diario/semana-09.md`, `mkdocs.yml`, `README.md` e `docs/uso-de-ia.md`.
+- **O que foi pedido:** Auditar todo o repositório frente aos requisitos da Entrega E2, corrigir o bloqueio de arquivo nos testes em ambiente Windows, explicitar e testar o tratamento de dados atrasados e reprocessamento de janela, e auxiliar na documentação dos diários de bordo das Semanas 07, 08 e 09.
+- **O que foi aproveitado:** Fechamento explícito da conexão SQLite com `contextlib.closing` em `04_reprocessar.py`; adição do teste unitário `test_dado_atrasado_e_reprocessamento_janela`; documentação das regras de roteamento por tempo do evento (`ano`) e reprocessamento de janela em `docs/camada-parquet.md` e `docs/cdc.md`; alinhamento cronológico dos diários das Semanas 07 (apresentação E1 e ADR 0002), 08 (Parquet, Delta Lake e ADR 0003) e 09 (CDC lógico, replay idempotente e ADR 0004); atualização do `README.md` e `ADR 0004`.
+- **Como foi verificado:** Leitura e análise de todos os arquivos modificados pela IA, execução da suíte de testes unitários no Windows (`python -m unittest discover -s tests -p "test_cdc_replay.py" -v` com 3 testes aprovados em 0,21s) e validação do build estrito da documentação (`python -m mkdocs build --strict`).
+- **Quem revisou:** Arthur Evangelista.
