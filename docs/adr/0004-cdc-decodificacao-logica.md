@@ -10,7 +10,7 @@
 
 O METRA utiliza PostgreSQL 16 como fonte transacional e DuckDB como motor analítico, conforme a [ADR 0002](0002-simplificacao-arquitetural-duckdb.md). Para a etapa de CDC (*Change Data Capture*), precisamos capturar alterações confirmadas na origem sem depender de uma nova extração completa a cada atualização.
 
-O PostgreSQL já gera WAL (*Write-Ahead Log*) para recuperação de transações. Entretanto, a configuração versionada atual apenas ajusta `max_wal_size`; ainda será necessário habilitar a decodificação lógica e configurar o acesso de replicação. Esta ADR propõe a abordagem de captura, sem implementar esses componentes.
+O PostgreSQL gera WAL (*Write-Ahead Log*) para recuperação de transações e, com `wal_level=logical` habilitado no serviço do `docker-compose.yml`, expõe as mutações confirmadas por meio de slots de replicação lógica. Esta ADR formaliza a escolha do mecanismo de captura e reprocessamento implementado em `src/cdc/`.
 
 Comparamos três caminhos: Debezium com pgoutput, consumidor próprio com wal2json e `pg_recvlogical` com `test_decoding`. Debezium é um conector de CDC; pg_recvlogical é um cliente de recepção; pgoutput, wal2json e test_decoding são plugins de saída da decodificação lógica.
 
@@ -66,7 +66,7 @@ Utilizar `pg_recvlogical` para receber o fluxo de um slot lógico criado com `te
 
 ### Base de dados e método de estimativa
 
-A contagem do [CSV amostral](../../data/caged_centro_oeste_amostra.csv) identificou 49.178 registros, distribuídos em 37 competências, de janeiro de 2023 a janeiro de 2026. Esse total também está registrado nas [evidências da ADR 0003](evidencias/0003-compressao-parquet.json). Para o recorte completo, existem 14,7 milhões de registros.
+A contagem do CSV amostral (`data/caged_centro_oeste_amostra.csv`) identificou 49.178 registros, distribuídos em 37 competências, de janeiro de 2023 a janeiro de 2026. Esse total também está registrado nas [evidências da ADR 0003](evidencias/0003-compressao-parquet.json). Para o recorte completo, existem 14,7 milhões de registros.
 
 | Base | Quantidade | Interpretação |
 |---|---|---|
@@ -95,13 +95,13 @@ Nesse cenário, a captura dos 14,7 milhões de eventos levou aproximadamente **4
 
 ## 4. Decisão
 
-**Propomos adotar a alternativa C: pg_recvlogical com test_decoding para capturar mudanças do PostgreSQL por decodificação lógica e persistir o fluxo em arquivo.**
+**Adotamos a alternativa C: `pg_recvlogical` com `test_decoding` para capturar mudanças do PostgreSQL por decodificação lógica e persistir o fluxo em arquivo (`data/cdc/eventos.log`), acompanhado pelo consumidor idempotente `src/cdc/04_reprocessar.py`.**
 
-A justificativa central é usar o cliente de recepção do PostgreSQL para reduzir a infraestrutura e evitar implementar o protocolo de replicação. A escolha atende ao escopo inicial, aceitando os limites de um plugin de exemplo e de uma integração textual.
+A justificativa central é usar o cliente de recepção nativo do PostgreSQL para reduzir a infraestrutura e evitar implementar o protocolo de replicação. A escolha atende ao escopo da E2, aceitando os limites de um plugin textual e tratando a deduplicação de eventos no consumidor via chave primária SHA-256 em SQLite.
 
-A implementação deverá definir snapshot inicial consistente com o início do fluxo, persistência e rotação dos arquivos, processamento por transações completas e controle de progresso no destino. A confirmação enviada por pg_recvlogical não comprova que o destino analítico aplicou os eventos: arquivos confirmados precisam ser preservados até o processamento seguro. A captura deverá usar arquivo com sincronização em disco, sem desabilitar fsync; saída para outro processo exige avaliar separadamente a durabilidade.
+A implementação valida transações completas (`BEGIN ... COMMIT`), ignora fragmentos incompletos e preserva idempotência no reprocessamento de janelas e na chegada de dados atrasados, conforme documentado em [`docs/cdc.md`](../cdc.md).
 
-Esta proposta detalha a captura incremental prevista para a E2 na ADR 0002. Seu custo operacional deverá ser validado para preservar a orientação de simplificação daquela decisão.
+Esta decisão consolida a captura incremental prevista para a E2 na ADR 0002, preservando a orientação de simplificação arquitetural da plataforma.
 
 ---
 

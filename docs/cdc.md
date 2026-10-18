@@ -221,14 +221,23 @@ Os resultados numéricos de replay indicados acima são **saídas esperadas** pa
 python3 -m unittest discover -s tests -p 'test_cdc_replay.py' -v
 ```
 
-O arquivo `tests/test_cdc_replay.py` contém dois testes:
+O arquivo `tests/test_cdc_replay.py` contém três testes:
 
 | Teste | Verificação |
 |---|---|
 | `test_replay_mesmo_log_nao_duplicar` | Reprocessar duas vezes o mesmo log e anexá-lo novamente não aumenta o total de eventos únicos. |
 | `test_ignora_transacao_incompleta` | Uma transação com `BEGIN`, mas sem `COMMIT`, não é inserida no destino. |
+| `test_dado_atrasado_e_reprocessamento_janela` | Um evento atrasado (competência `ano=2023` registrado tardiamente em `2025`) anexado ao log é incorporado no reprocessamento da janela sem duplicar os eventos anteriores. |
 
-**Validação efetuada para esta documentação:** os dois testes unitários, executados em Python 3 sobre os arquivos de replay fornecidos, passaram (`Ran 2 tests ... OK`).
+**Validação efetuada para esta documentação:** os três testes unitários, executados em Python 3 sobre os arquivos de replay fornecidos, passaram (`Ran 3 tests ... OK`).
+
+---
+
+## Tratamento de dado atrasado e reprocessamento de janela
+
+- **Separação entre tempo do evento e tempo de captura:** no WAL, a ordem de chegada reflete o instante da confirmação da transação (`registrado_em` / XID), mas o payload carrega os atributos de competência do negócio (`ano`, `mes`). Um evento referente a uma competência passada que chega dias ou meses depois não é descartado pelo consumidor de CDC: ele é capturado normalmente na transação em que foi confirmado.
+- **Reprocessamento de janela sem duplicação:** quando uma janela do arquivo `data/cdc/eventos.log` precisa ser reprocessada (por exemplo, após a chegada de declarações atrasadas ou retomada de falha), o consumidor `04_reprocessar.py` varre todo o histórico, descarta por chave primária (`evento_id` com `INSERT OR IGNORE`) as transações já aplicadas anteriormente e insere apenas os novos eventos confirmados.
+- **Propagação para as partições analíticas:** para refletir os eventos atrasados nas tabelas Parquet e Delta Lake, a reexecução dos módulos `exportar_parquet.py` e `materializar_delta.py` roteia o registro atrasado pela coluna `ano` (tempo do evento) diretamente para a partição histórica correspondente (`ano=AAAA/`), reconstruindo a janela de forma atômica e conciliada.
 
 ---
 
@@ -238,8 +247,8 @@ O arquivo `tests/test_cdc_replay.py` contém dois testes:
 - **Deduplicação é do consumidor:** a restrição `PRIMARY KEY` e `INSERT OR IGNORE` impedem a persistência repetida de **eventos identificados como iguais** no SQLite.
 - **Replay não é uma nova alteração no PostgreSQL:** executar `04_reprocessar.py` novamente relê o log existente; isso não gera um novo `INSERT` na tabela OLTP.
 - **Garantias condicionais:** o destino é idempotente para o cenário de reexecução do mesmo conteúdo, mas não há coordenação transacional entre avanço do slot, gravação em arquivo e escrita no SQLite. Por isso, **não se afirma `exactly-once` de ponta a ponta**.
-- **Semântica at-least-once:** o desenho tolera duplicatas no destino de demonstração, quando identificadas; entretanto, uma garantia operacional integral de entrega *at-least-once* também exigiria recuperação durável e confirmação coordenada, o que não foi implementado aqui.
-- **Sem sincronização com a camada analítica:** o consumidor não aplica automaticamente as mudanças do WAL às tabelas Parquet/Delta. Esse seria um passo de integração adicional.
+- **Semântica at-least-once com consumidor idempotente:** o desenho tolera duplicatas no destino de demonstração quando identificadas, alcançando efeito equivalente a *effectively-once* sobre o log persistido, enquanto a camada analítica Parquet/Delta garante idempotência por substituição atômica e conciliação de contagens.
+- **Sem sincronização em tempo real com a camada analítica:** o consumidor de CDC demonstra a captura e deduplicação em SQLite; a atualização das tabelas Parquet/Delta ocorre pela reexecução idempotente do lote sobre a origem.
 - **Plugin de demonstração:** `test_decoding` gera texto de teste, e não um contrato estruturado de eventos para produção. Para maior robustez, considerar `pgoutput` com um conector CDC apropriado e metadados de origem estáveis.
 - **Retenção do WAL:** o slot pode reter arquivos WAL se deixar de consumir; monitorar o uso de disco.
 - **Transações desconhecidas:** o parser de replay abandona uma transação ao encontrar conteúdo inesperado; os testes cobrem apenas os formatos presentes na implementação atual.

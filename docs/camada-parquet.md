@@ -36,6 +36,17 @@ Com a amostra versionada, a extração produz 49.178 movimentações, 5.572 muni
 
 ---
 
+## Tratamento de Dado Atrasado e Reprocessamento de Janela
+
+No domínio do Novo CAGED, empregadores podem enviar declarações fora do prazo (por exemplo, uma admissão ocorrida na competência `ano=2023, mes=11`, mas registrada na origem transacional apenas em `2025-02`). Para evitar que o evento atrasado caia na janela errada ou seja perdido, o pipeline aplica duas regras explícitas:
+
+1. **Roteamento estrito pelo Tempo do Evento (`ano` de competência):**
+   Conforme estabelecido no [ADR 0001](adr/0001-modelagem-sistema-origem.md), o modelo separa o **tempo do evento** (`ano`, `mes`) do **tempo de registro operacional** (`registrado_em`). O particionamento em Parquet (`PARTITION_BY (ano)`) e na tabela Delta (`partition_by=["ano"]`) utiliza exclusivamente a coluna `ano` (competência real do fato), e nunca o carimbo `registrado_em`. Dessa forma, um registro de 2023 que chega com atraso em 2025 é gravado diretamente na partição `ano=2023/`, preservando a fidelidade histórica da série temporal.
+2. **Reprocessamento atômico e idempotente de janela:**
+   Quando novos registros atrasados chegam à origem e a extração é reexecutada (`exportar_parquet.py` seguido de `materializar_delta.py`), as partições são reconstruídas integralmente em diretório temporário (`parquet.tmp`), conciliadas contra a contagem total da origem (`COUNT(*)`) e comitadas no log transacional Delta (`_delta_log/`) com `mode="overwrite"` e limpeza via `vacuum`. O reprocessamento incorpora o dado atrasado na janela histórica correta sem duplicar nenhum registro anterior.
+
+---
+
 ## Por que Delta e não Iceberg?
 
 A tarefa pede pelo menos uma tabela Delta **ou** Iceberg. A Squad materializa em **Delta Lake**, gravada com a biblioteca `deltalake` (delta-rs):
