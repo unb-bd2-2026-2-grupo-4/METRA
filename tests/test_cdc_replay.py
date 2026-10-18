@@ -47,6 +47,32 @@ class ReplayCDC(unittest.TestCase):
             resultado = replay.processar(log, diretorio / "replay.sqlite3")
             self.assertEqual(resultado["total_destino"], 2)
 
+    def test_dado_atrasado_e_reprocessamento_janela(self):
+        with tempfile.TemporaryDirectory() as pasta:
+            diretorio = Path(pasta)
+            log = diretorio / "eventos.log"
+            banco = diretorio / "replay.sqlite3"
+            # Janela inicial com eventos de 2025.
+            log.write_text(LOG, encoding="utf-8")
+            inicial = replay.processar(log, banco)
+            self.assertEqual(inicial["total_destino"], 2)
+
+            # Chegada de dado atrasado (competencia anterior declarada fora do prazo)
+            # e reprocessamento de toda a janela acumulada.
+            evento_atrasado = (
+                "BEGIN 772\n"
+                "table oltp.movimentacao: INSERT: id_movimentacao[bigint]:99999 "
+                "ano[integer]:2023 mes[integer]:11 registrado_em[timestamp with time zone]:'2025-02-10 10:00:00+00'\n"
+                "COMMIT 772\n"
+            )
+            with log.open("a", encoding="utf-8") as arquivo:
+                arquivo.write(evento_atrasado)
+
+            reprocessado = replay.processar(log, banco)
+            self.assertEqual(reprocessado["novos"], 1)
+            self.assertEqual(reprocessado["duplicados"], 2)
+            self.assertEqual(reprocessado["total_destino"], 3)
+
 
 if __name__ == "__main__":
     unittest.main()
