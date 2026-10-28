@@ -1,0 +1,24 @@
+version: 2
+
+sources:
+  - name: lake
+    description: >
+      Parquet extraído 1:1 do schema oltp do PostgreSQL por src/extracao/exportar_parquet.py.
+      Cada tabela é uma pasta; movimentacao é particionada por ano (ano=AAAA/).
+    config:
+      meta:
+        # METRA_LAKE_PARQUET: diretório do Parquet, relativo a dbt_metra/.
+        # A coluna de partição também está nos arquivos: sem a inferência Hive,
+        # ano mantém o tipo INTEGER da origem.
+        external_location: "read_parquet('{{ env_var('METRA_LAKE_PARQUET', '../data/lake/parquet') }}/{name}/**/*.parquet', hive_partitioning = false)"
+    tables:
+      - name: movimentacao
+        description: Movimentações de admissão e desligamento do Novo CAGED (oltp.movimentacao).
+      - name: municipio
+        description: Municípios do IBGE, com o sentinela 9999999 para município não identificado (oltp.municipio).
+      - name: cbo_2002
+        description: Ocupações da CBO 2002 (oltp.cbo_2002).
+      - name: cnae_subclasse
+        description: Subclasses da CNAE 2.0 (oltp.cnae_subclasse).
+      - name: cnae_secao
+        description: Seções da CNAE 2.0 (oltp.cnae_secao).

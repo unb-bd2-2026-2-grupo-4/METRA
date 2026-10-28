@@ -1,0 +1,20 @@
+# Camada analítica do METRA (E3): Parquet extraído do OLTP -> Silver -> Gold no DuckDB.
+name: metra
+version: "1.0.0"
+profile: metra
+
+model-paths: ["models"]
+macro-paths: ["macros"]
+clean-targets: ["target", "dbt_packages"]
+
+models:
+  metra:
+    # Silver: limpeza e padronização 1:1 com as tabelas da origem.
+    # Materializada como tabela para não depender do caminho do Parquet na leitura.
+    staging:
+      +schema: silver
+      +materialized: table
+    # Gold: dimensões e fatos do Star Schema.
+    marts:
+      +schema: gold
+      +materialized: table
