@@ -51,3 +51,5 @@ site/
 *~
 .DS_Store
 Thumbs.db
+e2-compressao.patch
+IMPLEMENTATION_PLAN.md
