@@ -65,12 +65,16 @@ nav:
       - Relacionamento entre as Bases: relacionamentos.md
       - Captura de Mudanças (CDC): cdc.md
       - Extração para Parquet e Delta: camada-parquet.md
+      - Camada Analítica e Qualidade dbt: camada-analitica-dbt.md
+      - Consumo e Governança: consumo-e-governanca.md
   - Governança & Decisões:
       - Decisões de Arquitetura (ADR):
           - "ADR 0001: Origem Transacional OLTP": adr/0001-modelagem-sistema-origem.md
           - "ADR 0002: Simplificação com DuckDB": adr/0002-simplificacao-arquitetural-duckdb.md
           - "ADR 0003: Compressão Parquet": adr/0003-compressao-parquet.md
           - "ADR 0004: Estratégia de CDC": adr/0004-cdc-decodificacao-logica.md
+          - "ADR 0005: Modelagem Analítica (proposta)": adr/0005-modelagem-analitica-dbt.md
+          - "ADR 0007: Busca e Consumo (proposta)": adr/0007-busca-semantica-e-consumo.md
       - Governança e IA: uso-de-ia.md
       - Diário de Bordo:
           - Semana 01: diario/semana-01.md

@@ -301,6 +301,14 @@ Os modelos `stg_movimentacao`, `stg_municipio`, `stg_cbo` e `stg_cnae` leem o Pa
 
 O `profiles.yml` versionado em `dbt_metra/` dispensa configuração em `~/.dbt/`. As variáveis `METRA_LAKE_PARQUET` (diretório do Parquet, relativo a `dbt_metra/`) e `METRA_DUCKDB` (arquivo de destino) permitem apontar para outros caminhos, como em contêineres ou no orquestrador.
 
+Os testes das fontes e da Silver são executados por `dbt build` ou `dbt test --profiles-dir .`, dentro de `dbt_metra/`. Cobrem schema, chaves, referências, domínios, volume, distribuição e linhagem. Para validar a detecção de falhas com Parquet sintético isolado, execute na raiz:
+
+```bash
+python -m unittest discover -s tests -p 'test_dbt_quality.py' -v
+```
+
+Veja a [camada analítica e o Star Schema proposto](docs/camada-analitica-dbt.md), a [ADR-0005](docs/adr/0005-modelagem-analitica-dbt.md).
+
 ---
 
 ## Governança, Transparência e Evolução do Projeto
