@@ -1,0 +1,561 @@
+# Contratos da Silver. Não duplicar patches de modelos em outro YAML.
+version: 2
+models:
+- name: stg_movimentacao
+  description: Movimentações de admissão e desligamento do Novo CAGED, uma linha por movimentação da origem.
+  columns:
+  - name: id_movimentacao
+    description: Chave da movimentação na origem (oltp.movimentacao).
+    data_tests:
+    - not_null
+    - unique
+    data_type: BIGINT
+  - name: ano
+    description: Ano da competência.
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - 2023
+          - 2024
+          - 2025
+          - 2026
+          quote: false
+    data_type: INTEGER
+  - name: mes
+    description: Mês da competência (1 a 12).
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - 1
+          - 2
+          - 3
+          - 4
+          - 5
+          - 6
+          - 7
+          - 8
+          - 9
+          - 10
+          - 11
+          - 12
+          quote: false
+    data_type: INTEGER
+  - name: competencia
+    description: Primeiro dia do mês da competência.
+    data_tests:
+    - not_null
+    data_type: DATE
+  - name: id_municipio
+    description: Código IBGE de 7 dígitos; 9999999 quando não identificado. Liga a stg_municipio.
+    data_tests:
+    - not_null
+    - relationships:
+        arguments:
+          to: ref('stg_municipio')
+          field: id_municipio
+    data_type: VARCHAR
+  - name: codigo_cnae_subclasse
+    description: Subclasse CNAE 2.0 de 7 dígitos; 9999999 quando não identificada. Liga a stg_cnae.
+    data_tests:
+    - not_null
+    - relationships:
+        arguments:
+          to: ref('stg_cnae')
+          field: codigo_cnae_subclasse
+    data_type: VARCHAR
+  - name: codigo_cbo
+    description: Ocupação CBO 2002 de 6 dígitos. Liga a stg_cbo.
+    data_tests:
+    - not_null
+    - relationships:
+        arguments:
+          to: ref('stg_cbo')
+          field: codigo_cbo
+    data_type: VARCHAR
+  - name: codigo_sexo
+    description: Código do CAGED (1 homem, 3 mulher, 9 não identificado).
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - 1
+          - 3
+          - 9
+          quote: false
+    data_type: INTEGER
+  - name: codigo_raca_cor
+    description: Código do CAGED (1 branca, 2 preta, 3 parda, 4 amarela, 5 indígena, 6 não informada, 9 não identificado).
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - 1
+          - 2
+          - 3
+          - 4
+          - 5
+          - 6
+          - 9
+          quote: false
+    data_type: INTEGER
+  - name: idade
+    description: Idade em anos; nula quando ausente ou fora de 10 a 120.
+    data_type: INTEGER
+  - name: codigo_grau_instrucao
+    description: Código de escolaridade do CAGED.
+    data_tests:
+    - not_null
+    data_type: INTEGER
+  - name: codigo_tipo_movimentacao
+    description: Código do tipo de movimentação do CAGED (admissão, demissão, aposentadoria etc.).
+    data_tests:
+    - not_null
+    data_type: INTEGER
+  - name: saldo_movimentacao
+    description: 1 para admissão e -1 para desligamento; a soma é o saldo de empregos.
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - -1
+          - 1
+          quote: false
+    data_type: INTEGER
+  - name: tipo_evento
+    description: '''admissao'' ou ''desligamento'', derivado de saldo_movimentacao.'
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - admissao
+          - desligamento
+    data_type: VARCHAR
+  - name: salario_mensal
+    description: Salário mensal nominal em R$; zero quando ausente ou negativo na fonte.
+    data_type: DECIMAL(16,2)
+  - name: salario_valido
+    description: Verdadeiro quando salario_mensal > 0; critério para entrar em médias salariais.
+    data_type: BOOLEAN
+  - name: horas_contratuais
+    description: Horas semanais contratadas; zero quando ausentes ou negativas na fonte.
+    data_type: DECIMAL(5,2)
+  - name: id_ingestao
+    description: Lote de ingestão na camada bronze (linhagem).
+    data_tests:
+    - not_null
+    data_type: BIGINT
+  - name: numero_linha
+    description: Linha do arquivo de origem no lote (linhagem).
+    data_tests:
+    - not_null
+    data_type: BIGINT
+  - name: registrado_em
+    description: Momento do registro na origem transacional.
+    data_tests:
+    - not_null
+    data_type: TIMESTAMP WITH TIME ZONE
+  config:
+    tags:
+    - qualidade
+    - silver
+  data_tests:
+  - metra_not_empty
+  - metra_same_count:
+      arguments:
+        compare_model: source('lake', 'movimentacao')
+        distinct_key: id_movimentacao
+  - metra_expression:
+      name: stg_movimentacao_id_municipio_formato
+      arguments:
+        expression: regexp_full_match(id_municipio, '[0-9]{7}')
+  - metra_expression:
+      name: stg_movimentacao_codigo_cbo_formato
+      arguments:
+        expression: regexp_full_match(codigo_cbo, '[0-9]{6}')
+  - metra_expression:
+      name: stg_movimentacao_codigo_cnae_subclasse_formato
+      arguments:
+        expression: regexp_full_match(codigo_cnae_subclasse, '[0-9]{7}')
+  - metra_unique_combination:
+      arguments:
+        columns:
+        - id_ingestao
+        - numero_linha
+  - metra_expression:
+      name: stg_movimentacao_linhagem_positiva
+      arguments:
+        expression: id_movimentacao > 0 and id_ingestao > 0 and numero_linha > 0
+  - metra_expression:
+      name: stg_movimentacao_competencia_coerente
+      arguments:
+        expression: competencia = make_date(ano, mes, 1)
+  - metra_expression:
+      name: stg_movimentacao_idade_valida
+      arguments:
+        expression: idade is null or idade between 10 and 120
+  - metra_expression:
+      name: stg_movimentacao_salario_nao_negativo
+      arguments:
+        expression: salario_mensal is null or salario_mensal >= 0
+  - metra_expression:
+      name: stg_movimentacao_horas_nao_negativas
+      arguments:
+        expression: horas_contratuais is null or horas_contratuais >= 0
+  - metra_expression:
+      name: stg_movimentacao_flag_salario
+      arguments:
+        expression: salario_valido is not distinct from (salario_mensal > 0)
+  - metra_expression:
+      name: stg_movimentacao_tipo_evento_coerente
+      arguments:
+        expression: (saldo_movimentacao = 1 and tipo_evento = 'admissao') or (saldo_movimentacao = -1 and tipo_evento
+          = 'desligamento')
+  - metra_same_distribution:
+      name: silver_distribuicao_competencia
+      arguments:
+        compare_model: source('lake', 'movimentacao')
+        dimensions:
+        - ano
+        - mes
+        compare_dimensions:
+        - ano
+        - mes
+  - metra_same_distribution:
+      name: silver_distribuicao_geografia
+      arguments:
+        compare_model: source('lake', 'movimentacao')
+        dimensions:
+        - ano
+        - mes
+        - id_municipio
+        compare_dimensions:
+        - ano
+        - mes
+        - id_municipio
+  - metra_same_distribution:
+      name: silver_distribuicao_perfil
+      arguments:
+        compare_model: source('lake', 'movimentacao')
+        dimensions:
+        - codigo_sexo
+        - codigo_raca_cor
+        - codigo_grau_instrucao
+        - saldo_movimentacao
+        compare_dimensions:
+        - sexo
+        - raca_cor
+        - grau_instrucao
+        - saldo_movimentacao
+  - metra_monthly_volume:
+      name: silver_volume_mensal
+      arguments:
+        min_ratio: 0.25
+        max_ratio: 4.0
+      config:
+        severity: warn
+  - metra_column_types:
+      arguments:
+        expected:
+          id_movimentacao: BIGINT
+          ano: INTEGER
+          mes: INTEGER
+          competencia: DATE
+          id_municipio: VARCHAR
+          codigo_cnae_subclasse: VARCHAR
+          codigo_cbo: VARCHAR
+          codigo_sexo: INTEGER
+          codigo_raca_cor: INTEGER
+          idade: INTEGER
+          codigo_grau_instrucao: INTEGER
+          codigo_tipo_movimentacao: INTEGER
+          saldo_movimentacao: INTEGER
+          tipo_evento: VARCHAR
+          salario_mensal: DECIMAL(16,2)
+          salario_valido: BOOLEAN
+          horas_contratuais: DECIMAL(5,2)
+          id_ingestao: BIGINT
+          numero_linha: BIGINT
+          registrado_em: TIMESTAMP WITH TIME ZONE
+- name: stg_municipio
+  description: Municípios oficiais do IBGE, incluindo o sentinela 9999999.
+  columns:
+  - name: id_municipio
+    description: Código IBGE de 7 dígitos.
+    data_tests:
+    - not_null
+    - unique
+    data_type: VARCHAR
+  - name: nome_municipio
+    description: Nome oficial do município.
+    data_tests:
+    - not_null
+    data_type: VARCHAR
+  - name: sigla_uf
+    description: Sigla da UF; NI para o sentinela.
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - AC
+          - AL
+          - AP
+          - AM
+          - BA
+          - CE
+          - DF
+          - ES
+          - GO
+          - MA
+          - MT
+          - MS
+          - MG
+          - PA
+          - PB
+          - PR
+          - PE
+          - PI
+          - RJ
+          - RN
+          - RS
+          - RO
+          - RR
+          - SC
+          - SP
+          - SE
+          - TO
+          - NI
+    data_type: VARCHAR
+  - name: nome_uf
+    description: Nome da UF.
+    data_tests:
+    - not_null
+    data_type: VARCHAR
+  - name: regiao
+    description: Grande região do IBGE.
+    data_tests:
+    - not_null
+    data_type: VARCHAR
+  - name: is_capital
+    description: Verdadeiro para as capitais do Centro-Oeste (Brasília, Goiânia, Cuiabá e Campo Grande).
+    data_tests:
+    - not_null
+    data_type: BOOLEAN
+  - name: is_identificado
+    description: Falso apenas para o sentinela 9999999.
+    data_tests:
+    - not_null
+    data_type: BOOLEAN
+  - name: is_centro_oeste
+    description: Verdadeiro para municípios de DF, GO, MT e MS.
+    data_tests:
+    - not_null
+    data_type: BOOLEAN
+  config:
+    tags:
+    - qualidade
+    - silver
+  data_tests:
+  - metra_not_empty
+  - metra_same_count:
+      arguments:
+        compare_model: source('lake', 'municipio')
+  - metra_expression:
+      name: stg_municipio_id_municipio_formato
+      arguments:
+        expression: regexp_full_match(id_municipio, '[0-9]{7}')
+  - metra_expression:
+      name: stg_municipio_flag_identificado
+      arguments:
+        expression: is_identificado = (id_municipio <> '9999999')
+  - metra_expression:
+      name: stg_municipio_flag_centro_oeste
+      arguments:
+        expression: is_centro_oeste = (sigla_uf in ('DF','GO','MT','MS'))
+  - metra_expression:
+      name: stg_municipio_capitais_recorte
+      arguments:
+        expression: is_capital = (id_municipio in ('5300108','5208707','5103403','5002704'))
+  - metra_expression:
+      name: stg_municipio_sentinela
+      arguments:
+        expression: id_municipio <> '9999999' or (sigla_uf = 'NI' and not is_capital)
+  - metra_expression:
+      name: stg_municipio_nome_municipio_preenchido
+      arguments:
+        expression: length(trim(nome_municipio)) > 0
+  - metra_expression:
+      name: stg_municipio_nome_uf_preenchido
+      arguments:
+        expression: length(trim(nome_uf)) > 0
+  - metra_expression:
+      name: stg_municipio_regiao_preenchido
+      arguments:
+        expression: length(trim(regiao)) > 0
+  - metra_column_types:
+      arguments:
+        expected:
+          id_municipio: VARCHAR
+          nome_municipio: VARCHAR
+          sigla_uf: VARCHAR
+          nome_uf: VARCHAR
+          regiao: VARCHAR
+          is_capital: BOOLEAN
+          is_identificado: BOOLEAN
+          is_centro_oeste: BOOLEAN
+- name: stg_cbo
+  description: Ocupações da CBO 2002.
+  columns:
+  - name: codigo_cbo
+    description: Código da ocupação com 6 dígitos.
+    data_tests:
+    - not_null
+    - unique
+    data_type: VARCHAR
+  - name: titulo_ocupacao
+    description: Título da ocupação.
+    data_tests:
+    - not_null
+    data_type: VARCHAR
+  - name: codigo_grande_grupo
+    description: Grande grupo ocupacional (primeiro dígito do código).
+    data_tests:
+    - not_null
+    data_type: VARCHAR
+  - name: is_cadastro_oficial
+    description: Falso para ocupações criadas pela carga a partir de códigos ausentes da base oficial.
+    data_tests:
+    - not_null
+    data_type: BOOLEAN
+  config:
+    tags:
+    - qualidade
+    - silver
+  data_tests:
+  - metra_not_empty
+  - metra_same_count:
+      arguments:
+        compare_model: source('lake', 'cbo_2002')
+  - metra_expression:
+      name: stg_cbo_codigo_cbo_formato
+      arguments:
+        expression: regexp_full_match(codigo_cbo, '[0-9]{6}')
+  - metra_expression:
+      name: stg_cbo_grande_grupo
+      arguments:
+        expression: codigo_grande_grupo = left(codigo_cbo, 1)
+  - metra_expression:
+      name: stg_cbo_flag_cadastro
+      arguments:
+        expression: is_cadastro_oficial = (titulo_ocupacao not like '% (ATUALIZACAO MTE)')
+  - metra_expression:
+      name: stg_cbo_titulo_ocupacao_preenchido
+      arguments:
+        expression: length(trim(titulo_ocupacao)) > 0
+  - metra_column_types:
+      arguments:
+        expected:
+          codigo_cbo: VARCHAR
+          titulo_ocupacao: VARCHAR
+          codigo_grande_grupo: VARCHAR
+          is_cadastro_oficial: BOOLEAN
+- name: stg_cnae
+  description: Subclasses da CNAE 2.0 com a seção correspondente.
+  columns:
+  - name: codigo_cnae_subclasse
+    description: Código da subclasse com 7 dígitos.
+    data_tests:
+    - not_null
+    - unique
+    data_type: VARCHAR
+  - name: descricao_subclasse
+    description: Descrição da subclasse.
+    data_tests:
+    - not_null
+    data_type: VARCHAR
+  - name: codigo_secao
+    description: Letra da seção CNAE; Z para atividades não identificadas.
+    data_tests:
+    - not_null
+    - accepted_values:
+        arguments:
+          values:
+          - A
+          - B
+          - C
+          - D
+          - E
+          - F
+          - G
+          - H
+          - I
+          - J
+          - K
+          - L
+          - M
+          - N
+          - O
+          - P
+          - Q
+          - R
+          - S
+          - T
+          - U
+          - Z
+    data_type: VARCHAR
+  - name: descricao_secao
+    description: Descrição da seção.
+    data_tests:
+    - not_null
+    data_type: VARCHAR
+  - name: is_cadastro_oficial
+    description: Falso para o sentinela 9999999 e para subclasses administrativas criadas pela carga.
+    data_tests:
+    - not_null
+    data_type: BOOLEAN
+  config:
+    tags:
+    - qualidade
+    - silver
+  data_tests:
+  - metra_not_empty
+  - metra_same_count:
+      arguments:
+        compare_model: source('lake', 'cnae_subclasse')
+  - metra_expression:
+      name: stg_cnae_codigo_cnae_subclasse_formato
+      arguments:
+        expression: regexp_full_match(codigo_cnae_subclasse, '[0-9]{7}')
+  - metra_expression:
+      name: stg_cnae_flag_cadastro
+      arguments:
+        expression: is_cadastro_oficial = (codigo_cnae_subclasse <> '9999999' and descricao_subclasse not like '%
+          (REGISTRO ADMINISTRATIVO)')
+  - metra_expression:
+      name: stg_cnae_sentinela
+      arguments:
+        expression: codigo_cnae_subclasse <> '9999999' or codigo_secao = 'Z'
+  - metra_expression:
+      name: stg_cnae_descricao_subclasse_preenchido
+      arguments:
+        expression: length(trim(descricao_subclasse)) > 0
+  - metra_expression:
+      name: stg_cnae_descricao_secao_preenchido
+      arguments:
+        expression: length(trim(descricao_secao)) > 0
+  - metra_column_types:
+      arguments:
+        expected:
+          codigo_cnae_subclasse: VARCHAR
+          descricao_subclasse: VARCHAR
+          codigo_secao: VARCHAR
+          descricao_secao: VARCHAR
+          is_cadastro_oficial: BOOLEAN
