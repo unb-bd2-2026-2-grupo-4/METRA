@@ -132,7 +132,7 @@ E4            | Análises e Visualizações  |
 ├── docker-compose.yml      # Manifesto que sobe todos os serviços locais da plataforma (E1 a E4)
 ├── mkdocs.yml              # Configuração do portal de documentação (Material for MkDocs)
 ├── requirements-docs.txt   # Dependências Python para execução local do MkDocs
-├── requirements-pipeline.txt # Dependências Python da ingestão, das migrações e da extração
+├── requirements-pipeline.txt # Dependências Python da ingestão, das migrações, da extração e do dbt
 ├── .env.example            # Variáveis de ambiente do PostgreSQL (opcional)
 ├── docker/                 # Arquivos de configuração e Dockerfiles dos serviços
 │   └── ingestao/Dockerfile # Imagem da tarefa de ingestão e carga do pipeline E1
@@ -160,6 +160,13 @@ E4            | Análises e Visualizações  |
 │       ├── carga_cbo.py         # Ingestão da base CBO 2002 no bronze
 │       ├── carga_oltp.py        # Promoção e normalização Bronze -> OLTP 3FN
 │       └── executar_pipeline.py # Orquestrador sequencial de ponta a ponta
+├── dbt_metra/              # Projeto dbt-duckdb da camada analítica (E3)
+│   ├── dbt_project.yml     # Camadas: staging -> schema silver; marts -> schema gold
+│   ├── profiles.yml        # Alvo DuckDB local (data/metra_analitico.duckdb), sem credenciais
+│   ├── macros/             # generate_schema_name: schemas "silver" e "gold" sem prefixo
+│   └── models/
+│       ├── staging/        # Silver: fontes Parquet e modelos stg_movimentacao, stg_municipio, stg_cbo, stg_cnae
+│       └── marts/          # Gold: dimensões e fatos do Star Schema
 ├── tests/
 │   └── test_cdc_replay.py  # Testes unitários de replay idempotente, transações incompletas e dados atrasados
 ├── data/                   # Diretório de dados (inclui amostra versionada de 2.8 MB)
@@ -281,6 +288,18 @@ python3 -m src.extracao.validar_lake        # compara PostgreSQL, Parquet e Delt
 A extração copia as cinco tabelas do schema `oltp` em modo somente leitura, particiona `movimentacao` por `ano` (roteando pelo tempo do evento para absorver dados atrasados na competência correta) e concilia a contagem de linhas com a origem. A tabela Delta é gravada com `deltalake` (delta-rs) e lida pelo DuckDB com `delta_scan`. Reexecuções substituem os arquivos sem acumular registros, e nada em `data/lake/` é versionado. A primeira execução precisa de internet para baixar as extensões `postgres` e `delta` do DuckDB.
 
 Os dois primeiros comandos aceitam `--compressao` (`snappy`, `zstd` ou `uncompressed`); o padrão `snappy` foi validado por benchmark reproduzível conforme documentado no [`ADR 0003`](./docs/adr/0003-compressao-parquet.md). Detalhes em [`docs/camada-parquet.md`](./docs/camada-parquet.md).
+### Camada Silver com dbt-duckdb (E3)
+
+Depois da extração para Parquet, no mesmo ambiente Python:
+
+```bash
+cd dbt_metra
+dbt build   # Parquet (data/lake/parquet/) -> schema silver de data/metra_analitico.duckdb
+```
+
+Os modelos `stg_movimentacao`, `stg_municipio`, `stg_cbo` e `stg_cnae` leem o Parquet de `data/lake/parquet/<tabela>/` e são materializados como tabelas no schema `silver`. Mantêm uma linha por registro da origem, padronizam nomes e acrescentam colunas derivadas (`competencia`, `tipo_evento`, `salario_valido` e marcações de registros sentinela ou não oficiais), sem agregar nem decodificar os códigos do CAGED. O alvo é um arquivo próprio, separado de `data/metra.duckdb`, porque o DuckDB aceita um único processo escrevendo por vez; o arquivo não é versionado.
+
+O `profiles.yml` versionado em `dbt_metra/` dispensa configuração em `~/.dbt/`. As variáveis `METRA_LAKE_PARQUET` (diretório do Parquet, relativo a `dbt_metra/`) e `METRA_DUCKDB` (arquivo de destino) permitem apontar para outros caminhos, como em contêineres ou no orquestrador.
 
 ---
 

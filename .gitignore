@@ -31,6 +31,7 @@ __pycache__/
 # dbt Artefatos
 target/
 dbt_packages/
+.user.yml
 logs/
 *.log
 

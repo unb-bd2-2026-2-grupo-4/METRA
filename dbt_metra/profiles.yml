@@ -1,0 +1,9 @@
+# Sem credenciais: o alvo é um arquivo DuckDB local, não versionado.
+# Arquivo separado de data/metra.duckdb (src/analise.py), pois o DuckDB aceita um único escritor.
+metra:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: "{{ env_var('METRA_DUCKDB', '../data/metra_analitico.duckdb') }}"
+      threads: 4
