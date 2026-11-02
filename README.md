@@ -344,7 +344,7 @@ Essa verificação executa os modelos reais com fixtures e com a amostra version
 
 ### Orquestração com Dagster (E3)
 
-O ambiente de orquestração usa `dagster`, `dagster-dbt` e `dagster-webserver`. A definição em `dagster_metra/definitions.py` expõe o pipeline de ingestão e extração como os assets `executar_pipeline` e `exportar_parquet`, além do projeto dbt como um asset único. O asset `exportar_parquet` depende de `executar_pipeline`, fazendo com que a origem PostgreSQL seja atualizada antes da geração do lake Parquet. O `target/manifest.json` é preparado automaticamente quando necessário.
+O ambiente de orquestração usa `dagster`, `dagster-dbt` e `dagster-webserver`. A definição em `dagster_metra/definitions.py` expõe o pipeline de ingestão e extração como os assets `executar_pipeline` e `exportar_parquet`, conecta os cinco sources Parquet do dbt à extração e carrega os modelos Silver e Gold a partir do manifesto dbt. Assim, a linhagem completa aparece como `executar_pipeline` → `exportar_parquet` → `lake/*` → Silver → Gold (o asset `exportar_parquet` depende de `executar_pipeline`, fazendo com que a origem PostgreSQL seja atualizada antes da geração do lake Parquet). O `target/manifest.json` é preparado automaticamente quando necessário.
 
 Para abrir a interface localmente:
 
@@ -358,7 +358,7 @@ Acesse [http://localhost:3000](http://localhost:3000). Alternativamente, execute
 docker compose --profile dagster up --build dagster-webserver
 ```
 
-Na interface, materialize `executar_pipeline` para executar as migrações e cargas E1, e em seguida, materialize `exportar_parquet` para gerar os arquivos Parquet. O asset dbt pode então ser materializado para executar `dbt build` sobre o lake. O arquivo DuckDB e os Parquets são montados a partir de `data/`.
+Na interface, materialize `executar_pipeline` para executar as migrações e cargas E1, e em seguida, materialize `exportar_parquet` para gerar os arquivos Parquet. Depois, os assets dbt podem então ser materializados para executar `dbt build` sobre o lake. Os sources `lake/*` são virtuais: representam os Parquets produzidos pela extração e aparecem como parte da linhagem, sem uma materialização adicional. O arquivo DuckDB e os Parquets são montados a partir de `data/`.
 
 ---
 

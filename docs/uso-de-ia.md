@@ -197,3 +197,12 @@ Abaixo constam os registros de todas as atividades:
 - **O que foi pedido:** Auxílio para transformar as etapas de `src/ingestao/executar_pipeline.py` e `src/extracao/exportar_parquet.py` em assets do Dagster, mantendo a execução original dos scripts e organizando a dependência entre ingestão, extração e camada analítica.
 - **O que foi aproveitado:** Criação dos assets `executar_pipeline` e `exportar_parquet`, com dependência explícita entre eles; registro dos assets no `Definitions`; inclusão do código `src/` na imagem do Dagster; configuração das variáveis `PG*` e da dependência de saúde do PostgreSQL no Compose; atualização das instruções de uso no README.
 - **Como foi verificado:** Compilação dos módulos Python, validação do carregamento das definições com `dagster definitions validate -w workspace.yaml`, confirmação da dependência `executar_pipeline → exportar_parquet`, validação do `docker compose config --quiet` e execução de `git diff --check`.
+
+### 02/11/2026 - Integração da linhagem dos assets dbt no Dagster (E3)
+
+- **Ferramenta:** Codex (OpenAI).
+- **Onde:** `dagster_metra/definitions.py` e `README.md`.
+- **O que foi pedido:** Conectar os assets do dbt aos assets de ingestão e extração do Dagster para que o grafo de linhagem completo apareça na interface do Dagster.
+- **O que foi aproveitado:** Criação de specs virtuais para os cinco sources `lake/*` definidos no manifesto dbt, cada um dependente de `exportar_parquet`; reutilização do `DagsterDbtTranslator` para preservar as chaves e dependências entre sources, Silver e Gold; atualização da documentação com o fluxo completo `executar_pipeline → exportar_parquet → lake/* → Silver → Gold`.
+- **Como foi verificado:** O grafo de assets foi construído com as dependências dos cinco sources apontando para `exportar_parquet`, e a definição foi validada com `Definitions.validate_loadable`. Também foram verificadas a compilação dos módulos Python e a ausência de erros de whitespace com `git diff --check`, e a visualização do grafo de linhagem completo na UI do Dagster também foi revisada.
+- **Quem revisou:** Davi Camilo
