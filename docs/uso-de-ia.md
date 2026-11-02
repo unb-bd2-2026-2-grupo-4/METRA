@@ -146,7 +146,6 @@ Abaixo constam os registros de todas as atividades:
 - **O que foi aproveitado:** Estruturação da documentação com visão geral, arquitetura e diagrama Mermaid, descrição dos scripts, regras de captura e deduplicação, instruções de execução, testes de validação e evidências de funcionamento. Foram detalhados o uso de `pg_recvlogical` com `test_decoding`, a propagação dos eventos para `eventos.log` e o reprocessamento com deduplicação em SQLite, incluindo as limitações da solução.
 - **Como foi verificado:** O conteúdo foi revisado quanto à coerência com a implementação existente e à padronização com as demais páginas do projeto. Foram consideradas as evidências reais de captura de `INSERT` e `UPDATE`, além dos resultados dos testes automatizados de replay.
 
-
 ### 17/10/2026 - Apoio à ADR 0004 e esclarecimentos sobre PostgreSQL e CDC
 
 - **Ferramenta:** ChatGPT (OpenAI).
@@ -182,3 +181,42 @@ Abaixo constam os registros de todas as atividades:
 - **O que foi aproveitado:** Cinco dimensões, fato detalhada e três fatos mensais reconstruídas integralmente; chaves naturais e perfil demográfico por combinação observada; somas e denominadores para médias salariais de admissão; consultas P1–P5 com janela de calendário, distinção entre mês ausente e zero observado, comparação capital/interior e diferenças salariais descritivas. 
 - **Como foi verificado:** Dez testes de negócio aprovados com Parquet temporário e execução real de `dbt build` e `dbt compile` em DuckDB isolado (Python 3.12.3, dbt-core 1.12.6, dbt-duckdb 1.11.1 e DuckDB 1.5.6). A amostra versionada, com referências sintéticas de teste, conciliou 49.178 eventos, 25.325 admissões, 23.853 desligamentos e saldo 1.472; as cinco análises compiladas foram executadas sobre ela. Os três testes existentes de CDC também passaram.
 - **Quem revisou:** Tiago Antunes
+
+### 01/11/2026 - Configuração e validação do ambiente Dagster (E3)
+
+- **Ferramenta:** Codex e ChatGPT (OpenAI).
+- **Onde:** `dagster_metra/definitions.py`, `workspace.yaml`, `docker/dagster/Dockerfile`, `docker-compose.yml`, `requirements-pipeline.txt` e `README.md`.
+- **O que foi pedido:** Auxílio na configuração e validação do ambiente de orquestração da E3, utilizando `dagster`, `dagster-dbt` e `dagster-webserver`, integrado aos modelos dbt do projeto METRA. Foram solicitadas orientações para executar o ambiente localmente, configurar o `workspace.yaml` e verificar o funcionamento da interface e dos assets.
+- **O que foi aproveitado:** Estrutura geral fornecida, configuração do carregamento do módulo `dagster_metra.definitions` pelo `workspace.yaml` e inicialização do servidor com `dagster dev -w workspace.yaml`. Também foram aproveitadas recomendações para verificar a integração com o dbt, a disponibilidade dos arquivos Parquet da E2, o carregamento dos assets e a execução das materializações pela interface do Dagster.
+- **Como foi verificado:** O ambiente foi inicializado com sucesso utilizando `dagster dev -w workspace.yaml`, com carregamento das variáveis de ambiente do arquivo `.env` e inicialização dos serviços internos do Dagster. A inicialização confirmou o funcionamento do servidor, mas não comprovou, por si só, a materialização dos assets, a execução completa dos modelos Silver e Gold ou a integração via Docker, os quais já foram validados manualmente (todos OK).
+- **Quem revisou:** Davi Camilo
+
+#### Continuação - Transformação das etapas em assets do Dagster (E3)
+
+- **Onde:** `dagster_metra/assets.py`, `dagster_metra/definitions.py`, `docker/dagster/Dockerfile`, `docker-compose.yml` e `README.md`.
+- **O que foi pedido:** Auxílio para transformar as etapas de `src/ingestao/executar_pipeline.py` e `src/extracao/exportar_parquet.py` em assets do Dagster, mantendo a execução original dos scripts e organizando a dependência entre ingestão, extração e camada analítica.
+- **O que foi aproveitado:** Criação dos assets `executar_pipeline` e `exportar_parquet`, com dependência explícita entre eles; registro dos assets no `Definitions`; inclusão do código `src/` na imagem do Dagster; configuração das variáveis `PG*` e da dependência de saúde do PostgreSQL no Compose; atualização das instruções de uso no README.
+- **Como foi verificado:** Compilação dos módulos Python, validação do carregamento das definições com `dagster definitions validate -w workspace.yaml`, confirmação da dependência `executar_pipeline → exportar_parquet`, validação do `docker compose config --quiet` e execução de `git diff --check`.
+
+### 02/11/2026 - Integração da linhagem dos assets dbt no Dagster (E3)
+
+- **Ferramenta:** Codex (OpenAI).
+- **Onde:** `dagster_metra/definitions.py` e `README.md`.
+- **O que foi pedido:** Conectar os assets do dbt aos assets de ingestão e extração do Dagster para que o grafo de linhagem completo apareça na interface do Dagster.
+- **O que foi aproveitado:** Criação de specs virtuais para os cinco sources `lake/*` definidos no manifesto dbt, cada um dependente de `exportar_parquet`; reutilização do `DagsterDbtTranslator` para preservar as chaves e dependências entre sources, Silver e Gold; atualização da documentação com o fluxo completo `executar_pipeline → exportar_parquet → lake/* → Silver → Gold`.
+- **Como foi verificado:** O grafo de assets foi construído com as dependências dos cinco sources apontando para `exportar_parquet`, e a definição foi validada com `Definitions.validate_loadable`. Também foram verificadas a compilação dos módulos Python e a ausência de erros de whitespace com `git diff --check`, e a visualização do grafo de linhagem completo na UI do Dagster também foi revisada.
+- **Quem revisou:** Davi Camilo
+
+#### Continuação - Correções da revisão do ambiente Dagster (E3)
+
+- **Onde:** `docker/dagster/Dockerfile`, `docker-compose.yml` e `README.md`.
+- **O que foi pedido:** Resolver os pontos levantados na revisão: garantir a geração do manifesto dbt em clone limpo, iniciar o `dagster-daemon` junto ao webserver e esclarecer no README que os testes genéricos de qualidade do dbt dependem da entrega específica de qualidade.
+- **O que foi aproveitado:** Inclusão de `dbt parse --no-partial-parse` no build da imagem Dagster; criação do serviço `dagster-daemon` com `DAGSTER_HOME` compartilhado com o webserver; atualização do comando de inicialização para subir explicitamente PostgreSQL, webserver e daemon; e correção da documentação para não afirmar que os `data_tests` já existem no manifesto.
+- **Como foi verificado:** O `dbt parse` local e o build Docker das imagens `dagster-webserver` e `dagster-daemon` foram concluídos com sucesso. Os 13 testes existentes passaram. O Compose manteve PostgreSQL saudável, webserver e daemon ativos; uma materialização real de `exportar_parquet` executada dentro do container terminou com `ASSET_MATERIALIZATION`, `STEP_SUCCESS` e `RUN_SUCCESS`.
+
+#### Continuação - Correção de concorrência na exportação Parquet (E3)
+
+- **Onde:** `src/extracao/exportar_parquet.py` e `requirements-pipeline.txt`.
+- **O que foi pedido:** Investigar falhas repetidas de materialização do asset `exportar_parquet`, causadas por `OSError: [Errno 39] Directory not empty` na substituição de `data/lake/parquet.tmp` por `data/lake/parquet`.
+- **O que foi aproveitado:** Diagnóstico de que o diretório temporário fixo não era seguro para execuções concorrentes; inclusão de `FileLock` para serializar a exportação; criação de diretório temporário exclusivo por execução; troca com diretório de backup e restauração da extração anterior se a substituição falhar; declaração explícita da dependência `filelock`.
+- **Como foi verificado:** Compilação e importação do módulo sem erro, `git diff --check`, execução dos 13 testes existentes com resultado `OK`, reconstrução das imagens Docker e nova materialização de `exportar_parquet` no Compose com `ASSET_MATERIALIZATION`, `STEP_SUCCESS` e `RUN_SUCCESS`.
