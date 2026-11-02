@@ -146,7 +146,6 @@ Abaixo constam os registros de todas as atividades:
 - **O que foi aproveitado:** Estruturação da documentação com visão geral, arquitetura e diagrama Mermaid, descrição dos scripts, regras de captura e deduplicação, instruções de execução, testes de validação e evidências de funcionamento. Foram detalhados o uso de `pg_recvlogical` com `test_decoding`, a propagação dos eventos para `eventos.log` e o reprocessamento com deduplicação em SQLite, incluindo as limitações da solução.
 - **Como foi verificado:** O conteúdo foi revisado quanto à coerência com a implementação existente e à padronização com as demais páginas do projeto. Foram consideradas as evidências reais de captura de `INSERT` e `UPDATE`, além dos resultados dos testes automatizados de replay.
 
-
 ### 17/10/2026 - Apoio à ADR 0004 e esclarecimentos sobre PostgreSQL e CDC
 
 - **Ferramenta:** ChatGPT (OpenAI).
@@ -182,3 +181,12 @@ Abaixo constam os registros de todas as atividades:
 - **O que foi aproveitado:** Cinco dimensões, fato detalhada e três fatos mensais reconstruídas integralmente; chaves naturais e perfil demográfico por combinação observada; somas e denominadores para médias salariais de admissão; consultas P1–P5 com janela de calendário, distinção entre mês ausente e zero observado, comparação capital/interior e diferenças salariais descritivas. 
 - **Como foi verificado:** Dez testes de negócio aprovados com Parquet temporário e execução real de `dbt build` e `dbt compile` em DuckDB isolado (Python 3.12.3, dbt-core 1.12.6, dbt-duckdb 1.11.1 e DuckDB 1.5.6). A amostra versionada, com referências sintéticas de teste, conciliou 49.178 eventos, 25.325 admissões, 23.853 desligamentos e saldo 1.472; as cinco análises compiladas foram executadas sobre ela. Os três testes existentes de CDC também passaram.
 - **Quem revisou:** Tiago Antunes
+
+### 01/11/2026 - Configuração e validação do ambiente Dagster (E3)
+
+- **Ferramenta:** Codex e ChatGPT (OpenAI).
+- **Onde:** `dagster_metra/definitions.py`, `workspace.yaml`, `docker/dagster/Dockerfile`, `docker-compose.yml`, `requirements-pipeline.txt` e `README.md`.
+- **O que foi pedido:** Auxílio na configuração e validação do ambiente de orquestração da E3, utilizando `dagster`, `dagster-dbt` e `dagster-webserver`, integrado aos modelos dbt do projeto METRA. Foram solicitadas orientações para executar o ambiente localmente, configurar o `workspace.yaml` e verificar o funcionamento da interface e dos assets.
+- **O que foi aproveitado:** Estrutura geral fornecida, configuração do carregamento do módulo `dagster_metra.definitions` pelo `workspace.yaml` e inicialização do servidor com `dagster dev -w workspace.yaml`. Também foram aproveitadas recomendações para verificar a integração com o dbt, a disponibilidade dos arquivos Parquet da E2, o carregamento dos assets e a execução das materializações pela interface do Dagster.
+- **Como foi verificado:** O ambiente foi inicializado com sucesso utilizando `dagster dev -w workspace.yaml`, com carregamento das variáveis de ambiente do arquivo `.env` e inicialização dos serviços internos do Dagster. A inicialização confirmou o funcionamento do servidor, mas não comprovou, por si só, a materialização dos assets, a execução completa dos modelos Silver e Gold ou a integração via Docker, os quais já foram validados manualmente (todos OK).
+- **Quem revisou:** Davi Camilo

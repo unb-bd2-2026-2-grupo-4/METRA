@@ -35,6 +35,10 @@ dbt_packages/
 logs/
 *.log
 
+# Dagster Artefatos
+dagster_home/
+.dagster/
+
 # MkDocs Artefatos de Build
 site/
 

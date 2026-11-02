@@ -52,5 +52,19 @@ services:
       - ./data:/app/data:ro
       - ./src:/app/src:ro
 
+  dagster-webserver:
+    build:
+      context: .
+      dockerfile: docker/dagster/Dockerfile
+    profiles: ["dagster"]
+    container_name: g4_dagster
+    ports:
+      - "${DAGSTER_PORT:-3000}:3000"
+    environment:
+      METRA_LAKE_PARQUET: /app/data/lake/parquet
+      METRA_DUCKDB: /app/data/metra_analitico.duckdb
+    volumes:
+      - ./data:/app/data
+
 volumes:
   postgres_data:

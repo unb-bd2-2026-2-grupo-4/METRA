@@ -340,7 +340,25 @@ Para validar as regras de negócio com Parquet e DuckDB temporários, a partir d
 python -m unittest discover -s tests -p 'test_gold.py' -v
 ```
 
-Essa verificação executa os modelos reais com fixtures e com a amostra versionada (referências sintéticas), incluindo reexecução e evento atrasado. Os testes genéricos de qualidade em `dbt test` serão adicionados por Euller; os contratos já estão em `models/marts/_gold__models.yml`.
+Essa verificação executa os modelos reais com fixtures e com a amostra versionada (referências sintéticas), incluindo reexecução e evento atrasado. Além disso, testes genéricos de qualidade foram adicionados e os contratos já estão em `models/marts/_gold__models.yml`.
+
+### Orquestração com Dagster (E3)
+
+O ambiente de orquestração usa `dagster`, `dagster-dbt` e `dagster-webserver`. A definição em `dagster_metra/definitions.py` expõe o projeto dbt como um asset único, executando `dbt build` e preservando a linhagem dos modelos Silver e Gold no Dagster. O `target/manifest.json` é preparado automaticamente quando necessário.
+
+Para abrir a interface localmente, depois de gerar os arquivos Parquet:
+
+```bash
+dagster dev -w workspace.yaml
+```
+
+Acesse [http://localhost:3000](http://localhost:3000). Alternativamente, execute a interface em container:
+
+```bash
+docker compose --profile dagster up --build dagster-webserver
+```
+
+O arquivo DuckDB e os Parquets são montados a partir de `data/`. O Dagster deve executar o asset somente depois que a extração para Parquet estiver concluída.
 
 ---
 

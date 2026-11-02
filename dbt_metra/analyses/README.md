@@ -114,15 +114,3 @@ nos denominadores; códigos inesperados mantêm seu valor e recebem rótulo
 O mesmo evento participa uma vez de cada eixo. Não somar contagens entre eixos.
 Para cruzamentos simultâneos, consultar `fct_perfil_mensal` com
 `dim_perfil_demografico`; não juntar os quatro resultados marginais entre si.
-
-## Repasse para o Marco 1
-
-- **Euller:** acrescentar os testes genéricos aos modelos já descritos em
-  `_gold__models.yml`: unicidade das chaves e grãos compostos, integridade das
-  FKs e invariantes das métricas. Os testes de negócio temporários estão em
-  `tests/test_gold.py`. O ADR-0005, diagrama e página analítica ficam com ele.
-- **Davi:** os modelos usam `ref()` e aparecem no `manifest.json` do mesmo
-  projeto; materializar após a Silver e antes de abrir o banco para consumo.
-- **Arthur e Yan:** consultar as três fatos mensais ou a fato detalhada com
-  suas dimensões. Os SQLs compilados são exemplos executáveis para o dashboard.
-  O contrato CBO preserva os códigos textuais de seis dígitos para integração.
