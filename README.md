@@ -340,11 +340,13 @@ Para validar as regras de negócio com Parquet e DuckDB temporários, a partir d
 python -m unittest discover -s tests -p 'test_gold.py' -v
 ```
 
-Essa verificação executa os modelos reais com fixtures e com a amostra versionada (referências sintéticas), incluindo reexecução e evento atrasado. Além disso, testes genéricos de qualidade foram adicionados e os contratos já estão em `models/marts/_gold__models.yml`.
+Essa verificação executa os modelos reais com fixtures e com a amostra versionada (referências sintéticas), incluindo reexecução e evento atrasado. Os testes unitários e de regras de negócio existentes não substituem os testes genéricos de qualidade do dbt (eles serão acrescentados na entrega de qualidade). Os contratos descritivos já estão em `models/marts/_gold__models.yml`, mas ainda não há `data_tests` nesse manifesto.
 
 ### Orquestração com Dagster (E3)
 
-O ambiente de orquestração usa `dagster`, `dagster-dbt` e `dagster-webserver`. A definição em `dagster_metra/definitions.py` expõe o pipeline de ingestão e extração como os assets `executar_pipeline` e `exportar_parquet`, conecta os cinco sources Parquet do dbt à extração e carrega os modelos Silver e Gold a partir do manifesto dbt. Assim, a linhagem completa aparece como `executar_pipeline` → `exportar_parquet` → `lake/*` → Silver → Gold (o asset `exportar_parquet` depende de `executar_pipeline`, fazendo com que a origem PostgreSQL seja atualizada antes da geração do lake Parquet). O `target/manifest.json` é preparado automaticamente quando necessário.
+O ambiente de orquestração usa `dagster`, `dagster-dbt` e `dagster-webserver`. A definição em `dagster_metra/definitions.py` expõe o pipeline de ingestão e extração como os assets `executar_pipeline` e `exportar_parquet`, conecta os cinco sources Parquet do dbt à extração e carrega os modelos Silver e Gold a partir do manifesto dbt. Assim, a linhagem completa aparece como `executar_pipeline` → `exportar_parquet` → `lake/*` → Silver → Gold (o asset `exportar_parquet` depende de `executar_pipeline`, fazendo com que a origem PostgreSQL seja atualizada antes da geração do lake Parquet).
+
+Em container, o `target/manifest.json` é gerado durante o build da imagem. No desenvolvimento com `dagster dev`, `prepare_if_dev()` continua atualizando-o quando necessário.
 
 Para abrir a interface localmente:
 
@@ -355,8 +357,10 @@ dagster dev -w workspace.yaml
 Acesse [http://localhost:3000](http://localhost:3000). Alternativamente, execute a interface em container:
 
 ```bash
-docker compose --profile dagster up --build dagster-webserver
+docker compose --profile dagster up --build -d postgres dagster-webserver dagster-daemon
 ```
+
+O comando sobe o `dagster-webserver` e o `dagster-daemon` com o mesmo `DAGSTER_HOME`, portanto os jobs enviados pela UI são executados pelo daemon.
 
 Na interface, materialize `executar_pipeline` para executar as migrações e cargas E1, e em seguida, materialize `exportar_parquet` para gerar os arquivos Parquet. Depois, os assets dbt podem então ser materializados para executar `dbt build` sobre o lake. Os sources `lake/*` são virtuais: representam os Parquets produzidos pela extração e aparecem como parte da linhagem, sem uma materialização adicional. O arquivo DuckDB e os Parquets são montados a partir de `data/`.
 

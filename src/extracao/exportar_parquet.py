@@ -19,10 +19,12 @@ A conexao usa as variaveis padrao do libpq (PGHOST, PGPORT, PGDATABASE, PGUSER, 
 import argparse
 import logging
 import shutil
+import tempfile
 import time
 from pathlib import Path
 
 import duckdb
+from filelock import FileLock
 
 LAKE = Path(__file__).resolve().parents[2] / "data" / "lake"
 DIRETORIO_PARQUET = LAKE / "parquet"
@@ -42,6 +44,7 @@ TABELAS = {
 }
 
 log = logging.getLogger("exportar_parquet")
+LOCK = LAKE / ".parquet.lock"
 
 
 def leitura_parquet(tabela: str, diretorio: Path = DIRETORIO_PARQUET) -> str:
@@ -87,23 +90,40 @@ def exportar_tabela(
 
 def exportar(compressao: str = COMPRESSAO_PADRAO, destino: Path = DIRETORIO_PARQUET) -> None:
     """Extrai todas as tabelas e substitui a extracao anterior somente ao final."""
-    temporario = destino.with_name(destino.name + ".tmp")
-    shutil.rmtree(temporario, ignore_errors=True)
-    temporario.mkdir(parents=True)
+    # O Dagster pode executar mais de uma materialização em paralelo.
+    with FileLock(str(LOCK)):
+        destino.parent.mkdir(parents=True, exist_ok=True)
+        temporario = Path(
+            tempfile.mkdtemp(prefix=f".{destino.name}.tmp-", dir=destino.parent)
+        )
+        backup = destino.with_name(f".{destino.name}.backup-{temporario.name[-8:]}")
 
-    log.info("Extraindo oltp -> %s (compressao=%s)", destino, compressao)
-    try:
-        with duckdb.connect() as conn:
-            conn.execute("ATTACH '' AS origem (TYPE postgres, READ_ONLY)")
-            # Uma transacao unica: todas as tabelas e contagens saem da mesma leitura.
-            conn.execute("BEGIN")
-            for tabela in TABELAS:
-                exportar_tabela(conn, tabela, temporario, compressao)
-            conn.execute("COMMIT")
-        shutil.rmtree(destino, ignore_errors=True)
-        temporario.rename(destino)
-    finally:
-        shutil.rmtree(temporario, ignore_errors=True)
+        log.info("Extraindo oltp -> %s (compressao=%s)", destino, compressao)
+        try:
+            with duckdb.connect() as conn:
+                conn.execute("ATTACH '' AS origem (TYPE postgres, READ_ONLY)")
+                # Uma transação única: todas as tabelas e contagens saem da mesma leitura.
+                conn.execute("BEGIN")
+                for tabela in TABELAS:
+                    exportar_tabela(conn, tabela, temporario, compressao)
+                conn.execute("COMMIT")
+
+            # Mantem a extração anterior até a nova estar pronta.
+            # Como o lock cobre todo o bloco, o destino não pode ser recriado por outra execução.
+            if destino.exists():
+                destino.rename(backup)
+            try:
+                temporario.rename(destino)
+            except Exception:
+                if destino.exists():
+                    shutil.rmtree(destino, ignore_errors=True)
+                if backup.exists():
+                    backup.rename(destino)
+                raise
+            shutil.rmtree(backup, ignore_errors=True)
+        finally:
+            shutil.rmtree(temporario, ignore_errors=True)
+            shutil.rmtree(backup, ignore_errors=True)
 
 
 def main() -> None:

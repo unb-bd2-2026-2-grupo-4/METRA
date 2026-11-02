@@ -6,3 +6,4 @@ dbt-duckdb==1.11.1
 dagster==1.13.28
 dagster-dbt==0.29.28
 dagster-webserver==1.13.28
+filelock==4.2.6

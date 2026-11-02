@@ -206,3 +206,17 @@ Abaixo constam os registros de todas as atividades:
 - **O que foi aproveitado:** Criação de specs virtuais para os cinco sources `lake/*` definidos no manifesto dbt, cada um dependente de `exportar_parquet`; reutilização do `DagsterDbtTranslator` para preservar as chaves e dependências entre sources, Silver e Gold; atualização da documentação com o fluxo completo `executar_pipeline → exportar_parquet → lake/* → Silver → Gold`.
 - **Como foi verificado:** O grafo de assets foi construído com as dependências dos cinco sources apontando para `exportar_parquet`, e a definição foi validada com `Definitions.validate_loadable`. Também foram verificadas a compilação dos módulos Python e a ausência de erros de whitespace com `git diff --check`, e a visualização do grafo de linhagem completo na UI do Dagster também foi revisada.
 - **Quem revisou:** Davi Camilo
+
+#### Continuação - Correções da revisão do ambiente Dagster (E3)
+
+- **Onde:** `docker/dagster/Dockerfile`, `docker-compose.yml` e `README.md`.
+- **O que foi pedido:** Resolver os pontos levantados na revisão: garantir a geração do manifesto dbt em clone limpo, iniciar o `dagster-daemon` junto ao webserver e esclarecer no README que os testes genéricos de qualidade do dbt dependem da entrega específica de qualidade.
+- **O que foi aproveitado:** Inclusão de `dbt parse --no-partial-parse` no build da imagem Dagster; criação do serviço `dagster-daemon` com `DAGSTER_HOME` compartilhado com o webserver; atualização do comando de inicialização para subir explicitamente PostgreSQL, webserver e daemon; e correção da documentação para não afirmar que os `data_tests` já existem no manifesto.
+- **Como foi verificado:** O `dbt parse` local e o build Docker das imagens `dagster-webserver` e `dagster-daemon` foram concluídos com sucesso. Os 13 testes existentes passaram. O Compose manteve PostgreSQL saudável, webserver e daemon ativos; uma materialização real de `exportar_parquet` executada dentro do container terminou com `ASSET_MATERIALIZATION`, `STEP_SUCCESS` e `RUN_SUCCESS`.
+
+#### Continuação - Correção de concorrência na exportação Parquet (E3)
+
+- **Onde:** `src/extracao/exportar_parquet.py` e `requirements-pipeline.txt`.
+- **O que foi pedido:** Investigar falhas repetidas de materialização do asset `exportar_parquet`, causadas por `OSError: [Errno 39] Directory not empty` na substituição de `data/lake/parquet.tmp` por `data/lake/parquet`.
+- **O que foi aproveitado:** Diagnóstico de que o diretório temporário fixo não era seguro para execuções concorrentes; inclusão de `FileLock` para serializar a exportação; criação de diretório temporário exclusivo por execução; troca com diretório de backup e restauração da extração anterior se a substituição falhar; declaração explícita da dependência `filelock`.
+- **Como foi verificado:** Compilação e importação do módulo sem erro, `git diff --check`, execução dos 13 testes existentes com resultado `OK`, reconstrução das imagens Docker e nova materialização de `exportar_parquet` no Compose com `ASSET_MATERIALIZATION`, `STEP_SUCCESS` e `RUN_SUCCESS`.
