@@ -58,9 +58,17 @@ services:
       dockerfile: docker/dagster/Dockerfile
     profiles: ["dagster"]
     container_name: g4_dagster
+    depends_on:
+      postgres:
+        condition: service_healthy
     ports:
       - "${DAGSTER_PORT:-3000}:3000"
     environment:
+      PGHOST: postgres
+      PGPORT: 5432
+      PGDATABASE: ${POSTGRES_DB:-metra}
+      PGUSER: ${POSTGRES_USER:-metra}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-metra}
       METRA_LAKE_PARQUET: /app/data/lake/parquet
       METRA_DUCKDB: /app/data/metra_analitico.duckdb
     volumes:

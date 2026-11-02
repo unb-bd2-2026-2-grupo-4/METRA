@@ -190,3 +190,10 @@ Abaixo constam os registros de todas as atividades:
 - **O que foi aproveitado:** Estrutura geral fornecida, configuração do carregamento do módulo `dagster_metra.definitions` pelo `workspace.yaml` e inicialização do servidor com `dagster dev -w workspace.yaml`. Também foram aproveitadas recomendações para verificar a integração com o dbt, a disponibilidade dos arquivos Parquet da E2, o carregamento dos assets e a execução das materializações pela interface do Dagster.
 - **Como foi verificado:** O ambiente foi inicializado com sucesso utilizando `dagster dev -w workspace.yaml`, com carregamento das variáveis de ambiente do arquivo `.env` e inicialização dos serviços internos do Dagster. A inicialização confirmou o funcionamento do servidor, mas não comprovou, por si só, a materialização dos assets, a execução completa dos modelos Silver e Gold ou a integração via Docker, os quais já foram validados manualmente (todos OK).
 - **Quem revisou:** Davi Camilo
+
+#### Continuação - Transformação das etapas em assets do Dagster (E3)
+
+- **Onde:** `dagster_metra/assets.py`, `dagster_metra/definitions.py`, `docker/dagster/Dockerfile`, `docker-compose.yml` e `README.md`.
+- **O que foi pedido:** Auxílio para transformar as etapas de `src/ingestao/executar_pipeline.py` e `src/extracao/exportar_parquet.py` em assets do Dagster, mantendo a execução original dos scripts e organizando a dependência entre ingestão, extração e camada analítica.
+- **O que foi aproveitado:** Criação dos assets `executar_pipeline` e `exportar_parquet`, com dependência explícita entre eles; registro dos assets no `Definitions`; inclusão do código `src/` na imagem do Dagster; configuração das variáveis `PG*` e da dependência de saúde do PostgreSQL no Compose; atualização das instruções de uso no README.
+- **Como foi verificado:** Compilação dos módulos Python, validação do carregamento das definições com `dagster definitions validate -w workspace.yaml`, confirmação da dependência `executar_pipeline → exportar_parquet`, validação do `docker compose config --quiet` e execução de `git diff --check`.

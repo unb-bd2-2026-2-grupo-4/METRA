@@ -344,9 +344,9 @@ Essa verificação executa os modelos reais com fixtures e com a amostra version
 
 ### Orquestração com Dagster (E3)
 
-O ambiente de orquestração usa `dagster`, `dagster-dbt` e `dagster-webserver`. A definição em `dagster_metra/definitions.py` expõe o projeto dbt como um asset único, executando `dbt build` e preservando a linhagem dos modelos Silver e Gold no Dagster. O `target/manifest.json` é preparado automaticamente quando necessário.
+O ambiente de orquestração usa `dagster`, `dagster-dbt` e `dagster-webserver`. A definição em `dagster_metra/definitions.py` expõe o pipeline de ingestão e extração como os assets `executar_pipeline` e `exportar_parquet`, além do projeto dbt como um asset único. O asset `exportar_parquet` depende de `executar_pipeline`, fazendo com que a origem PostgreSQL seja atualizada antes da geração do lake Parquet. O `target/manifest.json` é preparado automaticamente quando necessário.
 
-Para abrir a interface localmente, depois de gerar os arquivos Parquet:
+Para abrir a interface localmente:
 
 ```bash
 dagster dev -w workspace.yaml
@@ -358,7 +358,7 @@ Acesse [http://localhost:3000](http://localhost:3000). Alternativamente, execute
 docker compose --profile dagster up --build dagster-webserver
 ```
 
-O arquivo DuckDB e os Parquets são montados a partir de `data/`. O Dagster deve executar o asset somente depois que a extração para Parquet estiver concluída.
+Na interface, materialize `executar_pipeline` para executar as migrações e cargas E1, e em seguida, materialize `exportar_parquet` para gerar os arquivos Parquet. O asset dbt pode então ser materializado para executar `dbt build` sobre o lake. O arquivo DuckDB e os Parquets são montados a partir de `data/`.
 
 ---
 

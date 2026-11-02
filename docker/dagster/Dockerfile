@@ -6,6 +6,7 @@ COPY requirements-pipeline.txt .
 RUN pip install --no-cache-dir -r requirements-pipeline.txt
 
 COPY dagster_metra/ dagster_metra/
+COPY src/ src/
 COPY dbt_metra/ dbt_metra/
 COPY workspace.yaml .
 
