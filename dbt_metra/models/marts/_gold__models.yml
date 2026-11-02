@@ -1,0 +1,209 @@
+version: 2
+
+# Contratos Gold; os data_tests de qualidade serão acrescentados por Euller.
+models:
+  - name: dim_competencia
+    description: "Uma linha por mês entre o mínimo e o máximo da Silver; presença de registros não certifica completude da fonte."
+    columns:
+      - name: competencia
+        description: "Primeiro dia do mês de ocorrência do evento (DATE)."
+      - name: ano
+        description: "Ano da competência."
+      - name: mes
+        description: "Número do mês, de 1 a 12."
+      - name: trimestre
+        description: "Número do trimestre, de 1 a 4."
+      - name: tem_dados
+        description: "Existe ao menos uma movimentação Silver nesta competência, incluindo registros fora do recorte dos agregados."
+  - name: dim_municipio
+    description: "Uma linha por código municipal; preserva os atributos e sentinelas da Silver."
+    columns:
+      - name: id_municipio
+        description: "Chave natural textual IBGE, 7 dígitos; 9999999 é o sentinela."
+      - name: nome_municipio
+        description: "Nome do município."
+      - name: sigla_uf
+        description: "Sigla da UF; NI no sentinela. Os agregados restringem DF, GO, MT e MS."
+      - name: nome_uf
+        description: "Nome da UF."
+      - name: regiao
+        description: "Grande região do IBGE."
+      - name: is_capital
+        description: "Verdadeiro para Brasília, Goiânia, Cuiabá ou Campo Grande; DF não possui interior."
+      - name: is_identificado
+        description: "Falso para o município sentinela."
+      - name: is_centro_oeste
+        description: "UF pertence a DF, GO, MT ou MS."
+  - name: dim_cnae
+    description: "Uma linha por subclasse CNAE; hierarquia de seção incorporada à dimensão."
+    columns:
+      - name: codigo_cnae_subclasse
+        description: "Chave natural textual com 7 dígitos."
+      - name: descricao_subclasse
+        description: "Descrição da subclasse, inclusive cadastros administrativos."
+      - name: codigo_secao
+        description: "Seção CNAE; Z permanece nos agregados e é excluída dos rankings e da correlação."
+      - name: descricao_secao
+        description: "Descrição da seção econômica."
+      - name: is_cadastro_oficial
+        description: "Falso para sentinela e cadastros administrativos."
+  - name: dim_cbo
+    description: "Uma linha por ocupação CBO 2002, inclusive títulos genéricos da origem."
+    columns:
+      - name: codigo_cbo
+        description: "Chave natural textual com 6 dígitos."
+      - name: titulo_ocupacao
+        description: "Título da ocupação."
+      - name: codigo_grande_grupo
+        description: "Primeiro dígito do código CBO."
+      - name: is_cadastro_oficial
+        description: "Falso para códigos sem título encontrado na fonte oficial."
+  - name: dim_perfil_demografico
+    description: "Uma linha por combinação observada dos códigos de sexo, raça/cor, escolaridade e faixa etária; não representa uma pessoa."
+    columns:
+      - name: id_perfil_demografico
+        description: "Chave natural composta: sexo|raca_cor|grau_instrucao|faixa_etaria."
+      - name: codigo_sexo
+        description: "Código do sexo registrado na origem; não mede identidade de gênero."
+      - name: sexo
+        description: "1 Homem, 3 Mulher, 9 Não identificado; demais códigos não mapeados."
+      - name: codigo_raca_cor
+        description: "Código de raça/cor preservado da Silver."
+      - name: raca_cor
+        description: "1 Branca, 2 Preta, 3 Parda, 4 Amarela, 5 Indígena, 6 Não informada, 9 Não identificada."
+      - name: codigo_grau_instrucao
+        description: "Código de escolaridade, preservando inclusive valores não mapeados."
+      - name: escolaridade
+        description: "Descrição dos códigos 1–11, 80 (Pós-graduação completa) e 99; demais códigos não mapeados."
+      - name: codigo_faixa_etaria
+        description: "0 não informada; 1 até 17; 2 18–24; 3 25–29; 4 30–39; 5 40–49; 6 50–64; 7 65 ou mais."
+      - name: faixa_etaria
+        description: "Rótulo da faixa etária, com limites inclusivos."
+  - name: fct_movimentacao
+    description: "Uma linha por id_movimentacao da Silver, sem filtro regional e sem perda de eventos; dimensões ligadas por LEFT JOIN."
+    columns:
+      - name: id_movimentacao
+        description: "Chave da movimentação na origem."
+      - name: ano
+        description: "Ano do evento."
+      - name: mes
+        description: "Mês do evento."
+      - name: competencia
+        description: "Primeiro dia do mês de ocorrência do evento (DATE)."
+      - name: id_municipio
+        description: "FK natural para dim_municipio; preserva o sentinela."
+      - name: codigo_cnae_subclasse
+        description: "FK natural textual para dim_cnae."
+      - name: codigo_cbo
+        description: "FK natural textual para dim_cbo."
+      - name: codigo_sexo
+        description: "Código do sexo registrado na origem."
+      - name: codigo_raca_cor
+        description: "Código de raça/cor da origem."
+      - name: idade
+        description: "Idade em anos, nula quando ausente ou inválida na origem."
+      - name: codigo_grau_instrucao
+        description: "Código da escolaridade na origem."
+      - name: codigo_tipo_movimentacao
+        description: "Tipo de movimentação cadastrado no CAGED."
+      - name: saldo_movimentacao
+        description: "1 admissão, -1 desligamento; sinal usado nas métricas."
+      - name: tipo_evento
+        description: "admissao ou desligamento, conforme o sinal."
+      - name: salario_mensal
+        description: "Salário mensal nominal em R$ da Silver; a E1 substitui ausentes e negativos por zero."
+      - name: salario_valido
+        description: "Verdadeiro para salário positivo; elegibilidade da média exige também admissão."
+      - name: horas_contratuais
+        description: "Horas semanais da origem."
+      - name: id_ingestao
+        description: "Identificação do lote Bronze."
+      - name: numero_linha
+        description: "Linha no arquivo do lote Bronze."
+      - name: registrado_em
+        description: "Momento do registro transacional; não define competência."
+      - name: codigo_faixa_etaria
+        description: "Faixa calculada a partir da idade; mesma regra da dimensão de perfil."
+      - name: id_perfil_demografico
+        description: "FK para a combinação observada em dim_perfil_demografico."
+      - name: sigla_uf
+        description: "Sigla da UF; NI no sentinela. Os agregados restringem DF, GO, MT e MS."
+      - name: is_capital
+        description: "Verdadeiro para Brasília, Goiânia, Cuiabá ou Campo Grande; DF não possui interior."
+      - name: is_identificado
+        description: "Indicador geográfico da dimensão municipal."
+      - name: is_centro_oeste
+        description: "Indicador geográfico da dimensão municipal."
+      - name: codigo_secao
+        description: "Seção CNAE; Z permanece nos agregados e é excluída dos rankings e da correlação."
+      - name: codigo_grande_grupo
+        description: "Grande grupo da dimensão CBO."
+      - name: competencia_tem_dados
+        description: "Indicador da dimensão de competência."
+  - name: fct_setor_mensal
+    description: "Uma linha por competência × UF × seção CNAE no recorte identificado do Centro-Oeste de 2023–2026. Atende P1, P2 e P4."
+    columns:
+      - name: competencia
+        description: "Primeiro dia do mês de ocorrência do evento (DATE)."
+      - name: sigla_uf
+        description: "Sigla da UF; NI no sentinela. Os agregados restringem DF, GO, MT e MS."
+      - name: codigo_secao
+        description: "Seção CNAE; Z permanece nos agregados e é excluída dos rankings e da correlação."
+      - name: admissoes
+        description: "Quantidade de eventos com saldo_movimentacao = 1."
+      - name: desligamentos
+        description: "Quantidade de eventos com saldo_movimentacao = -1."
+      - name: saldo
+        description: "Soma de saldo_movimentacao; admissoes menos desligamentos."
+      - name: soma_salarios_admissao
+        description: "Soma em R$ nominais dos salários positivos de admissão; zero para eventos inelegíveis."
+      - name: qtd_salarios_admissao
+        description: "Quantidade de admissões com salário positivo; denominador da média."
+      - name: salario_medio_admissao
+        description: "Soma salarial dividida pelo denominador; NULL sem salários elegíveis. Recalcular após reagrupar."
+  - name: fct_geografia_mensal
+    description: "Uma linha por competência × UF × capital/interior no recorte identificado do Centro-Oeste de 2023–2026. Atende P3; ausência de grupo não gera linha artificial."
+    columns:
+      - name: competencia
+        description: "Primeiro dia do mês de ocorrência do evento (DATE)."
+      - name: sigla_uf
+        description: "Sigla da UF; NI no sentinela. Os agregados restringem DF, GO, MT e MS."
+      - name: is_capital
+        description: "Verdadeiro para Brasília, Goiânia, Cuiabá ou Campo Grande; DF não possui interior."
+      - name: admissoes
+        description: "Quantidade de eventos com saldo_movimentacao = 1."
+      - name: desligamentos
+        description: "Quantidade de eventos com saldo_movimentacao = -1."
+      - name: saldo
+        description: "Soma de saldo_movimentacao; admissoes menos desligamentos."
+      - name: soma_salarios_admissao
+        description: "Soma em R$ nominais dos salários positivos de admissão; zero para eventos inelegíveis."
+      - name: qtd_salarios_admissao
+        description: "Quantidade de admissões com salário positivo; denominador da média."
+      - name: salario_medio_admissao
+        description: "Soma salarial dividida pelo denominador; NULL sem salários elegíveis. Recalcular após reagrupar."
+  - name: fct_perfil_mensal
+    description: "Uma linha por competência × UF × capital/interior × seção CNAE × perfil no recorte identificado do Centro-Oeste de 2023–2026. Atende P5."
+    columns:
+      - name: competencia
+        description: "Primeiro dia do mês de ocorrência do evento (DATE)."
+      - name: sigla_uf
+        description: "Sigla da UF; NI no sentinela. Os agregados restringem DF, GO, MT e MS."
+      - name: is_capital
+        description: "Verdadeiro para Brasília, Goiânia, Cuiabá ou Campo Grande; DF não possui interior."
+      - name: codigo_secao
+        description: "Seção CNAE; Z permanece nos agregados e é excluída dos rankings e da correlação."
+      - name: id_perfil_demografico
+        description: "FK para dim_perfil_demografico; permite recortes demográficos cruzados."
+      - name: admissoes
+        description: "Quantidade de eventos com saldo_movimentacao = 1."
+      - name: desligamentos
+        description: "Quantidade de eventos com saldo_movimentacao = -1."
+      - name: saldo
+        description: "Soma de saldo_movimentacao; admissoes menos desligamentos."
+      - name: soma_salarios_admissao
+        description: "Soma em R$ nominais dos salários positivos de admissão; zero para eventos inelegíveis."
+      - name: qtd_salarios_admissao
+        description: "Quantidade de admissões com salário positivo; denominador da média."
+      - name: salario_medio_admissao
+        description: "Soma salarial dividida pelo denominador; NULL sem salários elegíveis. Recalcular após reagrupar."

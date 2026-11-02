@@ -294,12 +294,53 @@ Depois da extração para Parquet, no mesmo ambiente Python:
 
 ```bash
 cd dbt_metra
-dbt build   # Parquet (data/lake/parquet/) -> schema silver de data/metra_analitico.duckdb
+dbt build   # Parquet -> schemas silver e gold de data/metra_analitico.duckdb
 ```
 
 Os modelos `stg_movimentacao`, `stg_municipio`, `stg_cbo` e `stg_cnae` leem o Parquet de `data/lake/parquet/<tabela>/` e são materializados como tabelas no schema `silver`. Mantêm uma linha por registro da origem, padronizam nomes e acrescentam colunas derivadas (`competencia`, `tipo_evento`, `salario_valido` e marcações de registros sentinela ou não oficiais), sem agregar nem decodificar os códigos do CAGED. O alvo é um arquivo próprio, separado de `data/metra.duckdb`, porque o DuckDB aceita um único processo escrevendo por vez; o arquivo não é versionado.
 
 O `profiles.yml` versionado em `dbt_metra/` dispensa configuração em `~/.dbt/`. As variáveis `METRA_LAKE_PARQUET` (diretório do Parquet, relativo a `dbt_metra/`) e `METRA_DUCKDB` (arquivo de destino) permitem apontar para outros caminhos, como em contêineres ou no orquestrador.
+
+### Camada Gold e perguntas de gestão (E3)
+
+O mesmo `dbt build` também reconstrói o schema `gold`, usando `ref()` sobre a Silver:
+
+- Dimensões `dim_competencia`, `dim_municipio`, `dim_cnae`, `dim_cbo` e `dim_perfil_demografico`.
+- `fct_movimentacao`: uma linha por evento da Silver, com chaves dimensionais e linhagem.
+- `fct_setor_mensal`: competência × UF × seção CNAE (P1, P2 e P4).
+- `fct_geografia_mensal`: competência × UF × capital/interior (P3).
+- `fct_perfil_mensal`: competência × UF × capital/interior × seção CNAE × perfil (P5).
+
+Os agregados usam municípios identificados do Centro-Oeste entre 2023 e 2026. Preservam somas e denominadores salariais para recalcular médias em qualquer agrupamento. As tabelas são reconstruídas integralmente, incluindo competências antigas que recebam dados atrasados.
+
+As cinco consultas de referência estão em [`dbt_metra/analyses/`](./dbt_metra/analyses/README.md). P2 trata sazonalidade; P3 compara capitais e interior. P4 usa explicitamente a proxy `200 × min(admissões, desligamentos) / (admissões + desligamentos)`, que mede equilíbrio dos fluxos e não a taxa convencional de turnover sobre estoque. P5 descreve salários e movimentações, sem estimar chances individuais de recolocação. Os resultados se referem aos dados carregados, não a totais populacionais ou ao saldo oficial ajustado do CAGED.
+
+Para compilar e consultar P3, no ambiente de `requirements-pipeline.txt`, depois da extração:
+
+```bash
+cd dbt_metra
+dbt build
+dbt compile
+python - <<'PY'
+from pathlib import Path
+import os
+import duckdb
+
+sql = Path('target/compiled/metra/analyses/p3_capitais_interior.sql').read_text()
+with duckdb.connect(os.environ.get('METRA_DUCKDB', '../data/metra_analitico.duckdb'), read_only=True) as conn:
+    conn.sql(sql).show()
+PY
+```
+
+Não execute o SQL Jinja original diretamente no DuckDB; use a consulta compilada. Compilar não executa nem publica as análises como tabelas. Dashboard e consultas devem abrir o banco após o término da escrita pelo dbt.
+
+Para validar as regras de negócio com Parquet e DuckDB temporários, a partir da raiz:
+
+```bash
+python -m unittest discover -s tests -p 'test_gold.py' -v
+```
+
+Essa verificação executa os modelos reais com fixtures e com a amostra versionada (referências sintéticas), incluindo reexecução e evento atrasado. Os testes genéricos de qualidade em `dbt test` serão adicionados por Euller; os contratos já estão em `models/marts/_gold__models.yml`.
 
 ---
 
