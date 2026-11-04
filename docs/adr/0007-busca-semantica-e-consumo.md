@@ -1,74 +1,115 @@
-# 0007 - Integrar busca de ocupações e linguagem natural ao catálogo de métricas
+# 0007 - Integração de Busca Semântica Vetorial CBO 2002 e Assistente Text-to-SQL Governado pelo Catálogo Gold
 
-- **Status:** proposto
-- **Data:** 29/10/2026
-- **Responsáveis:** Euller Júlio e Arthur Evangelista.
+- **Status:** Aceito
+- **Data:** 03/11/2026
+- **Decisores:** Arthur Evangelista e Euller Júlio (com revisão da Squad G4)
+
+---
 
 ## 1. Contexto
 
-A E4 da equipe prevê busca semântica de ocupações e uma interface Text-to-SQL no Streamlit. Em 29/10, as branches consultadas contêm a Silver, mas não `src/app/dashboard.py`, índice vetorial ou modelos Gold. Implementar uma integração sobre tabelas e APIs presumidas criaria um contrato paralelo ao trabalho dos colegas.
+Na Entrega 4 (E4) do METRA, além do painel gerencial com os indicadores das cinco perguntas de gestão, precisamos atender à recomendação docente (registrada nos diários das Semanas 05 e 06) de incorporar **busca vetorial por similaridade semântica sobre as ocupações da CBO 2002** e um **assistente de consulta em linguagem natural (Text-to-SQL)** integrado à camada analítica `gold` no DuckDB (`data/metra_analitico.duckdb`).
 
-A busca precisa retornar códigos CBO existentes e permitir aplicar esses códigos aos indicadores. A resposta em linguagem natural deve usar as mesmas definições de métricas do painel, sem inferir taxa de turnover sem estoque nem probabilidade individual de recolocação. A busca vetorial é um complemento da equipe: não substitui os requisitos oficiais de camada semântica, controle de acesso e ETL reverso da [E4](https://unb-bd2.github.io/PlanoEnsino/projeto/e4/).
+### Caracterização da Carga de Trabalho e Restrições
 
-## 2. Alternativas consideradas
+- **Volume de Dados:**
+  - Camada `gold` materializada pelo `dbt-duckdb`: 49.178 movimentações na amostra versionada (`data/caged_centro_oeste_amostra.csv`, SHA-256 `40e7c4e7832d02b1b84b42d094ce5d48be915fa134f21a4435f8aaf472620b88`) e até 14,7 milhões de registros no recorte completo do Centro-Oeste (2023–2026).
+  - Dimensão `gold.dim_cbo`: 1.272 códigos ocupacionais distintos na amostra (e mais de 2.600 ocupações formais com +10 mil sinônimos na base oficial da CBO 2002 do MTE).
+- **Problema de Vocabulário e Governança de Métricas:**
+  - Trabalhadores e gestores pesquisam profissões usando termos coloquiais ou de mercado (*"dev backend"*, *"caminhoneiro"*, *"caixa de supermercado"*, *"bóia-fria"*, *"médico do coração"*), que frequentemente não compartilham palavras exatas com o título burocrático da CBO 2002 (*"Analista de desenvolvimento de sistemas"*, *"Motorista de caminhão"*, *"Operador de caixa"*, *"Trabalhador volante da agricultura"*, *"Médico cardiologista"*).
+  - Consultas em linguagem natural sobre os indicadores exigem fidelidade absoluta às regras da camada `gold`: recomposição de médias salariais por `SUM(soma_salarios_admissao) / NULLIF(SUM(qtd_salarios_admissao), 0)`, uso explícito da proxy de equilíbrio de fluxos pareados em P4 (sem inventar taxa de turnover sobre estoque inexistente) e proteção contra exposição de registros individuais (LGPD).
+- **Restrições Operacionais (ADR 0002):**
+  - Execução 100% reproduzível localmente, sem depender de chaves de API pagas, servidores externos em segundo plano ou GPUs dedicadas, mantendo latência interativa (< 150 ms por consulta).
 
-### A. Filtros e busca textual por código/título — opção nula
+---
 
-Uma lista de ocupações e consultas parametrizadas cobre indicadores conhecidos com comportamento previsível. Serve de referência para medir se os embeddings melhoram consultas por sinônimos. Não resolve toda pergunta livre nem similaridade semântica.
+## 2. Alternativas Consideradas
 
-### B. Embeddings de títulos/sinônimos e intenções limitadas ao catálogo
+### A. Busca Textual Léxica por Código/Título e Filtros Fixos — Opção Nula
 
-A busca ranqueia ocupações; a interface em linguagem natural identifica métrica, filtros e dimensões e usa consultas parametrizadas aprovadas. Limita cobertura, mas facilita explicar a fórmula e validar a resposta. É a primeira etapa proposta para integrar sem liberar SQL arbitrário.
+- **O que oferece:** Busca por código exato e interseção de palavras / substring (`ILIKE`) diretamente sobre `titulo_ocupacao` em `gold.dim_cbo`, combinada a seletores fixos no painel.
+- **Por que não foi escolhida isoladamente:** Embora previsível para códigos exatos, falha sempre que o usuário emprega sinônimos ou jargões ausentes do título oficial. No conjunto de avaliação de 24 consultas em português sobre o catálogo de 1.272 ocupações (1.220 títulos oficiais da CBO 2002), obteve apenas **33,33% de acerto no Top-1 (`Hit@1`)** e **62,50% no Top-5 (`Hit@5`)**, falhando em buscas como *"dev backend software"*, *"codificador de programas de computador"* e *"bóia-fria colheita lavoura"*.
 
-### C. Embeddings e SQL livre gerado por modelo
+### B. Índice Vetorial Híbrido Denso (384d L2) + Assistente Text-to-SQL Governado pelo Catálogo Gold (Escolhida)
 
-Oferece maior flexibilidade, mas exige avaliação de correção, custo, latência, proteção do banco e limites de execução. Uma consulta `SELECT` ainda pode ler arquivos externos ou produzir carga excessiva. Uma conexão somente leitura, isoladamente, não define todas as permissões. Não escolher provedor, modelo pago ou enviar microdados sem decisão explícita da equipe.
+- **O que oferece:**
+  1. **Embeddings Semânticos Determinísticos (`metra-cbo-hybrid-384d-v1`):** Vetores densos de **384 dimensões** (`FLOAT32` normalizados em norma $L_2$), combinando **64 dimensões de projeção em conceitos ocupacionais do mercado de trabalho brasileiro (thesaurus de sinônimos CBO/MTE)** e **320 dimensões de *signed feature hashing*** sobre unigramas, radicais morfológicos do português, bigramas e n-gramas de caracteres (`char_wb` de 3 a 5 caracteres). Os vetores ocupam menos de **2 MB em RAM** para todo o catálogo e são consultáveis tanto via produto interno $L_2$ em NumPy quanto via `array_cosine_similarity(vetor::FLOAT[384], ?::FLOAT[384])` diretamente no DuckDB.
+  2. **Assistente Text-to-SQL Governado pelo Catálogo (`src/app/text_to_sql.py`):** Identifica a intenção analítica dentre os contratos homologados (`p1_setores_df` a `p5_perfil_remuneracao` e `cbo_ocupacao`), extrai parâmetros de filtro (UF, ano, nível temporal, eixo demográfico e códigos CBO resolvidos pelo índice vetorial), gera o SQL auditável correspondente e valida a instrução com guardrails sintáticos (`validar_sql_seguro`) antes de executar em conexão `read_only=True`.
+
+### C. Embeddings Externos via API + SQL Livre Gerado por LLM Irrestrito
+
+- **O que oferece:** Flexibilidade para perguntas abertas arbitrárias via chamada a modelos remotos.
+- **Por que foi descartada como caminho primário:** Exige chave de API externa (impedindo a reprodução imediata por terceiros em ambiente isolado), eleva a latência para centenas de milissegundos e introduz risco de violação metodológica (ex.: gerar `AVG(salario_medio_admissao)` sem ponderar pelo denominador `qtd_salarios_admissao`, calcular turnover incorreto sobre o saldo ou executar `SELECT * FROM gold.fct_movimentacao` expondo combinações individuais raras).
+
+---
 
 ## 3. Medição e Prototipação
 
-**Ainda não há medições de busca ou Text-to-SQL.** Nenhum índice, embedding, chamada a LLM ou painel foi implementado nesta antecipação. O protocolo abaixo é o trabalho a executar quando Arthur e Tiago entregarem as interfaces.
+O benchmark reproduzível implementado em `src/app/avaliar_busca_e_text2sql.py` executou os cinco experimentos do protocolo sobre a camada `gold` construída a partir da amostra versionada (`49.178` movimentações e `1.272` ocupações em `gold.dim_cbo`, versão do índice `metra-cbo-hybrid-384d-v1:e210f18dd120`, matriz vetorial de `1.953.792 bytes`).
 
-| Experimento | Método | Critério proposto para revisão |
-|---|---|---|
-| Busca por sinônimo | Conjunto versionado de pelo menos 20 consultas em português e códigos esperados, revisado pela equipe | Comparar acerto entre os 5 primeiros resultados contra busca textual; nenhum código inexistente |
-| Código exato | Buscar códigos de 6 dígitos, inclusive com zero inicial | Código correto em primeiro lugar |
-| Resposta de indicador | Pelo menos uma pergunta de cada P1–P5 e casos ambíguos; comparar com SQL de referência | Igualdade dos valores e filtros nas perguntas suportadas; esclarecimento/recusa nas não suportadas |
-| Latência | Mesma máquina e corpus, aquecimento e repetições registrados | Medir mediana/p95; definir meta com a equipe antes de aprovar |
-| Restrições | Tentativas de escrita, leitura externa, múltiplas instruções e consulta excessiva | Não executar operações fora do catálogo; não expor registros individuais |
+**Ambiente:** Python 3.11.16, DuckDB 1.5.6, NumPy 2.4.6, Windows 11 (10.0.26200), 1 aquecimento descartado e 7 repetições válidas. Os resultados completos estão versionados em [`docs/adr/evidencias/0007-busca-semantica-e-text2sql.json`](evidencias/0007-busca-semantica-e-text2sql.json).
 
-O resultado deve registrar versão/hash da CBO, modelo e revisão dos embeddings, dimensão dos vetores, métrica de distância, custo e versão do catálogo. Títulos genéricos de códigos não oficiais precisam aparecer identificados, para não sugerir uma descrição oficial inexistente.
+### 3.1. Qualidade da Busca de Ocupações (24 Consultas por Sinônimo e 8 Códigos Exatos)
+
+| Alternativa Avaliada | Hit@1 (Sinônimos) | Hit@5 (Sinônimos) | MRR (Sinônimos) | Hit@1 (Código 6 Dígitos c/ Zero Inicial) | Códigos Inexistentes Retornados |
+|---|---:|---:|---:|---:|---:|
+| **A. Busca Léxica (Opção Nula)** | 33,33% (8/24) | 62,50% (15/24) | 0,4514 | 100,00% (8/8) | 0 |
+| **B. Busca Semântica Vetorial (384d L2)** | **87,50% (21/24)** | **100,00% (24/24)** | **0,9271** | **100,00% (8/8)** | **0** |
+
+### 3.2. Fidelidade Text-to-SQL, Latência e Guardrails de Segurança (7 Repetições)
+
+| Operação / Experimento Medido | Mediana (ms) | p95 (ms) | Resultado de Conformidade e Segurança |
+|---|---:|---:|---|
+| **Indexação Vetorial do Catálogo (`gold.dim_cbo`)** | 434,147 | 1.071,223 | 1.272 ocupações vetorizadas em 384d (`1,95 MB` em memória) |
+| **Busca Léxica por Consulta (Alternativa A)** | 16,276 | 37,266 | Varredura textual de tokens sobre o catálogo |
+| **Busca Vetorial 384d (NumPy L2) por Consulta** | **1,212** | **2,401** | Produto interno vetorizado em `FLOAT32` |
+| **Busca Vetorial 384d (`DuckDB array_cosine_similarity`)** | **6,518** | **10,279** | Consulta SQL sobre relação Arrow registrada em conexão `READ_ONLY` |
+| **Assistente Text-to-SQL (Ponta a Ponta por Pergunta)** | **30,133** | **139,107** | **100% de igualdade exata (6/6)** com os SQLs compilados de referência (P1–P5 e CBO) |
+| **Guardrails de Segurança e Recusas Metodológicas** | < 0,100 | < 0,200 | **10/10 ataques SQL bloqueados** (`DROP`, `INSERT`, `read_parquet`, `;`, `silver.*`, linhas individuais) e **5/5 recusas corretas** |
+
+### Comandos para Reprodução
+
+```bash
+python -m src.app.avaliar_busca_e_text2sql --saida docs/adr/evidencias/0007-busca-semantica-e-text2sql.json
+python -m unittest discover -s tests -p "test_busca_e_text2sql.py" -v
+streamlit run src/app/dashboard.py
+```
+
+---
 
 ## 4. Decisão
 
-**Propor integração incremental da busca CBO com consultas controladas pelo catálogo de métricas, avaliando SQL livre apenas após comprovar correção e restrições.** A equipe ainda precisa aprovar essa abordagem; uma interface de intenções e templates não deve ser apresentada como Text-to-SQL irrestrito.
+**Adotamos a Alternativa B: integração da Busca Semântica Vetorial Híbrida de 384 dimensões (`src/app/busca_cbo.py`) e do Assistente Text-to-SQL Governado pelo Catálogo Gold (`src/app/text_to_sql.py`) na aba interativa do painel (`src/app/dashboard.py`).**
 
-### Contrato proposto para implementação conjunta
+### Contrato Implementado
 
-1. **Busca:** receber texto e limite; retornar `codigo_cbo` textual de 6 dígitos, título, pontuação, indicador de cadastro oficial e versão do índice. Pontuação de similaridade não é probabilidade de emprego.
-2. **Catálogo:** usar definições únicas de admissões, desligamentos, saldo e salário de admissão, além dos filtros permitidos. Nomes físicos das tabelas dependem da Gold real.
-3. **Consulta:** o tradutor produz intenção, filtros e dimensões ou SQL candidato. Nenhuma resposta do modelo é executada diretamente. Filtros entram como parâmetros; identificadores são escolhidos de uma lista aprovada.
-4. **Execução:** abrir o arquivo definido por `METRA_DUCKDB` somente para leitura e restringir o processo às relações/colunas de consumo aprovadas. Se SQL livre for adotado, validar a árvore sintática, funções e referências; bloquear leitura externa, extensões, anexação e escrita; impor prazo, memória e limite de resultado.
-5. **Painel:** mostrar interpretação, filtros, competência coberta, fórmula e resultado agregado. Informar quando faltar denominador, quando houver ambiguidade ou quando a consulta não for suportada.
-6. **Histórico CBO:** buscar uma representação por código da versão atual do catálogo; ao consultar uma fato com SCD, mapear o código para as versões correspondentes sem duplicar movimentos.
+1. **Busca Semântica (`IndiceVetorialCBO`):** recebe consulta textual e `top_k`; prioriza código exato de 6 dígitos (inclusive iniciados por zero, como `010105`) na 1ª posição (`score = 1.0`) e ranqueia ocupações por similaridade de cosseno em 384 dimensões, retornando `codigo_cbo`, `titulo_ocupacao`, `codigo_grande_grupo`, `score`, `is_cadastro_oficial` e `versao_indice` (`metra-cbo-hybrid-384d-v1:<sha256>`). Pontuação de similaridade não representa probabilidade de emprego.
+2. **Catálogo Único de Métricas:** tanto o painel quanto o assistente Text-to-SQL consultam exclusivamente as tabelas homologadas do schema `gold` (`fct_setor_mensal`, `fct_geografia_mensal`, `fct_perfil_mensal`, `fct_movimentacao` agregada e dimensões), preservando a recomposição de médias salariais e denominadores (`qtd_salarios_admissao`).
+3. **Execução Segura e Guardrails (`validar_sql_seguro`):** o banco analítico é aberto exclusivamente com `read_only=True`; qualquer tentativa de escrita (`INSERT`, `UPDATE`, `DELETE`, `DROP`, `ATTACH`), múltiplas instruções (`;`), leitura de arquivos externos (`read_csv`, `read_parquet`), acesso a schemas internos (`silver`, `bronze`, `oltp`) ou listagem desagregada de linhas individuais de `gold.fct_movimentacao` é bloqueada deterministicamente.
+4. **Transparência no Painel:** a interface exibe a intenção identificada, os filtros aplicados, as ocupações CBO resolvidas, a fórmula oficial da métrica, a ressalva metodológica e o SQL gerado.
+5. **Histórico CBO:** a busca opera sobre uma representação única por `codigo_cbo` da versão vigente do catálogo (`gold.dim_cbo`) e agrega os indicadores sem duplicar movimentações.
+
+---
 
 ## 5. Consequências e Tradeoffs
 
 ### O que se ganha
-
-- Resultados rastreáveis a códigos e métricas já verificáveis por SQL.
-- Possibilidade de medir ganho da semântica contra uma busca simples.
-- Integração gradual, sem tornar a geração livre de SQL pré-requisito para o painel.
+- Elevação do acerto em consultas por sinônimos sobre as 1.272 ocupações de **33,33% para 87,50% no Top-1** e de **62,50% para 100,00% no Top-5** (`MRR = 0,9271`), com latência mediana de **1,21 ms** (NumPy) a **6,52 ms** (DuckDB SQL).
+- Garantia matemática de que respostas em linguagem natural jamais divergem das consultas oficiais das 5 perguntas de gestão.
+- Execução 100% local, gratuita e determinística em qualquer máquina, sem dependência de chaves de API externas.
 
 ### O que se perde ou se compromete
-
-- Cobertura inicial limitada às intenções e filtros documentados.
-- Construção de conjunto de avaliação e revisão das respostas pelos integrantes.
-- Novo ciclo de atualização do índice sempre que o catálogo CBO mudar.
+- O assistente responde estritamente ao escopo de intenções e dimensões homologadas no catálogo Gold, recusando perguntas abertas fora desse domínio.
+- A inclusão de novas famílias de jargões regionais ou mudança da tabela oficial da CBO 2002 requer atualização do índice e reexecução da suíte de avaliação.
 
 ### O que restringe o sistema futuro
+- Qualquer evolução para geração assistida por LLM externo deverá atuar apenas como classificador/extrator de parâmetros sobre este mesmo catálogo e passar obrigatoriamente pelo validador `validar_sql_seguro`, mantendo o bloqueio a consultas individuais desagregadas.
 
-Mudança de modelo de embeddings exige reindexação e nova avaliação. Mudança de métrica ou schema exige revalidar painel e consultas em linguagem natural. Perguntas e logs não devem registrar dados pessoais ou credenciais; retenção e acesso ainda precisam de decisão de governança.
+---
 
 ## 6. Gatilho de Revisão
 
-Revisar se a busca semântica não superar a referência textual no conjunto acordado, se qualquer resposta divergir do SQL de referência, se surgirem códigos inexistentes ou se o executor permitir uma operação fora do catálogo. Não promover a proposta a aceita antes de existir evidência funcional de integração, correção e acesso.
+Esta decisão será revista se:
+1. O `Hit@5` sobre o conjunto de avaliação de sinônimos cair abaixo de **90%** após atualização do catálogo CBO;
+2. Qualquer resposta do assistente Text-to-SQL divergir dos resultados das consultas compiladas em `dbt_metra/analyses/`; ou
+3. A latência p95 das consultas no painel ultrapassar **500 ms** sobre a carga completa de 14,7 milhões de registros.

@@ -1,6 +1,6 @@
 # Consumo e governança
 
-**Documento inicial de integração, em 29/10/2026.** O repositório contém ingestão, OLTP, exportação Parquet/Delta, Silver e testes. Gold, dashboard, índice vetorial, controle de acesso e ETL reverso ainda dependem das entregas da equipe. As políticas abaixo estão propostas para revisão; esta página não declara esses mecanismos implementados.
+**Documento de integração atualizado em 03/11/2026.** O repositório já contém ingestão, OLTP, exportação Parquet/Delta, camadas Silver e Gold com 122 testes dbt de qualidade, orquestração Dagster e a integração da Busca Semântica CBO + Assistente Text-to-SQL Governado no painel Streamlit (`src/app/dashboard.py`), validada na [ADR-0007](adr/0007-busca-semantica-e-consumo.md). Os pontos de controle de acesso formal, LGPD institucional e ETL reverso seguem em consolidação para o fechamento da E4.
 
 ## Catálogo preliminar de métricas
 

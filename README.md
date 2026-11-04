@@ -294,7 +294,7 @@ Depois da extração para Parquet, no mesmo ambiente Python:
 
 ```bash
 cd dbt_metra
-dbt build   # Parquet (data/lake/parquet/) -> schema silver de data/metra_analitico.duckdb
+dbt build   # Parquet -> schemas silver e gold de data/metra_analitico.duckdb
 ```
 
 Os modelos `stg_movimentacao`, `stg_municipio`, `stg_cbo` e `stg_cnae` leem o Parquet de `data/lake/parquet/<tabela>/` e são materializados como tabelas no schema `silver`. Mantêm uma linha por registro da origem, padronizam nomes e acrescentam colunas derivadas (`competencia`, `tipo_evento`, `salario_valido` e marcações de registros sentinela ou não oficiais), sem agregar nem decodificar os códigos do CAGED. O alvo é um arquivo próprio, separado de `data/metra.duckdb`, porque o DuckDB aceita um único processo escrevendo por vez; o arquivo não é versionado.
@@ -307,7 +307,87 @@ Os testes das fontes e da Silver são executados por `dbt build` ou `dbt test --
 python -m unittest discover -s tests -p 'test_dbt_quality.py' -v
 ```
 
-Veja a [camada analítica e o Star Schema proposto](docs/camada-analitica-dbt.md), a [ADR-0005](docs/adr/0005-modelagem-analitica-dbt.md).
+Veja a [camada analítica e o Star Schema](docs/camada-analitica-dbt.md) e a [ADR-0005](docs/adr/0005-modelagem-analitica-dbt.md).
+
+### Camada Gold e perguntas de gestão (E3)
+
+O mesmo `dbt build` também reconstrói o schema `gold`, usando `ref()` sobre a Silver:
+
+- Dimensões `dim_competencia`, `dim_municipio`, `dim_cnae`, `dim_cbo` e `dim_perfil_demografico`.
+- `fct_movimentacao`: uma linha por evento da Silver, com chaves dimensionais e linhagem.
+- `fct_setor_mensal`: competência × UF × seção CNAE (P1, P2 e P4).
+- `fct_geografia_mensal`: competência × UF × capital/interior (P3).
+- `fct_perfil_mensal`: competência × UF × capital/interior × seção CNAE × perfil (P5).
+
+Os agregados usam municípios identificados do Centro-Oeste entre 2023 e 2026. Preservam somas e denominadores salariais para recalcular médias em qualquer agrupamento. As tabelas são reconstruídas integralmente, incluindo competências antigas que recebam dados atrasados.
+
+As cinco consultas de referência estão em [`dbt_metra/analyses/`](./dbt_metra/analyses/README.md). P2 trata sazonalidade; P3 compara capitais e interior. P4 usa explicitamente a proxy `200 × min(admissões, desligamentos) / (admissões + desligamentos)`, que mede equilíbrio dos fluxos e não a taxa convencional de turnover sobre estoque. P5 descreve salários e movimentações, sem estimar chances individuais de recolocação. Os resultados se referem aos dados carregados, não a totais populacionais ou ao saldo oficial ajustado do CAGED.
+
+Para compilar e consultar P3, no ambiente de `requirements-pipeline.txt`, depois da extração:
+
+```bash
+cd dbt_metra
+dbt build
+dbt compile
+python - <<'PY'
+from pathlib import Path
+import os
+import duckdb
+
+sql = Path('target/compiled/metra/analyses/p3_capitais_interior.sql').read_text()
+with duckdb.connect(os.environ.get('METRA_DUCKDB', '../data/metra_analitico.duckdb'), read_only=True) as conn:
+    conn.sql(sql).show()
+PY
+```
+
+Não execute o SQL Jinja original diretamente no DuckDB; use a consulta compilada. Compilar não executa nem publica as análises como tabelas. Dashboard e consultas devem abrir o banco após o término da escrita pelo dbt.
+
+Para validar as regras de negócio com Parquet e DuckDB temporários, a partir da raiz:
+
+```bash
+python -m unittest discover -s tests -p 'test_gold.py' -v
+```
+
+Essa verificação executa os modelos reais com fixtures e com a amostra versionada (referências sintéticas), incluindo reexecução e evento atrasado. Os contratos descritivos da Gold estão em `models/marts/_gold__models.yml`, complementando os 122 testes genéricos de qualidade das fontes e da Silver em `models/staging/schema.yml`.
+
+### Orquestração com Dagster (E3)
+
+O ambiente de orquestração usa `dagster`, `dagster-dbt` e `dagster-webserver`. A definição em `dagster_metra/definitions.py` expõe o pipeline de ingestão e extração como os assets `executar_pipeline` e `exportar_parquet`, conecta os cinco sources Parquet do dbt à extração e carrega os modelos Silver e Gold a partir do manifesto dbt. Assim, a linhagem completa aparece como `executar_pipeline` → `exportar_parquet` → `lake/*` → Silver → Gold (o asset `exportar_parquet` depende de `executar_pipeline`, fazendo com que a origem PostgreSQL seja atualizada antes da geração do lake Parquet).
+
+Em container, o `target/manifest.json` é gerado durante o build da imagem. No desenvolvimento com `dagster dev`, `prepare_if_dev()` continua atualizando-o quando necessário.
+
+Para abrir a interface localmente:
+
+```bash
+dagster dev -w workspace.yaml
+```
+
+Acesse [http://localhost:3000](http://localhost:3000). Alternativamente, execute a interface em container:
+
+```bash
+docker compose --profile dagster up --build -d postgres dagster-webserver dagster-daemon
+```
+
+O comando sobe o `dagster-webserver` e o `dagster-daemon` com o mesmo `DAGSTER_HOME`, portanto os jobs enviados pela UI são executados pelo daemon.
+
+Na interface, materialize `executar_pipeline` para executar as migrações e cargas E1, e em seguida, materialize `exportar_parquet` para gerar os arquivos Parquet. Depois, os assets dbt podem então ser materializados para executar `dbt build` sobre o lake. Os sources `lake/*` são virtuais: representam os Parquets produzidos pela extração e aparecem como parte da linhagem, sem uma materialização adicional. O arquivo DuckDB e os Parquets são montados a partir de `data/`.
+
+### Busca Semântica CBO, Assistente Text-to-SQL e Painel Streamlit (E4)
+
+A camada de consumo interativa (`src/app/dashboard.py`) integra duas abas conectadas em modo somente leitura (`read_only=True`) ao banco analítico `data/metra_analitico.duckdb` (construindo-o automaticamente a partir da amostra versionada quando ausente):
+
+1. **Busca Semântica CBO 2002 & Assistente Text-to-SQL (`ADR 0007`):**
+   - **Busca Semântica de Ocupações (`src/app/busca_cbo.py`):** índice vetorial híbrido de 384 dimensões normalizado em norma $L_2$ (`metra-cbo-hybrid-384d-v1`) sobre `gold.dim_cbo`, suportando busca por código exato de 6 dígitos (inclusive com zero inicial) e por sinônimos ou termos coloquiais (ex.: *"dev backend"*, *"caminhoneiro"*, *"bóia-fria"*), tanto via produto interno em NumPy quanto via `array_cosine_similarity(vetor::FLOAT[384], ?::FLOAT[384])` diretamente no DuckDB, cruzando os códigos com os indicadores agregados de `gold.fct_movimentacao`.
+   - **Assistente Text-to-SQL Governado pelo Catálogo (`src/app/text_to_sql.py`):** traduz perguntas em linguagem natural para consultas SQL auditáveis sobre os contratos da camada `gold` (P1–P5 e ocupações CBO), exibindo a fórmula oficial, ressalvas metodológicas e bloqueando deterministicamente comandos DDL/DML, leituras externas, acessos fora do schema `gold` ou consultas desagregadas de registros individuais (LGPD).
+2. **Painel das 5 Perguntas de Gestão (Contratos Gold):** visualização tabular e gráfica das cinco perguntas estratégicas do projeto sobre as tabelas agregadas da camada `gold`.
+
+Para executar o painel, os testes e o benchmark reproduzível da [`ADR 0007`](./docs/adr/0007-busca-semantica-e-consumo.md):
+
+```bash
+streamlit run src/app/dashboard.py
+python -m unittest discover -s tests -p 'test_busca_e_text2sql.py' -v
+python -m src.app.avaliar_busca_e_text2sql --saida docs/adr/evidencias/0007-busca-semantica-e-text2sql.json
+```
 
 ---
 

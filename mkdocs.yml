@@ -73,8 +73,8 @@ nav:
           - "ADR 0002: Simplificação com DuckDB": adr/0002-simplificacao-arquitetural-duckdb.md
           - "ADR 0003: Compressão Parquet": adr/0003-compressao-parquet.md
           - "ADR 0004: Estratégia de CDC": adr/0004-cdc-decodificacao-logica.md
-          - "ADR 0005: Modelagem Analítica (proposta)": adr/0005-modelagem-analitica-dbt.md
-          - "ADR 0007: Busca e Consumo (proposta)": adr/0007-busca-semantica-e-consumo.md
+          - "ADR 0005: Modelagem Analítica e Qualidade": adr/0005-modelagem-analitica-dbt.md
+          - "ADR 0007: Busca Semântica CBO e Text-to-SQL": adr/0007-busca-semantica-e-consumo.md
       - Governança e IA: uso-de-ia.md
       - Diário de Bordo:
           - Semana 01: diario/semana-01.md

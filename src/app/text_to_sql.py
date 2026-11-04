@@ -1,0 +1,1001 @@
+"""Assistente Text-to-SQL governado pelo catálogo de métricas da camada Gold (ADR 0007).
+
+Converte perguntas em linguagem natural em consultas SQL parametrizadas e auditáveis sobre
+o schema `gold` do DuckDB, garantindo:
+1. Alinhamento exato com as 5 consultas de referência (`p1_setores_df` a `p5_perfil_remuneracao`)
+   e com o contrato de indicadores por ocupação CBO (`gold.fct_movimentacao` + `gold.dim_cbo`).
+2. Recomposição estrita de médias salariais (`sum(soma_salarios_admissao) / nullif(sum(qtd_salarios_admissao), 0)`),
+   nunca realizando média de médias.
+3. Validação sintática e de segurança (`validar_sql_seguro`): bloqueia DDL/DML, múltiplas instruções,
+   leitura de arquivos externos (`read_csv`, `read_parquet`, `ATTACH`), tabelas fora do schema `gold`
+   e consultas de linhas individuais sem agregação em `gold.fct_movimentacao` (proteção LGPD).
+4. Recusa transparente para perguntas fora do escopo (estoque total de vínculos, taxa de desemprego
+   PNAD, probabilidade individual de recolocação ou previsões futuras).
+"""
+
+from __future__ import annotations
+
+from dataclasses import asdict, dataclass
+import re
+from typing import Any
+
+import duckdb
+
+from src.app.busca_cbo import IndiceVetorialCBO, normalizar_texto
+
+TABELAS_GOLD_PERMITIDAS = frozenset({
+    "gold.dim_competencia",
+    "gold.dim_municipio",
+    "gold.dim_cnae",
+    "gold.dim_cbo",
+    "gold.dim_perfil_demografico",
+    "gold.fct_movimentacao",
+    "gold.fct_setor_mensal",
+    "gold.fct_geografia_mensal",
+    "gold.fct_perfil_mensal",
+})
+
+COMANDOS_PROIBIDOS_SQL = frozenset({
+    "insert", "update", "delete", "drop", "alter", "create", "truncate",
+    "replace", "attach", "detach", "copy", "export", "import", "pragma",
+    "install", "load", "call", "set", "grant", "revoke", "vacuum", "merge",
+})
+
+FUNCOES_EXTERNAS_PROIBIDAS = frozenset({
+    "read_csv", "read_csv_auto", "read_parquet", "read_json", "read_json_auto",
+    "delta_scan", "postgres_scan", "sqlite_scan", "iceberg_scan", "glob",
+    "read_text", "read_blob", "parquet_scan",
+})
+
+
+class ViolacaoSegurancaSQL(ValueError):
+    """Exceção levantada quando uma consulta viola as políticas de segurança e governança."""
+
+
+@dataclass(frozen=True)
+class RespostaTextToSQL:
+    """Contrato completo de resposta do assistente Text-to-SQL (ADR 0007)."""
+
+    pergunta_original: str
+    suportada: bool
+    intencao: str
+    titulo_intencao: str
+    filtros_aplicados: dict[str, Any]
+    formula_metrica: str
+    ressalva_metodologica: str
+    sql_gerado: str
+    colunas: list[str]
+    linhas: list[tuple[Any, ...]]
+    ocupacoes_resolvidas: list[dict[str, Any]]
+    motivo_recusa: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+def validar_sql_seguro(sql: str) -> None:
+    """Valida que a instrução SQL é exclusivamente de leitura agregada sobre o schema `gold`."""
+    texto = (sql or "").strip()
+    if not texto:
+        raise ViolacaoSegurancaSQL("Consulta SQL vazia.")
+
+    # Remove comentários SQL antes de inspecionar
+    sem_comentarios = re.sub(r"--[^\n]*", " ", texto)
+    sem_comentarios = re.sub(r"/\*.*?\*/", " ", sem_comentarios, flags=re.DOTALL).strip()
+
+    # Bloqueia múltiplas instruções separadas por ponto-e-vírgula
+    partes = [p.strip() for p in sem_comentarios.split(";") if p.strip()]
+    if len(partes) > 1:
+        raise ViolacaoSegurancaSQL(
+            "Múltiplas instruções SQL (';') são bloqueadas pela camada de governança."
+        )
+
+    corpo = partes[0]
+    corpo_lower = corpo.lower()
+
+    if not (corpo_lower.startswith("select") or corpo_lower.startswith("with")):
+        raise ViolacaoSegurancaSQL(
+            "Apenas consultas analíticas iniciadas por SELECT ou WITH são permitidas."
+        )
+
+    tokens = re.findall(r"\b[a-z_][a-z0-9_]*\b", corpo_lower)
+    for tok in tokens:
+        if tok in COMANDOS_PROIBIDOS_SQL:
+            raise ViolacaoSegurancaSQL(
+                f"Operação ou palavra-chave SQL proibida detectada: '{tok.upper()}'."
+            )
+        if tok in FUNCOES_EXTERNAS_PROIBIDAS:
+            raise ViolacaoSegurancaSQL(
+                f"Função de leitura externa proibida detectada: '{tok}'."
+            )
+
+    # Verifica referências qualificadas schema.tabela
+    referencias_qualificadas = re.findall(
+        r"\b([a-z_][a-z0-9_]*)\.([a-z_][a-z0-9_]*)\b", corpo_lower
+    )
+    aliases_cte = set(re.findall(r"\b([a-z_][a-z0-9_]*)\s+as\s*\(", corpo_lower))
+    aliases_from = set(
+        re.findall(
+            r"\b(?:from|join)\s+gold\.[a-z_][a-z0-9_]*\s+(?:as\s+)?([a-z_][a-z0-9_]*)\b",
+            corpo_lower,
+        )
+    )
+    for alias_ou_schema, objeto in referencias_qualificadas:
+        if alias_ou_schema in ("silver", "bronze", "oltp", "pg_catalog", "information_schema", "main"):
+            raise ViolacaoSegurancaSQL(
+                f"Acesso ao schema '{alias_ou_schema}' negado. Apenas o schema 'gold' é permitido."
+            )
+        if alias_ou_schema == "gold":
+            nome_completo = f"gold.{objeto}"
+            if nome_completo not in TABELAS_GOLD_PERMITIDAS:
+                raise ViolacaoSegurancaSQL(
+                    f"Tabela '{nome_completo}' não pertence ao catálogo público da camada Gold."
+                )
+        elif alias_ou_schema not in aliases_cte and alias_ou_schema not in aliases_from and len(alias_ou_schema) > 4:
+            # Permite aliases curtos de tabela (s, d, j, c, b, f, p, r, e, g, a, m, mun, cnae, cbo)
+            if alias_ou_schema not in {
+                "base", "setores", "secoes", "janela", "cobertura", "calendario",
+                "grupos", "serie", "resumo", "comparacao", "totais", "pares",
+                "correlacao", "eixos", "referencias",
+            }:
+                raise ViolacaoSegurancaSQL(
+                    f"Referência qualificada não autorizada: '{alias_ou_schema}.{objeto}'."
+                )
+
+    # Garante que ao menos uma tabela gold.* seja consultada
+    if not any(t in corpo_lower for t in TABELAS_GOLD_PERMITIDAS):
+        raise ViolacaoSegurancaSQL(
+            "A consulta deve referenciar exclusivamente as tabelas homologadas do schema 'gold'."
+        )
+
+    # Proteção de privacidade (LGPD): proíbe SELECT de linhas individuais em gold.fct_movimentacao sem agregação
+    if "gold.fct_movimentacao" in corpo_lower:
+        tem_agregacao = any(
+            fn in corpo_lower for fn in ("count(", "sum(", "avg(", "group by")
+        )
+        if not tem_agregacao:
+            raise ViolacaoSegurancaSQL(
+                "Acesso negado pela política de governança/LGPD: 'gold.fct_movimentacao' só pode "
+                "ser consultada por meio de agregações estatísticas (SUM, COUNT, GROUP BY)."
+            )
+
+
+def _extrair_filtros_pergunta(pergunta: str) -> dict[str, Any]:
+    """Extrai filtros explícitos de UF, ano, localidade e eixo demográfico da pergunta."""
+    norm = normalizar_texto(pergunta)
+    tokens = set(norm.split())
+    filtros: dict[str, Any] = {}
+
+    # UF
+    if "distrito federal" in norm or "brasilia" in norm or "df" in tokens:
+        filtros["sigla_uf"] = "DF"
+    elif "goias" in norm or "goiania" in norm or "go" in tokens:
+        filtros["sigla_uf"] = "GO"
+    elif "mato grosso do sul" in norm or "campo grande" in norm or "ms" in tokens:
+        filtros["sigla_uf"] = "MS"
+    elif "mato grosso" in norm or "cuiaba" in norm or "mt" in tokens:
+        filtros["sigla_uf"] = "MT"
+
+    # Ano (2023 a 2026)
+    anos = [int(a) for a in re.findall(r"\b(202[3-6])\b", norm)]
+    if len(anos) == 1:
+        filtros["ano"] = anos[0]
+
+    # Eixo demográfico (P5)
+    if any(p in norm for p in ("sexo", "genero", "homem", "mulher", "homens", "mulheres", "feminino", "masculino")):
+        filtros["eixo"] = "sexo"
+    elif any(p in norm for p in ("raca", "cor", "branca", "preta", "parda", "indigena", "amarela", "negros", "negras")):
+        filtros["eixo"] = "raca_cor"
+    elif any(
+        p in norm
+        for p in (
+            "escolaridade", "instrucao", "ensino", "superior", "fundamental",
+            "ensino medio", "medio completo", "medio incompleto", "pos graduacao",
+            "mestrado", "doutorado", "analfabeto", "estudo", "graduacao",
+        )
+    ):
+        filtros["eixo"] = "escolaridade"
+    elif "idade" in tokens or any(p in norm for p in ("faixa etaria", "etaria", "jovens", "idosos", "anos de idade")):
+        filtros["eixo"] = "faixa_etaria"
+
+    # Nível para P3
+    if "mensal" in tokens or "mes a mes" in norm:
+        filtros["nivel"] = "mensal"
+    elif "anual" in tokens or "por ano" in norm:
+        filtros["nivel"] = "anual"
+    elif "total" in tokens or "consolidado" in tokens or "acumulado" in tokens:
+        filtros["nivel"] = "total"
+
+    return filtros
+
+
+def _cte_base_setor_mensal(filtros: dict[str, Any], where_extra: str = "") -> str:
+    """Gera a CTE `base` equivalente a `gold.fct_setor_mensal`, filtrando por CBO quando solicitado."""
+    codigos_cbo = filtros.get("codigos_cbo")
+    if not codigos_cbo:
+        clausula = f"\n    {where_extra}" if where_extra else ""
+        return f"select * from gold.fct_setor_mensal{clausula}"
+
+    lista_cbo = ", ".join(f"'{str(c).zfill(6)}'" for c in codigos_cbo)
+    condicoes = [
+        "f.is_identificado",
+        "f.is_centro_oeste",
+        "f.ano between 2023 and 2026",
+        f"f.codigo_cbo in ({lista_cbo})",
+    ]
+    if where_extra:
+        limpo = re.sub(r"^\s*where\s+", "", where_extra.strip(), flags=re.IGNORECASE)
+        if limpo:
+            condicoes.append(limpo)
+    where_sql = " and ".join(condicoes)
+    return f"""select
+        f.competencia, f.sigla_uf, f.codigo_secao,
+        count(*) filter (where f.saldo_movimentacao = 1) as admissoes,
+        count(*) filter (where f.saldo_movimentacao = -1) as desligamentos,
+        coalesce(sum(f.saldo_movimentacao), 0) as saldo,
+        coalesce(sum(case when f.saldo_movimentacao = 1 and f.salario_valido then f.salario_mensal else 0 end), 0) as soma_salarios_admissao,
+        count(*) filter (where f.saldo_movimentacao = 1 and f.salario_valido) as qtd_salarios_admissao,
+        sum(case when f.saldo_movimentacao = 1 and f.salario_valido then f.salario_mensal else 0 end)
+            / nullif(count(*) filter (where f.saldo_movimentacao = 1 and f.salario_valido), 0) as salario_medio_admissao
+    from gold.fct_movimentacao f
+    where {where_sql}
+    group by f.competencia, f.sigla_uf, f.codigo_secao"""
+
+
+def _gerar_sql_p1(filtros: dict[str, Any]) -> str:
+    uf = filtros.get("sigla_uf", "DF")
+    if uf not in ("DF", "GO", "MT", "MS"):
+        uf = "DF"
+    filtros["sigla_uf"] = uf
+    corpo_base = _cte_base_setor_mensal(filtros)
+    return f"""with base as (
+    {corpo_base}
+), janela as (
+    select (max(competencia) - interval '11 months')::date as inicio,
+           max(competencia) as fim
+    from base
+), cobertura as (
+    select count(distinct competencia) as competencias_disponiveis
+    from base cross join janela
+    where competencia between inicio and fim
+), setores as (
+    select codigo_secao,
+           sum(admissoes) as admissoes, sum(desligamentos) as desligamentos,
+           sum(saldo) as saldo
+    from base cross join janela
+    where sigla_uf = '{uf}' and codigo_secao <> 'Z'
+      and competencia between inicio and fim
+    group by codigo_secao
+), secoes as (
+    select distinct codigo_secao, descricao_secao from gold.dim_cnae
+)
+select s.*, d.descricao_secao,
+       dense_rank() over (order by admissoes desc) as ranking_admissoes,
+       dense_rank() over (order by desligamentos desc) as ranking_desligamentos,
+       j.inicio, j.fim, c.competencias_disponiveis
+from setores s
+left join secoes d using (codigo_secao)
+cross join janela j
+cross join cobertura c
+order by ranking_admissoes, codigo_secao"""
+
+
+def _gerar_sql_p2(filtros: dict[str, Any]) -> str:
+    clausulas_base: list[str] = []
+    if "sigla_uf" in filtros and filtros["sigla_uf"] in ("DF", "GO", "MT", "MS"):
+        clausulas_base.append(f"sigla_uf = '{filtros['sigla_uf']}'")
+    if "ano" in filtros and int(filtros["ano"]) in (2023, 2024, 2025, 2026):
+        clausulas_base.append(f"year(competencia) = {int(filtros['ano'])}")
+    where_base = f"where {' and '.join(clausulas_base)}" if clausulas_base else ""
+    corpo_base = _cte_base_setor_mensal(filtros, where_base)
+
+    return f"""with base as (
+    {corpo_base}
+), competencias as (
+    select distinct competencia from base
+), calendario as (
+    select c.competencia, c.ano, c.mes, p.competencia is not null as tem_dados
+    from gold.dim_competencia c
+    left join competencias p using (competencia)
+    where c.competencia between (select min(competencia) from base)
+                            and (select max(competencia) from base)
+), anos_completos as (
+    select ano from calendario
+    group by ano having count(*) filter (where tem_dados) = 12
+), grupos as (
+    select distinct sigla_uf, codigo_secao from base
+), serie as (
+    select c.*, g.sigla_uf, g.codigo_secao,
+           a.ano is not null as ano_completo_na_base,
+           case when c.tem_dados then coalesce(b.admissoes, 0) end as admissoes,
+           case when c.tem_dados then coalesce(b.desligamentos, 0) end as desligamentos,
+           case when c.tem_dados then coalesce(b.saldo, 0) end as saldo
+    from calendario c cross join grupos g
+    left join base b using (competencia, sigla_uf, codigo_secao)
+    left join anos_completos a on c.ano = a.ano
+), resumo as (
+    select sigla_uf, codigo_secao, mes,
+           count(*) as anos_considerados,
+           avg(admissoes) as media_admissoes_mes,
+           avg(desligamentos) as media_desligamentos_mes,
+           avg(saldo) as media_saldo_mes
+    from serie where ano_completo_na_base
+    group by sigla_uf, codigo_secao, mes
+)
+select s.*, coalesce(r.anos_considerados, 0) as anos_considerados,
+       r.media_admissoes_mes, r.media_desligamentos_mes, r.media_saldo_mes
+from serie s
+left join resumo r using (sigla_uf, codigo_secao, mes)
+order by sigla_uf, codigo_secao, competencia"""
+
+
+def _gerar_sql_p3(filtros: dict[str, Any]) -> str:
+    clausulas_base: list[str] = []
+    if "sigla_uf" in filtros and filtros["sigla_uf"] in ("DF", "GO", "MT", "MS"):
+        clausulas_base.append(f"sigla_uf = '{filtros['sigla_uf']}'")
+    if "ano" in filtros and int(filtros["ano"]) in (2023, 2024, 2025, 2026):
+        clausulas_base.append(f"year(competencia) = {int(filtros['ano'])}")
+    where_base = f"where {' and '.join(clausulas_base)}" if clausulas_base else ""
+
+    where_final = ""
+    if "nivel" in filtros and filtros["nivel"] in ("mensal", "anual", "total"):
+        where_final = f"where nivel = '{filtros['nivel']}'"
+
+    codigos_cbo = filtros.get("codigos_cbo")
+    if not codigos_cbo:
+        corpo_base = f"""select *, year(competencia)::integer as ano
+    from gold.fct_geografia_mensal
+    {where_base}"""
+    else:
+        lista_cbo = ", ".join(f"'{str(c).zfill(6)}'" for c in codigos_cbo)
+        conds = [
+            "f.is_identificado",
+            "f.is_centro_oeste",
+            "f.ano between 2023 and 2026",
+            f"f.codigo_cbo in ({lista_cbo})",
+        ]
+        if clausulas_base:
+            conds.extend(clausulas_base)
+        corpo_base = f"""select
+        f.competencia, f.sigla_uf, f.is_capital,
+        count(*) filter (where f.saldo_movimentacao = 1) as admissoes,
+        count(*) filter (where f.saldo_movimentacao = -1) as desligamentos,
+        coalesce(sum(f.saldo_movimentacao), 0) as saldo,
+        coalesce(sum(case when f.saldo_movimentacao = 1 and f.salario_valido then f.salario_mensal else 0 end), 0) as soma_salarios_admissao,
+        count(*) filter (where f.saldo_movimentacao = 1 and f.salario_valido) as qtd_salarios_admissao,
+        year(f.competencia)::integer as ano
+    from gold.fct_movimentacao f
+    where {' and '.join(conds)}
+    group by f.competencia, f.sigla_uf, f.is_capital"""
+
+    return f"""with base as (
+    {corpo_base}
+), grupos as (
+    select competencia, ano,
+           case when grouping(sigla_uf) = 1 then 'Centro-Oeste' else sigla_uf end as recorte,
+           case when grouping(competencia) = 0 then 'mensal'
+                when grouping(ano) = 0 then 'anual' else 'total' end as nivel,
+           is_capital,
+           sum(admissoes) as admissoes, sum(desligamentos) as desligamentos,
+           sum(saldo) as saldo,
+           sum(soma_salarios_admissao) / nullif(sum(qtd_salarios_admissao), 0) as salario,
+           sum(qtd_salarios_admissao) as n_salarios
+    from base
+    group by grouping sets (
+        (competencia, sigla_uf, is_capital), (competencia, is_capital),
+        (ano, sigla_uf, is_capital), (ano, is_capital),
+        (sigla_uf, is_capital), (is_capital)
+    )
+), comparacao as (
+    select nivel, competencia, ano, recorte,
+           max(admissoes) filter (where is_capital) as admissoes_capital,
+           max(admissoes) filter (where not is_capital) as admissoes_interior,
+           max(desligamentos) filter (where is_capital) as desligamentos_capital,
+           max(desligamentos) filter (where not is_capital) as desligamentos_interior,
+           max(saldo) filter (where is_capital) as saldo_capital,
+           max(saldo) filter (where not is_capital) as saldo_interior,
+           max(salario) filter (where is_capital) as salario_capital,
+           max(salario) filter (where not is_capital) as salario_interior,
+           coalesce(max(n_salarios) filter (where is_capital), 0) as n_capital,
+           coalesce(max(n_salarios) filter (where not is_capital), 0) as n_interior
+    from grupos group by nivel, competencia, ano, recorte
+)
+select *,
+       saldo_capital - saldo_interior as diferenca_saldo,
+       salario_capital - salario_interior as diferenca_salario
+from comparacao
+{where_final}
+order by nivel, competencia nulls last, ano nulls last, recorte"""
+
+
+def _gerar_sql_p4(filtros: dict[str, Any]) -> str:
+    clausulas_extra: list[str] = []
+    if "sigla_uf" in filtros and filtros["sigla_uf"] in ("DF", "GO", "MT", "MS"):
+        clausulas_extra.append(f"and sigla_uf = '{filtros['sigla_uf']}'")
+    if "ano" in filtros and int(filtros["ano"]) in (2023, 2024, 2025, 2026):
+        clausulas_extra.append(f"and year(competencia) = {int(filtros['ano'])}")
+    where_extra = f"where codigo_secao <> 'Z' {' '.join(clausulas_extra)}".strip()
+    corpo_base = _cte_base_setor_mensal(filtros, where_extra)
+
+    return f"""with base as (
+    {corpo_base}
+), totais as (
+    select codigo_secao,
+           sum(admissoes) as admissoes, sum(desligamentos) as desligamentos,
+           sum(saldo) as saldo,
+           sum(soma_salarios_admissao) as soma_salarios_admissao,
+           sum(qtd_salarios_admissao) as qtd_salarios_admissao
+    from base group by codigo_secao
+), setores as (
+    select *, soma_salarios_admissao / nullif(qtd_salarios_admissao, 0) as salario_medio_admissao,
+           200.0 * least(admissoes, desligamentos)
+               / nullif(admissoes + desligamentos, 0) as indice_fluxos_pareados_pct
+    from totais
+), pares as (
+    select * from setores
+    where indice_fluxos_pareados_pct is not null and salario_medio_admissao is not null
+), correlacao as (
+    select count(*) as pares_validos,
+           case when count(*) >= 3
+                  and stddev_pop(indice_fluxos_pareados_pct) > 0
+                  and stddev_pop(salario_medio_admissao) > 0
+                then corr(indice_fluxos_pareados_pct, salario_medio_admissao)
+           end as correlacao_pearson
+    from pares
+)
+select s.*, c.pares_validos, c.correlacao_pearson
+from setores s cross join correlacao c
+order by codigo_secao"""
+
+
+def _gerar_sql_p5(filtros: dict[str, Any]) -> str:
+    clausulas_base: list[str] = []
+    if "sigla_uf" in filtros and filtros["sigla_uf"] in ("DF", "GO", "MT", "MS"):
+        clausulas_base.append(f"f.sigla_uf = '{filtros['sigla_uf']}'")
+    if "ano" in filtros and int(filtros["ano"]) in (2023, 2024, 2025, 2026):
+        clausulas_base.append(f"year(f.competencia) = {int(filtros['ano'])}")
+    where_base = f"where {' and '.join(clausulas_base)}" if clausulas_base else ""
+
+    where_eixo = ""
+    if "eixo" in filtros and filtros["eixo"] in ("sexo", "raca_cor", "escolaridade", "faixa_etaria"):
+        where_eixo = f"where eixo = '{filtros['eixo']}'"
+
+    codigos_cbo = filtros.get("codigos_cbo")
+    if not codigos_cbo:
+        corpo_base = f"""select f.*, p.* exclude (id_perfil_demografico)
+    from gold.fct_perfil_mensal f
+    left join gold.dim_perfil_demografico p using (id_perfil_demografico)
+    {where_base}"""
+    else:
+        lista_cbo = ", ".join(f"'{str(c).zfill(6)}'" for c in codigos_cbo)
+        conds = [
+            "f.is_identificado",
+            "f.is_centro_oeste",
+            "f.ano between 2023 and 2026",
+            f"f.codigo_cbo in ({lista_cbo})",
+        ]
+        if clausulas_base:
+            conds.extend(clausulas_base)
+        corpo_base = f"""select
+        f.sigla_uf, f.is_capital, f.codigo_secao,
+        p.codigo_sexo, p.sexo,
+        p.codigo_raca_cor, p.raca_cor,
+        p.codigo_grau_instrucao, p.escolaridade,
+        p.codigo_faixa_etaria, p.faixa_etaria,
+        count(*) filter (where f.saldo_movimentacao = 1) as admissoes,
+        count(*) filter (where f.saldo_movimentacao = -1) as desligamentos,
+        coalesce(sum(f.saldo_movimentacao), 0) as saldo,
+        coalesce(sum(case when f.saldo_movimentacao = 1 and f.salario_valido then f.salario_mensal else 0 end), 0) as soma_salarios_admissao,
+        count(*) filter (where f.saldo_movimentacao = 1 and f.salario_valido) as qtd_salarios_admissao
+    from gold.fct_movimentacao f
+    left join gold.dim_perfil_demografico p using (id_perfil_demografico)
+    where {' and '.join(conds)}
+    group by
+        f.sigla_uf, f.is_capital, f.codigo_secao,
+        p.codigo_sexo, p.sexo,
+        p.codigo_raca_cor, p.raca_cor,
+        p.codigo_grau_instrucao, p.escolaridade,
+        p.codigo_faixa_etaria, p.faixa_etaria"""
+
+    return f"""with base as (
+    {corpo_base}
+), eixos as (
+    select b.sigla_uf, b.is_capital, b.codigo_secao,
+           e.eixo, e.codigo_categoria, e.categoria,
+           b.admissoes, b.desligamentos, b.saldo,
+           b.soma_salarios_admissao, b.qtd_salarios_admissao
+    from base b
+    cross join lateral (values
+        ('sexo', b.codigo_sexo, b.sexo),
+        ('raca_cor', b.codigo_raca_cor, b.raca_cor),
+        ('escolaridade', b.codigo_grau_instrucao, b.escolaridade),
+        ('faixa_etaria', b.codigo_faixa_etaria, b.faixa_etaria)
+    ) e(eixo, codigo_categoria, categoria)
+), grupos as (
+    select sigla_uf, is_capital, codigo_secao, eixo, codigo_categoria, categoria,
+           sum(admissoes) as admissoes, sum(desligamentos) as desligamentos,
+           sum(saldo) as saldo,
+           sum(soma_salarios_admissao) as soma_salarios_admissao,
+           sum(qtd_salarios_admissao) as qtd_salarios_admissao
+    from eixos group by sigla_uf, is_capital, codigo_secao, eixo, codigo_categoria, categoria
+), referencias as (
+    select *, soma_salarios_admissao / nullif(qtd_salarios_admissao, 0) as salario_medio_admissao,
+           sum(admissoes) over recorte as admissoes_recorte,
+           sum(soma_salarios_admissao) over recorte
+               / nullif(sum(qtd_salarios_admissao) over recorte, 0) as salario_medio_recorte
+    from grupos
+    window recorte as (partition by sigla_uf, is_capital, codigo_secao, eixo)
+)
+select *,
+       100.0 * admissoes / nullif(admissoes_recorte, 0) as participacao_admissoes_pct,
+       salario_medio_admissao - salario_medio_recorte as diferenca_salarial,
+       100.0 * (salario_medio_admissao - salario_medio_recorte)
+           / nullif(salario_medio_recorte, 0) as diferenca_salarial_pct
+from referencias
+{where_eixo}
+order by sigla_uf, is_capital, codigo_secao, eixo, codigo_categoria"""
+
+
+def _gerar_sql_cbo(codigos_cbo: list[str], filtros: dict[str, Any]) -> str:
+    lista_sql = ", ".join(f"'{c.zfill(6)}'" for c in codigos_cbo)
+    clausulas_f = [
+        "f.is_identificado",
+        "f.is_centro_oeste",
+        "f.ano between 2023 and 2026",
+    ]
+    if "sigla_uf" in filtros and filtros["sigla_uf"] in ("DF", "GO", "MT", "MS"):
+        clausulas_f.append(f"f.sigla_uf = '{filtros['sigla_uf']}'")
+    if "ano" in filtros and int(filtros["ano"]) in (2023, 2024, 2025, 2026):
+        clausulas_f.append(f"f.ano = {int(filtros['ano'])}")
+    cond_f = " and ".join(clausulas_f)
+
+    return f"""select
+    c.codigo_cbo,
+    c.titulo_ocupacao,
+    c.is_cadastro_oficial,
+    coalesce(count(f.id_movimentacao) filter (where f.saldo_movimentacao = 1), 0) as admissoes,
+    coalesce(count(f.id_movimentacao) filter (where f.saldo_movimentacao = -1), 0) as desligamentos,
+    coalesce(sum(f.saldo_movimentacao), 0) as saldo,
+    coalesce(count(f.id_movimentacao) filter (where f.saldo_movimentacao = 1 and f.salario_valido), 0) as qtd_salarios_admissao,
+    sum(case when f.saldo_movimentacao = 1 and f.salario_valido then f.salario_mensal else 0 end)
+        / nullif(count(f.id_movimentacao) filter (where f.saldo_movimentacao = 1 and f.salario_valido), 0) as salario_medio_admissao
+from gold.dim_cbo c
+left join gold.fct_movimentacao f
+    on c.codigo_cbo = f.codigo_cbo
+   and {cond_f}
+where c.codigo_cbo in ({lista_sql})
+group by c.codigo_cbo, c.titulo_ocupacao, c.is_cadastro_oficial
+order by admissoes desc, c.codigo_cbo asc"""
+
+
+def _detectar_violacao_ou_fora_escopo(pergunta: str) -> tuple[str | None, str | None]:
+    """Verifica se a pergunta tenta violar segurança/LGPD ou pede conceitos fora do catálogo."""
+    bruto = (pergunta or "").strip()
+    norm = normalizar_texto(bruto)
+
+    # 1. Tentativas explícitas de SQL injection, DDL/DML ou leitura de arquivos externos
+    padroes_ataque = (
+        r"\b(drop|delete|insert|update|alter|truncate|attach|copy|pragma|install|load)\b",
+        r"\b(read_csv|read_parquet|read_json|delta_scan|postgres_scan)\b",
+        r";\s*(select|drop|delete|insert|update)",
+    )
+    for pad in padroes_ataque:
+        if re.search(pad, bruto.lower()):
+            return (
+                "bloqueada_seguranca",
+                "Operação bloqueada pelos guardrails de segurança (ADR 0007): comandos de escrita, "
+                "alteração de esquema, múltiplas instruções ou leitura de arquivos externos não são permitidos.",
+            )
+
+    # 2. Tentativa de acesso a dados individuais / desagregados (violação LGPD / k-anonimato)
+    if any(
+        termo in norm
+        for termo in (
+            "cpf", "nome do trabalhador", "dados individuais", "registro individual",
+            "listar trabalhadores", "lista de pessoas", "microdado bruto",
+            "select * from", "sem agrupar",
+        )
+    ):
+        return (
+            "bloqueada_seguranca",
+            "Consulta recusada por governança e privacidade (LGPD): o catálogo expõe exclusivamente "
+            "indicadores estatísticos agregados da camada Gold, vedando a listagem de eventos individuais.",
+        )
+
+    # 3. Conceitos fora do escopo metodológico do CAGED / camada Gold
+    if any(
+        termo in norm
+        for termo in (
+            "taxa de desemprego", "pnad", "estoque total de empregados", "estoque de vinculos",
+            "rais", "previsao para 2027", "previsao para 2028", "prever salario",
+            "probabilidade de eu ser contratado", "chance individual de recolocacao",
+            "efeito causal", "inflacao ipca",
+        )
+    ):
+        return (
+            "nao_suportada",
+            "Pergunta fora do escopo metodológico do catálogo Gold: o Novo CAGED registra fluxos mensais "
+            "(admissões e desligamentos), não fornecendo estoque total de vínculos (RAIS), taxa de desemprego "
+            "(PNAD/IBGE), previsões futuras ou probabilidade individual de recolocação.",
+        )
+
+    return None, None
+
+
+def _extrair_termo_ocupacao(pergunta: str) -> str | None:
+    """Extrai o termo de cargo/ocupação quando a pergunta solicita indicadores ou filtro de profissão."""
+    norm = normalizar_texto(pergunta)
+
+    # Se menciona código CBO explícito
+    m_cbo = re.search(r"\bcbo\s*(\d{4}-?\d{2})\b", norm)
+    if m_cbo:
+        return m_cbo.group(1)
+
+    gatilhos_ocupacao = (
+        "ocupacao", "ocupacoes", "cargo", "cargos", "profissao", "profissoes",
+        "cbo", "programador", "desenvolvedor", "engenheiro", "arquiteto", "medico", "medica",
+        "enfermeiro", "enfermeira", "tecnico de enfermagem", "dentista", "farmaceutico",
+        "psicologo", "nutricionista", "fisioterapeuta", "veterinario", "biomedico",
+        "motorista", "caminhoneiro", "carreteiro", "pedreiro", "servente", "carpinteiro",
+        "pintor", "vendedor", "vendedora", "balconista", "operador de caixa",
+        "caixa de supermercado", "telemarketing", "call center", "professor", "professora",
+        "professores", "docente", "advogado", "contador", "administrador", "gerente",
+        "diretor", "faxineiro", "auxiliar de limpeza", "vigilante", "porteiro", "cozinheiro",
+        "garcom", "trabalhador rural", "tratorista", "boia fria", "agronomo", "eletricista",
+        "mecanico", "soldador", "almoxarife", "estoquista", "repositor", "auxiliar administrativo",
+        "assistente administrativo", "auxiliar de escritorio", "recepcionista", "secretaria",
+        "acougueiro", "padeiro", "motoboy", "cabeleireiro", "cuidador", "jornalista",
+        "designer", "cientista de dados", "analista de dados", "analista de sistemas",
+    )
+    if not any(g in norm for g in gatilhos_ocupacao):
+        return None
+
+    # Remove palavras de comando, eixos demográficos e recortes geográficos para isolar a profissão
+    remover = {
+        "qual", "quais", "quanto", "quantos", "quantas", "como", "esta", "estao",
+        "o", "a", "os", "as", "de", "do", "da", "dos", "das", "em", "no", "na",
+        "nos", "nas", "para", "por", "com", "e", "ou", "um", "uma", "uns", "umas",
+        "salario", "salarios", "medio", "medios",
+        "remuneracao", "media", "saldo", "liquido", "admissoes", "contratacoes",
+        "demissoes", "desligamentos", "movimentacoes", "empregos", "vagas", "indicadores",
+        "centro", "oeste", "distrito", "federal", "goias", "mato", "grosso", "sul",
+        "df", "go", "mt", "ms", "2023", "2024", "2025", "2026", "ocupacao", "ocupacoes",
+        "cargo", "cargos", "profissao", "profissoes", "cbo", "ganha", "recebe", "tem",
+        "teve", "houve", "diferenca", "diferencas", "salarial", "salariais", "entre",
+        "homem", "mulher", "homens", "mulheres", "sexo", "genero", "masculino", "feminino",
+        "raca", "cor", "branca", "preta", "parda", "indigena", "amarela", "negros",
+        "negras", "pardos", "pardas", "escolaridade", "instrucao", "grau", "impacta",
+        "impacto", "idade", "faixa", "etaria", "capital", "capitais", "interior",
+        "sazonalidade", "sazonal", "meses", "ano", "anos", "mensal", "anual", "ao",
+        "longo", "rotatividade", "turnover", "setor", "setores", "economico", "economicos",
+        "cnae", "secao", "ultimos", "12", "mais", "contratou", "demitiu", "existe",
+        "praticam", "baixos", "perfil", "sociodemografico", "demografico", "nivel", "abaixo",
+    }
+    tokens_restantes = [t for t in norm.split() if t not in remover]
+    if not tokens_restantes:
+        return None
+    return " ".join(tokens_restantes)
+
+
+class AssistenteTextToSQL:
+    """Tradutor e executor Text-to-SQL controlado pelo catálogo de métricas Gold (ADR 0007)."""
+
+    def __init__(self, indice_cbo: IndiceVetorialCBO | None = None):
+        self.indice_cbo = indice_cbo
+
+    def _obter_indice(self, conn: duckdb.DuckDBPyConnection) -> IndiceVetorialCBO:
+        if self.indice_cbo is None:
+            self.indice_cbo = IndiceVetorialCBO.de_conexao_duckdb(conn)
+        return self.indice_cbo
+
+    def classificar_intencao(self, pergunta: str) -> str:
+        """Identifica qual contrato analítico da camada Gold responde à pergunta."""
+        norm = normalizar_texto(pergunta)
+        if not norm:
+            return "nao_suportada"
+
+        motivo_bloqueio, _ = _detectar_violacao_ou_fora_escopo(pergunta)
+        if motivo_bloqueio:
+            return motivo_bloqueio
+
+        # P3: Capital vs. Interior (Pergunta Central)
+        if any(p in norm for p in ("capital", "capitais", "interior")):
+            return "p3_capitais_interior"
+
+        # P2: Sazonalidade / Série Mensal
+        if any(
+            p in norm
+            for p in (
+                "sazonalidade", "sazonal", "fim de ano", "meses do ano",
+                "variacao mensal", "serie mensal", "ciclo mensal", "quarto trimestre",
+            )
+        ):
+            return "p2_sazonalidade"
+
+        # P4: Rotatividade / Turnover / Equilíbrio de Fluxos Pareados e Correlação com Salário
+        if any(
+            p in norm
+            for p in (
+                "rotatividade", "turnover", "fluxos pareados", "equilibrio dos fluxos",
+                "correlacao", "pearson", "praticam salarios", "salarios mais baixos",
+            )
+        ):
+            return "p4_fluxos_salarios"
+
+        # P5: Perfil Sociodemográfico (Sexo, Raça/Cor, Escolaridade, Idade/Faixa Etária)
+        tokens_norm = set(norm.split())
+        if "idade" in tokens_norm or any(
+            p in norm
+            for p in (
+                "sociodemografico", "demografico", "perfil", "genero", "sexo",
+                "raca", "cor", "escolaridade", "grau de instrucao", "faixa etaria",
+                "mulheres", "homens", "homem", "mulher", "masculino", "feminino",
+                "negras", "negros", "pardas", "pardos", "branca", "preta", "indigenas",
+                "mestrado", "doutorado", "ensino medio", "superior completo",
+            )
+        ):
+            return "p5_perfil_remuneracao"
+
+        # P1: Ranking de setores econômicos (CNAE) no DF / últimos 12 meses
+        if any(
+            p in norm
+            for p in (
+                "setor", "setores", "cnae", "secao", "ultimos 12 meses",
+                "mais contratou", "mais demitiu", "ranking de admissoes",
+            )
+        ):
+            return "p1_setores_df"
+
+        # Consulta por Ocupação / Cargo (CBO 2002 via Busca Semântica)
+        if _extrair_termo_ocupacao(pergunta) is not None:
+            return "cbo_ocupacao"
+
+        return "nao_suportada"
+
+    def responder(
+        self,
+        conn: duckdb.DuckDBPyConnection,
+        pergunta: str,
+        top_k_cbo: int = 3,
+        filtro_cargo: str | None = None,
+        codigos_cbo_override: list[str] | None = None,
+        sigla_uf_override: str | None = None,
+        ano_override: int | None = None,
+        eixo_override: str | None = None,
+    ) -> RespostaTextToSQL:
+        """Traduz a pergunta para o contrato SQL Gold, valida guardrails e executa em modo leitura."""
+        texto = (pergunta or "").strip()
+        if not texto:
+            return RespostaTextToSQL(
+                pergunta_original=texto,
+                suportada=False,
+                intencao="nao_suportada",
+                titulo_intencao="Pergunta vazia",
+                filtros_aplicados={},
+                formula_metrica="N/A",
+                ressalva_metodologica="Informe uma pergunta sobre as métricas do catálogo Gold.",
+                sql_gerado="",
+                colunas=[],
+                linhas=[],
+                ocupacoes_resolvidas=[],
+                motivo_recusa="A pergunta fornecida está vazia.",
+            )
+
+        tipo_bloqueio, msg_bloqueio = _detectar_violacao_ou_fora_escopo(texto)
+        if tipo_bloqueio:
+            return RespostaTextToSQL(
+                pergunta_original=texto,
+                suportada=False,
+                intencao=tipo_bloqueio,
+                titulo_intencao=(
+                    "Bloqueio de Segurança / Governança"
+                    if tipo_bloqueio == "bloqueada_seguranca"
+                    else "Consulta Fora do Escopo do Catálogo"
+                ),
+                filtros_aplicados={},
+                formula_metrica="N/A",
+                ressalva_metodologica=msg_bloqueio or "",
+                sql_gerado="",
+                colunas=[],
+                linhas=[],
+                ocupacoes_resolvidas=[],
+                motivo_recusa=msg_bloqueio,
+            )
+
+        intencao = self.classificar_intencao(texto)
+        filtros = _extrair_filtros_pergunta(texto)
+        if sigla_uf_override and sigla_uf_override in ("DF", "GO", "MT", "MS"):
+            filtros["sigla_uf"] = sigla_uf_override
+        if ano_override and int(ano_override) in (2023, 2024, 2025, 2026):
+            filtros["ano"] = int(ano_override)
+        if eixo_override and eixo_override in ("sexo", "raca_cor", "escolaridade", "faixa_etaria"):
+            filtros["eixo"] = eixo_override
+
+        ocupacoes_resolvidas: list[dict[str, Any]] = []
+
+        # Se a consulta for analítica (P1 a P5) e contiver um cargo/profissão (na pergunta ou no filtro UI),
+        # resolve os códigos CBO via busca semântica para aplicar o drill-down por cargo!
+        if intencao in (
+            "p1_setores_df",
+            "p2_sazonalidade",
+            "p3_capitais_interior",
+            "p4_fluxos_salarios",
+            "p5_perfil_remuneracao",
+        ):
+            termo_cbo_composto = (filtro_cargo or "").strip() or _extrair_termo_ocupacao(texto)
+            if codigos_cbo_override:
+                indice = self._obter_indice(conn)
+                mapa_reg = {r.codigo_cbo: r for r in indice.registros}
+                cods_limpos = [str(c).zfill(6) for c in codigos_cbo_override]
+                filtros["codigos_cbo"] = cods_limpos
+                if termo_cbo_composto:
+                    filtros["termo_ocupacao"] = termo_cbo_composto
+                    filtros["termo_busca_cbo"] = termo_cbo_composto
+                ocupacoes_resolvidas = [
+                    {
+                        "codigo_cbo": c,
+                        "titulo_ocupacao": mapa_reg[c].titulo_ocupacao if c in mapa_reg else c,
+                        "codigo_grande_grupo": mapa_reg[c].codigo_grande_grupo if c in mapa_reg else c[0],
+                        "score": 1.0,
+                        "is_cadastro_oficial": mapa_reg[c].is_cadastro_oficial if c in mapa_reg else True,
+                        "versao_indice": indice.versao_indice,
+                        "metodo": "selecao_usuario",
+                    }
+                    for c in cods_limpos
+                ]
+            elif termo_cbo_composto:
+                indice = self._obter_indice(conn)
+                res_cbo = indice.buscar_semantico(termo_cbo_composto, top_k=top_k_cbo, apenas_oficiais=True)
+                if not res_cbo:
+                    res_cbo = indice.buscar_semantico(termo_cbo_composto, top_k=top_k_cbo, apenas_oficiais=False)
+                if res_cbo:
+                    ocupacoes_resolvidas = [r.to_dict() for r in res_cbo]
+                    filtros["codigos_cbo"] = [r.codigo_cbo for r in res_cbo]
+                    filtros["termo_ocupacao"] = termo_cbo_composto
+                    filtros["termo_busca_cbo"] = termo_cbo_composto
+
+        sufixo_cargo = (
+            f" — Cargo: {filtros['termo_ocupacao']}"
+            if filtros.get("termo_ocupacao")
+            else (
+                f" — CBOs: {', '.join(filtros['codigos_cbo'])}"
+                if filtros.get("codigos_cbo") and intencao != "cbo_ocupacao"
+                else ""
+            )
+        )
+
+        if intencao == "p1_setores_df":
+            sql = _gerar_sql_p1(filtros)
+            titulo = f"P1 — Ranking de Setores Econômicos (CNAE) em {filtros.get('sigla_uf', 'DF')} (Janela de 12 Meses){sufixo_cargo}"
+            formula = (
+                "admissoes = SUM(admissoes); desligamentos = SUM(desligamentos); "
+                "saldo = SUM(saldo); DENSE_RANK() independente para admissões e desligamentos."
+            )
+            ressalva = (
+                "Setor econômico corresponde à seção CNAE (excluindo 'Z' dos rankings). "
+                "A janela abrange os 12 meses de calendário até a última competência carregada na base."
+            )
+        elif intencao == "p2_sazonalidade":
+            sql = _gerar_sql_p2(filtros)
+            titulo = f"P2 — Sazonalidade Mensal de Contratações, Desligamentos e Saldo{sufixo_cargo}"
+            formula = (
+                "media_admissoes_mes = AVG(admissoes) nos anos com 12 competências presentes; "
+                "distinção estrita entre mês sem dados (NULL) e zero observado (0)."
+            )
+            ressalva = (
+                "Apenas anos completos (12 competências com dados no recorte) compõem a média histórica mensal "
+                "(2026 parcial permanece na série temporal, mas não distorce a média sazonal)."
+            )
+        elif intencao == "p3_capitais_interior":
+            sql = _gerar_sql_p3(filtros)
+            titulo = f"P3 — Comparação de Saldo Líquido e Salário Médio de Admissão: Capitais vs. Interior{sufixo_cargo}"
+            formula = (
+                "diferenca_saldo = saldo_capital - saldo_interior; "
+                "salario = SUM(soma_salarios_admissao) / NULLIF(SUM(qtd_salarios_admissao), 0); "
+                "diferenca_salario = salario_capital - salario_interior."
+            )
+            ressalva = (
+                "Considera municípios identificados do Centro-Oeste (2023–2026). "
+                "O Distrito Federal não possui municípios de interior (campos de interior permanecem NULL e n_interior = 0)."
+            )
+        elif intencao == "p4_fluxos_salarios":
+            sql = _gerar_sql_p4(filtros)
+            titulo = f"P4 — Equilíbrio de Fluxos Pareados (Proxy) e Salário Médio por Seção CNAE{sufixo_cargo}"
+            formula = (
+                "indice_fluxos_pareados_pct = 200.0 * LEAST(admissoes, desligamentos) / NULLIF(admissoes + desligamentos, 0); "
+                "correlacao_pearson = CORR(indice_fluxos_pareados_pct, salario_medio_admissao)."
+            )
+            ressalva = (
+                "O índice mede o equilíbrio entre entradas e saídas (0 a 100%), e NÃO a taxa convencional de "
+                "turnover sobre o estoque de vínculos (indisponível no CAGED)."
+            )
+        elif intencao == "p5_perfil_remuneracao":
+            sql = _gerar_sql_p5(filtros)
+            titulo = f"P5 — Remuneração Média de Admissão e Participação por Perfil Sociodemográfico{sufixo_cargo}"
+            formula = (
+                "participacao_admissoes_pct = 100.0 * admissoes / NULLIF(admissoes_recorte, 0); "
+                "diferenca_salarial = salario_medio_admissao - salario_medio_recorte."
+            )
+            ressalva = (
+                "Análise descritiva sobre eventos formais registrados; não mede identidade de gênero autodeclarada "
+                "além do cadastro CAGED nem estima probabilidade individual de recolocação."
+            )
+        elif intencao == "cbo_ocupacao":
+            termo_cbo = (filtro_cargo or "").strip() or _extrair_termo_ocupacao(texto) or texto
+            indice = self._obter_indice(conn)
+            resultados_cbo = indice.buscar_semantico(termo_cbo, top_k=top_k_cbo, apenas_oficiais=True)
+            if not resultados_cbo:
+                resultados_cbo = indice.buscar_semantico(termo_cbo, top_k=top_k_cbo, apenas_oficiais=False)
+            if not resultados_cbo:
+                return RespostaTextToSQL(
+                    pergunta_original=texto,
+                    suportada=False,
+                    intencao="nao_suportada",
+                    titulo_intencao="Ocupação CBO não localizada no catálogo",
+                    filtros_aplicados=filtros,
+                    formula_metrica="N/A",
+                    ressalva_metodologica="Nenhuma ocupação CBO atingiu similaridade mínima para a consulta.",
+                    sql_gerado="",
+                    colunas=[],
+                    linhas=[],
+                    ocupacoes_resolvidas=[],
+                    motivo_recusa="Não foram encontradas ocupações CBO compatíveis com o termo informado.",
+                )
+            ocupacoes_resolvidas = [r.to_dict() for r in resultados_cbo]
+            codigos = codigos_cbo_override if codigos_cbo_override else [r.codigo_cbo for r in resultados_cbo]
+            filtros["codigos_cbo"] = [str(c).zfill(6) for c in codigos]
+            filtros["termo_ocupacao"] = termo_cbo
+            filtros["termo_busca_cbo"] = termo_cbo
+            sql = _gerar_sql_cbo(filtros["codigos_cbo"], filtros)
+            titulo = f"Indicadores por Ocupação CBO 2002 (Busca Semântica: '{termo_cbo}')"
+            formula = (
+                "admissoes = COUNT(*) FILTER (saldo = 1); desligamentos = COUNT(*) FILTER (saldo = -1); "
+                "saldo = SUM(saldo_movimentacao); salario_medio_admissao = SUM(salario_valido) / NULLIF(COUNT(salario_valido), 0)."
+            )
+            ressalva = (
+                "Ocupações resolvidas via índice vetorial CBO 2002 (384 dimensões). "
+                "Títulos não oficiais '(ATUALIZACAO MTE)' aparecem identificados por is_cadastro_oficial = FALSE."
+            )
+        else:
+            return RespostaTextToSQL(
+                pergunta_original=texto,
+                suportada=False,
+                intencao="nao_suportada",
+                titulo_intencao="Pergunta Ambigua ou Não Mapeada no Catálogo Gold",
+                filtros_aplicados=filtros,
+                formula_metrica="N/A",
+                ressalva_metodologica=(
+                    "O assistente responde exclusivamente às métricas auditadas do catálogo Gold: "
+                    "(P1) Setores no DF, (P2) Sazonalidade mensal, (P3) Capitais vs. Interior, "
+                    "(P4) Fluxos pareados vs. Salários, (P5) Perfil sociodemográfico e consultas por Ocupação CBO."
+                ),
+                sql_gerado="",
+                colunas=[],
+                linhas=[],
+                ocupacoes_resolvidas=[],
+                motivo_recusa=(
+                    "A pergunta não pôde ser associada com segurança a uma métrica homologada do catálogo Gold. "
+                    "Reformule especificando o indicador desejado (ex.: saldo, salário médio de admissão, "
+                    "sazonalidade, capital vs. interior, perfil demográfico ou ocupação CBO)."
+                ),
+            )
+
+        validar_sql_seguro(sql)
+        relacao = conn.sql(sql)
+        colunas = list(relacao.columns)
+        linhas = relacao.fetchall()
+
+        return RespostaTextToSQL(
+            pergunta_original=texto,
+            suportada=True,
+            intencao=intencao,
+            titulo_intencao=titulo,
+            filtros_aplicados=filtros,
+            formula_metrica=formula,
+            ressalva_metodologica=ressalva,
+            sql_gerado=sql,
+            colunas=colunas,
+            linhas=linhas,
+            ocupacoes_resolvidas=ocupacoes_resolvidas,
+            motivo_recusa=None,
+        )

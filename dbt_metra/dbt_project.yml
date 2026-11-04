@@ -5,6 +5,7 @@ profile: metra
 
 model-paths: ["models"]
 macro-paths: ["macros"]
+analysis-paths: ["analyses"]
 clean-targets: ["target", "dbt_packages"]
 
 models:
