@@ -1,11 +1,13 @@
-"""Painel Analítico do METRA (E4) — Mercado de Trabalho Formal no Centro-Oeste (Novo CAGED).
+"""Painel Analítico do METRA (E4) — Monitoramento e Engenharia de Dados do Trabalho.
 
+Interface Executiva de Decisão, Busca Semântica Vetorial (CBO 2002) e Assistente Text-to-SQL.
 Execução:
     streamlit run src/app/dashboard.py
 """
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 import sys
 from typing import Any
@@ -17,104 +19,178 @@ if str(ROOT) not in sys.path:
 import pandas as pd
 import streamlit as st
 
-from src.app.banco_analitico import SECOES_CNAE_OFICIAIS, abrir_conexao_analitica, obter_caminho_duckdb
+from src.app.banco_analitico import (
+    SECOES_CNAE_OFICIAIS,
+    abrir_conexao_analitica,
+    obter_caminho_duckdb,
+)
 from src.app.busca_cbo import IndiceVetorialCBO, consultar_indicadores_cbo
 from src.app.text_to_sql import AssistenteTextToSQL, RespostaTextToSQL
 
-ATALHOS_PERGUNTAS: tuple[tuple[str, str], ...] = (
-    (
-        "Homens vs. Mulheres (Salário)",
-        "Qual a diferença salarial entre homens e mulheres?",
-    ),
-    (
-        "Salário por Escolaridade",
-        "Como a escolaridade impacta o salário médio de admissão?",
-    ),
-    (
-        "Salário por Raça/Cor",
-        "Qual a diferença salarial por raça e cor?",
-    ),
-    (
-        "Salário por Faixa Etária",
-        "Qual a diferença salarial por faixa etária e idade?",
-    ),
-    (
-        "Capitais vs. Interior (P3)",
-        "Qual é a diferença no saldo líquido e no salário médio entre as capitais e o interior?",
-    ),
-    (
-        "Setores no DF (P1)",
-        "Qual setor econômico mais contratou e demitiu no Distrito Federal nos últimos 12 meses?",
-    ),
-    (
-        "Sazonalidade Mensal (P2)",
-        "Existe sazonalidade nas contratações e demissões ao longo dos meses do ano?",
-    ),
-    (
-        "Rotatividade vs. Salário (P4)",
-        "Os setores com maior rotatividade praticam salários médios mais baixos?",
-    ),
-    (
-        "Homens vs. Mulheres (Professor)",
-        "Qual a diferença salarial entre homens e mulheres para o cargo de professor?",
-    ),
-    (
-        "Teste de Bloqueio SQL",
-        "DROP TABLE gold.fct_movimentacao;",
-    ),
-)
+# ==============================================================================
+# CONFIGURAÇÕES E ESTILOS VISUAIS MODERNOS
+# ==============================================================================
 
-ATALHOS_PROFISSOES: tuple[tuple[str, str], ...] = (
+ESTILO_CSS_CUSTOMIZADO = """
+<style>
+    /* Tipografia e espaçamento geral */
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+    
+    html, body, [class*="css"] {
+        font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    
+    .block-container {
+        padding-top: 1.8rem;
+        padding-bottom: 3rem;
+        max-width: 1350px;
+    }
+
+    /* Cards e Containers */
+    .metra-card {
+        background: #ffffff;
+        border: 1px solid #E2E8F0;
+        border-radius: 12px;
+        padding: 1.25rem 1.5rem;
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
+        margin-bottom: 1rem;
+        transition: all 0.2s ease;
+    }
+    
+    .metra-card:hover {
+        border-color: #CBD5E1;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.07);
+    }
+
+    /* Badges */
+    .metra-badge {
+        display: inline-block;
+        padding: 0.25rem 0.65rem;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        letter-spacing: 0.025em;
+    }
+    
+    .badge-primary { background: #EEF2FF; color: #4338CA; border: 1px solid #C7D2FE; }
+    .badge-success { background: #ECFDF5; color: #047857; border: 1px solid #A7F3D0; }
+    .badge-warning { background: #FFFBEB; color: #B45309; border: 1px solid #FDE68A; }
+    .badge-info    { background: #F0F9FF; color: #0369A1; border: 1px solid #BAE6FD; }
+
+    /* KPI Highlights */
+    .kpi-container {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        padding: 1rem 1.2rem;
+        background: #F8FAFC;
+        border: 1px solid #E2E8F0;
+        border-radius: 10px;
+        border-left: 4px solid #3B82F6;
+        min-height: 105px;
+    }
+    .kpi-title {
+        font-size: 0.8rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        color: #64748B;
+        letter-spacing: 0.05em;
+        margin-bottom: 0.25rem;
+    }
+    .kpi-value {
+        font-size: 1.55rem;
+        font-weight: 700;
+        color: #0F172A;
+        line-height: 1.2;
+    }
+    .kpi-sub {
+        font-size: 0.78rem;
+        color: #64748B;
+        margin-top: 0.35rem;
+    }
+
+    /* Estilização da Sidebar */
+    [data-testid="stSidebar"] {
+        background-color: #0F172A;
+    }
+    [data-testid="stSidebar"] * {
+        color: #F1F5F9;
+    }
+    [data-testid="stSidebar"] hr {
+        border-color: #334155;
+    }
+    [data-testid="stSidebar"] .stSelectbox label, 
+    [data-testid="stSidebar"] .stRadio label {
+        color: #94A3B8 !important;
+        font-weight: 600;
+    }
+    
+    /* Abas customizadas */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+        background-color: #F1F5F9;
+        padding: 6px;
+        border-radius: 10px;
+    }
+    .stTabs [data-baseweb="tab"] {
+        height: 42px;
+        border-radius: 8px;
+        padding: 0 16px;
+        font-weight: 600;
+        font-size: 0.9rem;
+        color: #475569;
+        background-color: transparent;
+        border: none;
+    }
+    .stTabs [aria-selected="true"] {
+        background-color: #FFFFFF !important;
+        color: #1E40AF !important;
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+    }
+</style>
+"""
+
+NOMES_MESES = {
+    1: "Janeiro", 2: "Fevereiro", 3: "Março", 4: "Abril",
+    5: "Maio", 6: "Junho", 7: "Julho", 8: "Agosto",
+    9: "Setembro", 10: "Outubro", 11: "Novembro", 12: "Dezembro",
+}
+
+MAPA_EIXOS_DEMOGRAFICOS = {
+    "sexo": "Gênero (Homens vs. Mulheres)",
+    "escolaridade": "Nível de Escolaridade",
+    "raca_cor": "Raça e Cor",
+    "faixa_etaria": "Faixa Etária",
+}
+
+SUGESTOES_PROFISSÕES = [
     ("Professor", "professor"),
-    ("Programador / TI", "desenvolvedor de software"),
+    ("Programador / Dev", "desenvolvedor de software"),
     ("Enfermeiro", "enfermeiro"),
     ("Médico", "medico"),
     ("Engenheiro Civil", "engenheiro civil"),
     ("Vendedor", "vendedor"),
     ("Caminhoneiro", "caminhoneiro"),
     ("Pedreiro", "pedreiro"),
-)
+]
 
-OPCOES_CARGO_RAPIDO: tuple[tuple[str, str], ...] = (
-    ("Todos os cargos (Mercado Geral)", ""),
-    ("Professor (Ensino Básico / Médio / Superior)", "professor"),
-    ("Desenvolvedor de Software / Programador", "desenvolvedor de software"),
-    ("Enfermeiro", "enfermeiro"),
-    ("Médico", "medico"),
-    ("Engenheiro Civil", "engenheiro civil"),
-    ("Vendedor de Comércio", "vendedor"),
-    ("Motorista / Caminhoneiro", "motorista"),
-    ("Operador de Caixa", "caixa de supermercado"),
-    ("Auxiliar / Assistente Administrativo", "assistente administrativo"),
-    ("Pedreiro", "pedreiro"),
-    ("Trabalhador Rural / Agropecuário", "trabalhador rural"),
-)
+PERGUNTAS_RAPIDAS = [
+    ("Gênero", "Qual a diferença salarial entre homens e mulheres?"),
+    ("Educação", "Como a escolaridade impacta o salário médio de admissão?"),
+    ("Geografia", "Qual é a diferença no saldo líquido e no salário médio entre as capitais e o interior?"),
+    ("Setores DF", "Qual setor econômico mais contratou e demitiu no Distrito Federal nos últimos 12 meses?"),
+    ("Sazonalidade", "Existe sazonalidade nas contratações e demissões ao longo dos meses do ano?"),
+    ("Rotatividade", "Os setores com maior rotatividade praticam salários médios mais baixos?"),
+    ("Profissões", "Qual a diferença salarial entre homens e mulheres para o cargo de professor?"),
+    ("Segurança SQL", "DROP TABLE gold.fct_movimentacao;"),
+]
 
-NOMES_MESES = {
-    1: "01 - Janeiro",
-    2: "02 - Fevereiro",
-    3: "03 - Março",
-    4: "04 - Abril",
-    5: "05 - Maio",
-    6: "06 - Junho",
-    7: "07 - Julho",
-    8: "08 - Agosto",
-    9: "09 - Setembro",
-    10: "10 - Outubro",
-    11: "11 - Novembro",
-    12: "12 - Dezembro",
-}
 
-MAPA_EIXOS_DEMOGRAFICOS = {
-    "sexo": "Sexo (Homem vs. Mulher)",
-    "escolaridade": "Escolaridade",
-    "raca_cor": "Raça/Cor",
-    "faixa_etaria": "Faixa Etária",
-}
-
+# ==============================================================================
+# FUNÇÕES DE FORMATAÇÃO NUMÉRICA BRASILEIRA
+# ==============================================================================
 
 def fmt_int(valor: Any, com_sinal: bool = False) -> str:
-    """Formata número inteiro no padrão brasileiro (ex.: 49.178 ou +1.472)."""
     if valor is None or pd.isna(valor):
         return "—"
     n = int(round(float(valor)))
@@ -125,7 +201,6 @@ def fmt_int(valor: Any, com_sinal: bool = False) -> str:
 
 
 def fmt_moeda(valor: Any) -> str:
-    """Formata valor monetário em Reais (ex.: R$ 2.138,54)."""
     if valor is None or pd.isna(valor):
         return "—"
     v = float(valor)
@@ -134,7 +209,6 @@ def fmt_moeda(valor: Any) -> str:
 
 
 def fmt_pct(valor: Any, com_sinal: bool = False) -> str:
-    """Formata percentual no padrão brasileiro (ex.: 13,2% ou +13,2%)."""
     if valor is None or pd.isna(valor):
         return "—"
     v = float(valor)
@@ -142,73 +216,315 @@ def fmt_pct(valor: Any, com_sinal: bool = False) -> str:
     return f"{sinal}{v:.1f}%".replace(".", ",")
 
 
-def descrever_filtros(filtros: dict[str, Any]) -> str:
-    """Descreve os filtros aplicados em texto simples."""
-    partes: list[str] = []
-    partes.append(f"UF: {filtros['sigla_uf']}" if filtros.get("sigla_uf") else "Região: Centro-Oeste (DF, GO, MT, MS)")
-    partes.append(f"Ano: {filtros['ano']}" if filtros.get("ano") else "Período: 2023 a 2026")
-    if filtros.get("eixo"):
-        partes.append(f"Dimensão: {MAPA_EIXOS_DEMOGRAFICOS.get(str(filtros['eixo']), str(filtros['eixo']))}")
-    if filtros.get("termo_ocupacao"):
-        partes.append(f"Filtro de Cargo: \"{filtros['termo_ocupacao']}\"")
-    if filtros.get("codigos_cbo"):
-        partes.append(f"CBOs ({len(filtros['codigos_cbo'])}): {', '.join(filtros['codigos_cbo'])}")
-    return "  |  ".join(partes)
+# ==============================================================================
+# CARREGAMENTO DOS RECURSOS ANALÍTICOS (CACHE)
+# ==============================================================================
 
-
-@st.cache_resource(show_spinner="Carregando banco analítico DuckDB e índice de ocupações CBO...")
+@st.cache_resource(show_spinner="Carregando banco analítico DuckDB e índice semântico da CBO...")
 def carregar_recursos_analiticos(caminho_str: str) -> tuple[IndiceVetorialCBO, AssistenteTextToSQL, dict[str, Any]]:
     with abrir_conexao_analitica(caminho_str, garantir_construcao=True) as conn:
         indice = IndiceVetorialCBO.de_conexao_duckdb(conn)
-        resumo_row = conn.execute("""
+        row = conn.execute("""
             SELECT
-                COUNT(*) AS total_movimentacoes,
+                COUNT(*) AS total_mov,
                 COUNT(*) FILTER (WHERE saldo_movimentacao = 1) AS admissoes,
                 COUNT(*) FILTER (WHERE saldo_movimentacao = -1) AS desligamentos,
                 COALESCE(SUM(saldo_movimentacao), 0) AS saldo,
                 SUM(CASE WHEN saldo_movimentacao = 1 AND salario_valido THEN salario_mensal ELSE 0 END)
-                    / NULLIF(COUNT(*) FILTER (WHERE saldo_movimentacao = 1 AND salario_valido), 0) AS salario_medio,
+                    / NULLIF(COUNT(*) FILTER (WHERE saldo_movimentacao = 1 AND salario_valido), 0) AS sal_medio,
                 MIN(competencia)::VARCHAR AS comp_min,
                 MAX(competencia)::VARCHAR AS comp_max
             FROM gold.fct_movimentacao
             WHERE is_identificado AND is_centro_oeste AND ano BETWEEN 2023 AND 2026
         """).fetchone()
-        resumo_geral = {
-            "total_movimentacoes": int(resumo_row[0] or 0),
-            "admissoes": int(resumo_row[1] or 0),
-            "desligamentos": int(resumo_row[2] or 0),
-            "saldo": int(resumo_row[3] or 0),
-            "salario_medio": float(resumo_row[4]) if resumo_row[4] is not None else None,
-            "comp_min": (resumo_row[5] or "2023-01")[:7],
-            "comp_max": (resumo_row[6] or "2026-01")[:7],
+
+        resumo = {
+            "total_movimentacoes": int(row[0] or 0),
+            "admissoes": int(row[1] or 0),
+            "desligamentos": int(row[2] or 0),
+            "saldo": int(row[3] or 0),
+            "salario_medio": float(row[4]) if row[4] is not None else None,
+            "comp_min": (row[5] or "2023-01")[:7],
+            "comp_max": (row[6] or "2026-01")[:7],
         }
     assistente = AssistenteTextToSQL(indice_cbo=indice)
-    return indice, assistente, resumo_geral
+    return indice, assistente, resumo
 
 
-def renderizar_resultado_p5(
+# ==============================================================================
+# COMPONENTES VISUAIS (KPI CARDS & AUDITORIA)
+# ==============================================================================
+
+def render_kpi(titulo: str, valor: str, subtitulo: str = "", borda_cor: str = "#3B82F6") -> None:
+    st.markdown(f"""
+        <div class="kpi-container" style="border-left-color: {borda_cor};">
+            <div class="kpi-title">{titulo}</div>
+            <div class="kpi-value">{valor}</div>
+            <div class="kpi-sub">{subtitulo}</div>
+        </div>
+    """, unsafe_allow_html=True)
+
+
+def render_auditoria_expander(resposta: RespostaTextToSQL) -> None:
+    with st.expander("🛠️ Auditoria Técnica, Fórmula e Consulta SQL (Governança BD2 / ADR-0007)"):
+        c1, c2 = st.columns([1, 1])
+        with c1:
+            st.markdown(f"**Identificador do Contrato:** `{resposta.intencao}`")
+            st.markdown(f"**Fórmula da Métrica:** `{resposta.formula_metrica}`")
+        with c2:
+            st.markdown(f"**Ressalva Metodológica:** {resposta.ressalva_metodologica}")
+        
+        if resposta.ocupacoes_resolvidas:
+            st.markdown("**Ocupações CBO Identificadas pelo Motor Vetorial (384d):**")
+            st.dataframe(pd.DataFrame(resposta.ocupacoes_resolvidas), hide_index=True)
+
+        st.markdown("**Consulta SQL Executada em Modo Somente Leitura (`READ_ONLY`) no DuckDB Gold:**")
+        st.code(resposta.sql_gerado, language="sql")
+
+
+# ==============================================================================
+# VISUALIZAÇÕES DAS PERGUNTAS DE GESTÃO (P1 A P5)
+# ==============================================================================
+
+def render_p3_capitais_interior(df_bruto: pd.DataFrame, cargo_label: str = "") -> None:
+    df_tot = df_bruto[df_bruto["nivel"] == "total"].copy()
+    if df_tot.empty:
+        df_tot = df_bruto.copy()
+
+    linha_co = df_tot[df_tot["recorte"] == "Centro-Oeste"]
+    ref = linha_co.iloc[0] if not linha_co.empty else df_tot.iloc[0]
+    
+    st.markdown(f"### 🏙️ Comparativo: Capitais vs. Interior {f'({cargo_label})' if cargo_label else ''}")
+    st.caption("Pergunta Central da Plataforma: Avalia a assimetria salarial e saldo líquido de postos entre as capitais e municípios do interior.")
+
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        render_kpi("Salário Médio • Capitais", fmt_moeda(ref["salario_capital"]), f"Saldo: {fmt_int(ref['saldo_capital'], True)} vagas", "#2563EB")
+    with c2:
+        render_kpi("Salário Médio • Interior", fmt_moeda(ref["salario_interior"]), f"Saldo: {fmt_int(ref['saldo_interior'], True)} vagas", "#0D9488")
+    with c3:
+        render_kpi("Diferença Salarial (Capital - Interior)", fmt_moeda(ref["diferenca_salario"]), f"Diferença de saldo: {fmt_int(ref['diferenca_saldo'], True)} vagas", "#F59E0B")
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    col_chart, col_table = st.columns([1, 1])
+
+    with col_chart:
+        st.markdown("**Salário Médio Inicial: Capitais vs. Interior (R$)**")
+        df_plot = df_tot.set_index("recorte")[["salario_capital", "salario_interior"]].rename(
+            columns={"salario_capital": "Capitais", "salario_interior": "Interior"}
+        )
+        st.bar_chart(df_plot, height=280)
+
+    with col_table:
+        st.markdown("**Tabela Discriminada por Estado (UF)**")
+        df_exibir = pd.DataFrame({
+            "Recorte": df_tot["recorte"],
+            "Salário Capital": df_tot["salario_capital"].map(fmt_moeda),
+            "Salário Interior": df_tot["salario_interior"].map(fmt_moeda),
+            "Diferença (R$)": df_tot["diferenca_salario"].map(fmt_moeda),
+            "Saldo Capitais": df_tot["saldo_capital"].map(lambda v: fmt_int(v, True)),
+            "Saldo Interior": df_tot["saldo_interior"].map(lambda v: fmt_int(v, True)),
+        })
+        st.dataframe(df_exibir, hide_index=True)
+
+
+def render_p1_setores_df(df_bruto: pd.DataFrame, cargo_label: str = "") -> None:
+    df_ativos = df_bruto[df_bruto["admissoes"] > 0].copy()
+    st.markdown(f"### 🏢 Setores Econômicos no DF (Últimos 12 Meses) {f'({cargo_label})' if cargo_label else ''}")
+    st.caption("Pergunta 1: Avalia quais setores mais contrataram e demitiram no Distrito Federal na janela móvel de 12 meses.")
+
+    if not df_ativos.empty:
+        mais_adm = df_ativos.sort_values("admissoes", ascending=False).iloc[0]
+        maior_saldo = df_ativos.sort_values("saldo", ascending=False).iloc[0]
+        
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            render_kpi("Líder de Contratações", f"Seção {mais_adm['codigo_secao']}", str(mais_adm['descricao_secao'])[:40], "#2563EB")
+        with c2:
+            render_kpi("Maior Saldo Líquido", f"Seção {maior_saldo['codigo_secao']}", f"{fmt_int(maior_saldo['saldo'], True)} postos líquidos", "#10B981")
+        with c3:
+            render_kpi("Janela Temporal", f"{str(mais_adm['inicio'])[:7]} a {str(mais_adm['fim'])[:7]}", f"{int(mais_adm['competencias_disponiveis'])} meses com dados", "#6366F1")
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    c_g, c_t = st.columns([1, 1])
+
+    with c_g:
+        st.markdown("**Top 8 Setores em Volume de Contratações**")
+        top8 = df_ativos.head(8).copy()
+        if not top8.empty:
+            top8["Setor"] = top8["codigo_secao"] + " • " + top8["descricao_secao"].str.slice(0, 20)
+            st.bar_chart(
+                top8.set_index("Setor")[["admissoes", "desligamentos"]].rename(
+                    columns={"admissoes": "Contratações", "desligamentos": "Demissões"}
+                ),
+                height=300
+            )
+
+    with c_t:
+        st.markdown("**Ranking Completo das Seções CNAE**")
+        df_tab = pd.DataFrame({
+            "Rank": df_bruto["ranking_admissoes"].map(lambda r: f"{int(r)}º"),
+            "Cód": df_bruto["codigo_secao"],
+            "Setor": df_bruto["descricao_secao"],
+            "Contratações": df_bruto["admissoes"].map(fmt_int),
+            "Demissões": df_bruto["desligamentos"].map(fmt_int),
+            "Saldo": df_bruto["saldo"].map(lambda v: fmt_int(v, True)),
+        })
+        st.dataframe(df_tab, hide_index=True, height=300)
+
+
+def render_p2_sazonalidade(df_bruto: pd.DataFrame, cargo_label: str = "") -> None:
+    df_val = df_bruto.dropna(subset=["admissoes", "desligamentos", "saldo"]).copy()
+    por_mes = (
+        df_val.groupby("mes", as_index=False)
+        .agg(
+            admissoes=("admissoes", "sum"),
+            desligamentos=("desligamentos", "sum"),
+            saldo=("saldo", "sum"),
+            anos=("ano", "nunique"),
+        )
+        .sort_values("mes")
+    )
+    por_mes["nome_mes"] = por_mes["mes"].map(lambda m: NOMES_MESES.get(int(m), str(m)))
+    por_mes["media_saldo"] = por_mes["saldo"] / por_mes["anos"].replace(0, 1)
+
+    st.markdown(f"### 📅 Padrão Sazonal de Contratações {f'({cargo_label})' if cargo_label else ''}")
+    st.caption("Pergunta 2: Identifica variações cíclicas de admissões, desligamentos e saldo ao longo dos meses do ano.")
+
+    if not por_mes.empty:
+        melhor = por_mes.sort_values("saldo", ascending=False).iloc[0]
+        pior = por_mes.sort_values("saldo", ascending=True).iloc[0]
+
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            render_kpi("Mês de Maior Saldo (+)", str(melhor["nome_mes"]), f"Saldo acumulado: {fmt_int(melhor['saldo'], True)} vagas", "#10B981")
+        with c2:
+            render_kpi("Mês de Maior Retração (-)", str(pior["nome_mes"]), f"Saldo acumulado: {fmt_int(pior['saldo'], True)} vagas", "#EF4444")
+        with c3:
+            render_kpi("Período Consolidado", f"{df_val['competencia'].nunique()} Meses", f"Anos analisados: 2023 a 2026", "#6366F1")
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    c_chart, c_table = st.columns([1, 1])
+
+    with c_chart:
+        st.markdown("**Saldo Líquido Acumulado por Mês do Ano**")
+        st.bar_chart(
+            por_mes.set_index("nome_mes")[["saldo"]].rename(columns={"saldo": "Saldo Líquido"}),
+            color="#2563EB",
+            height=290
+        )
+
+    with c_table:
+        st.markdown("**Detalhamento Mensal de Fluxos**")
+        df_tab = pd.DataFrame({
+            "Mês": por_mes["nome_mes"],
+            "Contratações": por_mes["admissoes"].map(fmt_int),
+            "Demissões": por_mes["desligamentos"].map(fmt_int),
+            "Saldo Acumulado": por_mes["saldo"].map(lambda v: fmt_int(v, True)),
+            "Média Saldo/Ano": por_mes["media_saldo"].map(lambda v: fmt_int(v, True)),
+        })
+        st.dataframe(df_tab, hide_index=True, height=290)
+
+
+def render_p4_rotatividade(df_bruto: pd.DataFrame, cargo_label: str = "") -> None:
+    df_val = df_bruto.dropna(subset=["salario_medio_admissao", "indice_fluxos_pareados_pct"]).copy()
+    corr_val = df_bruto["correlacao_pearson"].iloc[0] if "correlacao_pearson" in df_bruto.columns else None
+    corr_str = f"{float(corr_val):.3f}".replace(".", ",") if (corr_val is not None and not pd.isna(corr_val)) else "N/A"
+
+    st.markdown(f"### 🔄 Rotatividade de Pessoal vs. Salário Médio {f'({cargo_label})' if cargo_label else ''}")
+    st.caption("Pergunta 4: Analisa se os setores com maior rotatividade (fluxos pareados de admissão e demissão) praticam salários médios inferiores.")
+
+    if not df_val.empty:
+        maior_rot = df_val.sort_values("indice_fluxos_pareados_pct", ascending=False).iloc[0]
+        maior_sal = df_val.sort_values("salario_medio_admissao", ascending=False).iloc[0]
+
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            render_kpi("Correlação de Pearson (r)", corr_str, "Entre taxa de rotatividade e salário médio", "#8B5CF6")
+        with c2:
+            render_kpi("Maior Rotatividade", f"Seção {maior_rot['codigo_secao']} ({fmt_pct(maior_rot['indice_fluxos_pareados_pct'])})", f"Salário médio: {fmt_moeda(maior_rot['salario_medio_admissao'])}", "#F59E0B")
+        with c3:
+            render_kpi("Maior Salário Médio", f"Seção {maior_sal['codigo_secao']} ({fmt_moeda(maior_sal['salario_medio_admissao'])})", f"Rotatividade: {fmt_pct(maior_sal['indice_fluxos_pareados_pct'])}", "#10B981")
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    c_chart, c_table = st.columns([1, 1])
+
+    with c_chart:
+        st.markdown("**Salário Médio Inicial por Setor (R$)**")
+        df_plot = df_val.copy()
+        df_plot["Setor"] = df_plot["codigo_secao"] + " • " + df_plot["codigo_secao"].map(
+            lambda s: SECOES_CNAE_OFICIAIS.get(str(s), str(s))[:20]
+        )
+        st.bar_chart(
+            df_plot.set_index("Setor")[["salario_medio_admissao"]].rename(
+                columns={"salario_medio_admissao": "Salário Médio"}
+            ),
+            color="#2563EB",
+            height=300
+        )
+
+    with c_table:
+        st.markdown("**Tabela Ordenada por Taxa de Rotatividade**")
+        df_ord = df_bruto.sort_values("indice_fluxos_pareados_pct", ascending=False)
+        df_tab = pd.DataFrame({
+            "Seção": df_ord["codigo_secao"],
+            "Setor Econômico": df_ord["codigo_secao"].map(lambda s: SECOES_CNAE_OFICIAIS.get(str(s), str(s))),
+            "Rotatividade": df_ord["indice_fluxos_pareados_pct"].map(fmt_pct),
+            "Salário Inicial": df_ord["salario_medio_admissao"].map(fmt_moeda),
+            "Saldo": df_ord["saldo"].map(lambda v: fmt_int(v, True)),
+        })
+        st.dataframe(df_tab, hide_index=True, height=300)
+
+
+def render_p5_sociodemografico(
     df_bruto: pd.DataFrame,
     filtros: dict[str, Any],
-    chave_radio: str = "radio_p5_padrao",
+    caminho_str: str | None = None,
+    assistente: AssistenteTextToSQL | None = None,
+    chave_prefixo: str = "p5",
 ) -> None:
-    """Consolida e exibe de forma direta os indicadores sociodemográficos (Sexo, Escolaridade, Raça/Cor, Idade)."""
-    eixos_presentes = list(df_bruto["eixo"].unique())
-    if len(eixos_presentes) > 1:
-        eixo_padrao = filtros.get("eixo") if filtros.get("eixo") in eixos_presentes else eixos_presentes[0]
-        eixo_ativo = st.radio(
-            "Selecione a dimensão demográfica para visualizar:",
-            options=eixos_presentes,
-            index=eixos_presentes.index(eixo_padrao),
-            format_func=lambda e: MAPA_EIXOS_DEMOGRAFICOS.get(e, e),
-            horizontal=True,
-            key=chave_radio,
-        )
-        df_eixo = df_bruto[df_bruto["eixo"] == eixo_ativo].copy()
-    else:
-        eixo_ativo = eixos_presentes[0] if eixos_presentes else "sexo"
-        df_eixo = df_bruto.copy()
+    eixos = list(df_bruto["eixo"].unique())
+    eixo_atual = filtros.get("eixo") if filtros.get("eixo") in eixos else eixos[0]
+    cargo_label = filtros.get("termo_ocupacao", "")
 
-    # Consolida por categoria (somando estados e seções CNAE para mostrar o número real direto)
+    st.markdown(f"### 👥 Perfil Sociodemográfico e Desigualdades {f'({cargo_label})' if cargo_label else ''}")
+    st.caption("Pergunta 5: Avalia os impactos de gênero, raça/cor, escolaridade e faixa etária na remuneração inicial e contratações.")
+
+    # Seletor elegante de dimensão demográfica
+    eixos_labels = {
+        "sexo": "🚻 Gênero (Homens vs. Mulheres)",
+        "escolaridade": "🎓 Escolaridade",
+        "raca_cor": "🎨 Raça e Cor",
+        "faixa_etaria": "🎂 Faixa Etária",
+    }
+    
+    eixo_selecionado = st.radio(
+        "Selecione a Dimensão Sociodemográfica:",
+        options=list(eixos_labels.keys()),
+        format_func=lambda k: eixos_labels.get(k, k),
+        horizontal=True,
+        key=f"{chave_prefixo}_radio_eixo",
+    )
+
+    if eixo_selecionado != eixo_atual and caminho_str and assistente:
+        with abrir_conexao_analitica(caminho_str, garantir_construcao=False) as conn:
+            resp_nova = assistente.responder(
+                conn,
+                "Como o perfil sociodemográfico impacta o salário médio de admissão?",
+                filtro_cargo=filtros.get("termo_ocupacao"),
+                codigos_cbo_override=filtros.get("codigos_cbo"),
+                sigla_uf_override=filtros.get("sigla_uf"),
+                ano_override=filtros.get("ano"),
+                eixo_override=eixo_selecionado,
+            )
+            df_bruto = pd.DataFrame(resp_nova.linhas, columns=resp_nova.colunas)
+            eixo_atual = eixo_selecionado
+
+    df_eixo = df_bruto[df_bruto["eixo"] == eixo_atual].copy()
+    if df_eixo.empty:
+        st.info("Não há registros para a dimensão selecionada no filtro atual.")
+        return
+
     consolidado = (
         df_eixo.groupby(["codigo_categoria", "categoria"], as_index=False)
         .agg(
@@ -220,9 +536,9 @@ def renderizar_resultado_p5(
         )
     )
     total_adm = int(consolidado["admissoes"].sum())
-    soma_total_sal = float(consolidado["soma_sal"].sum())
-    qtd_total_sal = int(consolidado["qtd_sal"].sum())
-    media_geral = (soma_total_sal / qtd_total_sal) if qtd_total_sal > 0 else 0.0
+    soma_sal = float(consolidado["soma_sal"].sum())
+    qtd_sal = int(consolidado["qtd_sal"].sum())
+    media_geral = (soma_sal / qtd_sal) if qtd_sal > 0 else 0.0
 
     consolidado["salario_medio"] = consolidado.apply(
         lambda r: (float(r["soma_sal"]) / int(r["qtd_sal"])) if int(r["qtd_sal"]) > 0 else None,
@@ -240,922 +556,541 @@ def renderizar_resultado_p5(
         & consolidado["salario_medio"].notna()
     ].copy()
 
-    subtitulo_cargo = f" — Cargo: {filtros['termo_ocupacao']}" if filtros.get("termo_ocupacao") else ""
-
-    # Caso especial: SEXO (Homem vs. Mulher) — comparação direta lado a lado
-    if eixo_ativo == "sexo" and len(validos) >= 2:
+    # Destaque de Gênero
+    if eixo_atual == "sexo" and len(validos) >= 2:
         homens_df = validos[validos["categoria"].str.lower().str.startswith("hom")]
         mulheres_df = validos[validos["categoria"].str.lower().str.startswith("mul")]
         if not homens_df.empty and not mulheres_df.empty:
-            linha_h = homens_df.iloc[0]
-            linha_m = mulheres_df.iloc[0]
-            sal_h = float(linha_h["salario_medio"])
-            sal_m = float(linha_m["salario_medio"])
-            dif_reais = sal_h - sal_m
-            dif_pct_hm = 100.0 * (sal_h - sal_m) / sal_m if sal_m > 0 else 0.0
+            lh = homens_df.iloc[0]
+            lm = mulheres_df.iloc[0]
+            sh = float(lh["salario_medio"])
+            sm = float(lm["salario_medio"])
+            dif_reais = sh - sm
+            dif_pct = (100.0 * dif_reais / sm) if sm > 0 else 0.0
 
-            with st.container(border=True):
-                st.markdown(f"#### Comparativo Direto: Homens vs. Mulheres{subtitulo_cargo}")
-                k1, k2, k3 = st.columns(3)
-                k1.metric(
-                    "Salário Médio Inicial — Homens",
-                    fmt_moeda(sal_h),
-                    f"{fmt_int(linha_h['admissoes'])} contratações ({fmt_pct(linha_h['participacao_pct'])})",
-                    delta_color="off",
-                )
-                k2.metric(
-                    "Salário Médio Inicial — Mulheres",
-                    fmt_moeda(sal_m),
-                    f"{fmt_int(linha_m['admissoes'])} contratações ({fmt_pct(linha_m['participacao_pct'])})",
-                    delta_color="off",
-                )
-                k3.metric(
-                    "Diferença Salarial (Homem - Mulher)",
-                    fmt_moeda(dif_reais),
-                    f"Homens recebem {fmt_pct(dif_pct_hm, com_sinal=True)} em relação às mulheres",
-                    delta_color="off",
-                )
-
-        consolidado = consolidado.sort_values("admissoes", ascending=False)
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                render_kpi("Salário Médio • Homens", fmt_moeda(sh), f"{fmt_int(lh['admissoes'])} contratações ({fmt_pct(lh['participacao_pct'])})", "#2563EB")
+            with c2:
+                render_kpi("Salário Médio • Mulheres", fmt_moeda(sm), f"{fmt_int(lm['admissoes'])} contratações ({fmt_pct(lm['participacao_pct'])})", "#DB2777")
+            with c3:
+                render_kpi("Diferença Salarial (Homem - Mulher)", fmt_moeda(dif_reais), f"Homens ganham {fmt_pct(dif_pct, True)} a mais", "#F59E0B")
     else:
         validos_ord = validos.sort_values("salario_medio", ascending=False)
         if not validos_ord.empty:
             maior = validos_ord.iloc[0]
             menor = validos_ord.iloc[-1]
-            mais_contrata = validos.sort_values("admissoes", ascending=False).iloc[0]
-            nome_eixo = MAPA_EIXOS_DEMOGRAFICOS.get(eixo_ativo, eixo_ativo)
-            with st.container(border=True):
-                st.markdown(f"#### Destaques por {nome_eixo}{subtitulo_cargo}")
-                k1, k2, k3 = st.columns(3)
-                k1.metric(
-                    f"Maior Salário Médio ({maior['categoria']})",
-                    fmt_moeda(maior["salario_medio"]),
-                    f"{fmt_int(maior['admissoes'])} contratações ({fmt_pct(maior['participacao_pct'])})",
-                    delta_color="off",
-                )
-                k2.metric(
-                    f"Menor Salário Médio ({menor['categoria']})",
-                    fmt_moeda(menor["salario_medio"]),
-                    f"{fmt_int(menor['admissoes'])} contratações ({fmt_pct(menor['participacao_pct'])})",
-                    delta_color="off",
-                )
-                k3.metric(
-                    f"Maior Volume ({mais_contrata['categoria']})",
-                    f"{fmt_int(mais_contrata['admissoes'])} contratações",
-                    f"Salário médio: {fmt_moeda(mais_contrata['salario_medio'])}",
-                    delta_color="off",
-                )
-        consolidado = consolidado.sort_values("salario_medio", ascending=False)
+            mais_adm = validos.sort_values("admissoes", ascending=False).iloc[0]
 
-    df_tab = pd.DataFrame({
-        "Categoria": consolidado["categoria"],
-        "Contratações": consolidado["admissoes"].map(fmt_int),
-        "Demissões": consolidado["desligamentos"].map(fmt_int),
-        "Saldo de Vagas": consolidado["saldo"].map(lambda v: fmt_int(v, com_sinal=True)),
-        "Participação nas Contratações": consolidado["participacao_pct"].map(fmt_pct),
-        "Salário Médio Inicial": consolidado["salario_medio"].map(fmt_moeda),
-        "Diferença p/ Média do Grupo": consolidado["dif_media_pct"].map(lambda v: fmt_pct(v, com_sinal=True)),
-    })
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                render_kpi(f"Maior Salário ({maior['categoria'][:18]})", fmt_moeda(maior["salario_medio"]), f"{fmt_int(maior['admissoes'])} contratações", "#10B981")
+            with c2:
+                render_kpi(f"Menor Salário ({menor['categoria'][:18]})", fmt_moeda(menor["salario_medio"]), f"{fmt_int(menor['admissoes'])} contratações", "#EF4444")
+            with c3:
+                render_kpi(f"Maior Volume ({mais_adm['categoria'][:18]})", fmt_int(mais_adm["admissoes"]), f"Salário médio: {fmt_moeda(mais_adm['salario_medio'])}", "#6366F1")
 
-    c_tab, c_graf = st.columns([3, 2])
-    with c_tab:
-        st.markdown("**Tabela Consolidada por Categoria**")
-        st.dataframe(df_tab, width="stretch", hide_index=True)
+    st.markdown("<br>", unsafe_allow_html=True)
+    c_tab, c_graf = st.columns([1, 1])
+
     with c_graf:
         st.markdown("**Salário Médio Inicial por Categoria (R$)**")
         if not validos.empty:
             df_plot = validos.set_index("categoria")[["salario_medio"]].rename(
-                columns={"salario_medio": "Salário Médio (R$)"}
+                columns={"salario_medio": "Salário Médio"}
             )
-            st.bar_chart(df_plot, color="#2563eb")
+            st.bar_chart(df_plot, color="#2563EB", height=290)
 
-    if eixo_ativo == "sexo" and df_eixo["sigla_uf"].nunique() > 1:
-        st.markdown("**Comparativo Homens vs. Mulheres por Estado (UF)**")
-        uf_sex = (
-            df_eixo[df_eixo["categoria"].isin(["Homem", "Mulher"])]
-            .groupby(["sigla_uf", "categoria"], as_index=False)
-            .agg(
-                admissoes=("admissoes", "sum"),
-                soma_sal=("soma_salarios_admissao", "sum"),
-                qtd_sal=("qtd_salarios_admissao", "sum"),
-            )
-        )
-        uf_sex["sal"] = uf_sex["soma_sal"] / uf_sex["qtd_sal"].replace(0, pd.NA)
-        linhas_uf = []
-        for uf in sorted(uf_sex["sigla_uf"].unique()):
-            sub = uf_sex[uf_sex["sigla_uf"] == uf]
-            sh_s = sub[sub["categoria"] == "Homem"]["sal"]
-            sm_s = sub[sub["categoria"] == "Mulher"]["sal"]
-            sh = float(sh_s.iloc[0]) if (not sh_s.empty and pd.notna(sh_s.iloc[0])) else 0.0
-            sm = float(sm_s.iloc[0]) if (not sm_s.empty and pd.notna(sm_s.iloc[0])) else 0.0
-            ah = int(sub[sub["categoria"] == "Homem"]["admissoes"].iloc[0]) if not sub[sub["categoria"] == "Homem"].empty else 0
-            am = int(sub[sub["categoria"] == "Mulher"]["admissoes"].iloc[0]) if not sub[sub["categoria"] == "Mulher"].empty else 0
-            dif_r = sh - sm if (sh > 0 and sm > 0) else None
-            dif_p = (100.0 * dif_r / sm) if (dif_r is not None and sm > 0) else None
-            linhas_uf.append({
-                "Estado (UF)": uf,
-                "Salário Médio Homens": fmt_moeda(sh if sh > 0 else None),
-                "Salário Médio Mulheres": fmt_moeda(sm if sm > 0 else None),
-                "Diferença (R$)": fmt_moeda(dif_r),
-                "Diferença (%)": fmt_pct(dif_p, com_sinal=True),
-                "Contratações Homens": fmt_int(ah),
-                "Contratações Mulheres": fmt_int(am),
-            })
-        st.dataframe(pd.DataFrame(linhas_uf), width="stretch", hide_index=True)
+    with c_tab:
+        st.markdown("**Tabela de Distribuição e Médias Salariais**")
+        df_tab = pd.DataFrame({
+            "Categoria": consolidado["categoria"],
+            "Salário Médio": consolidado["salario_medio"].map(fmt_moeda),
+            "Diferença p/ Média": consolidado["dif_media_pct"].map(lambda v: fmt_pct(v, True)),
+            "Contratações": consolidado["admissoes"].map(fmt_int),
+            "Participação": consolidado["participacao_pct"].map(fmt_pct),
+        })
+        st.dataframe(df_tab, hide_index=True, height=290)
 
 
-def renderizar_resultado_p3(df_bruto: pd.DataFrame, filtros: dict[str, Any] | None = None) -> None:
-    """Consolida e exibe de forma direta a comparação Capitais vs. Interior."""
-    df_tot = df_bruto[df_bruto["nivel"] == "total"].copy()
-    if df_tot.empty:
-        df_tot = df_bruto.copy()
+# ==============================================================================
+# VISUALIZAÇÃO PRINCIPAL DO DISPATCHER DE RESPOSTAS
+# ==============================================================================
 
-    linha_co = df_tot[df_tot["recorte"] == "Centro-Oeste"]
-    ref = linha_co.iloc[0] if not linha_co.empty else df_tot.iloc[0]
-    subtitulo_cargo = f" — Cargo: {filtros['termo_ocupacao']}" if (filtros and filtros.get("termo_ocupacao")) else ""
-
-    with st.container(border=True):
-        st.markdown(f"#### Comparativo Direto: Capitais vs. Interior ({ref['recorte']}){subtitulo_cargo}")
-        k1, k2, k3 = st.columns(3)
-        k1.metric(
-            "Salário Médio — Capitais",
-            fmt_moeda(ref["salario_capital"]),
-            f"Saldo líquido: {fmt_int(ref['saldo_capital'], com_sinal=True)} vagas",
-            delta_color="off",
-        )
-        k2.metric(
-            "Salário Médio — Interior",
-            fmt_moeda(ref["salario_interior"]),
-            f"Saldo líquido: {fmt_int(ref['saldo_interior'], com_sinal=True)} vagas",
-            delta_color="off",
-        )
-        k3.metric(
-            "Diferença Salarial (Capital - Interior)",
-            fmt_moeda(ref["diferenca_salario"]),
-            f"Diferença de saldo: {fmt_int(ref['diferenca_saldo'], com_sinal=True)} vagas",
-            delta_color="off",
-        )
-
-    df_tab = pd.DataFrame({
-        "Recorte Geográfico": df_tot["recorte"],
-        "Contratações Capitais": df_tot["admissoes_capital"].map(fmt_int),
-        "Contratações Interior": df_tot["admissoes_interior"].map(fmt_int),
-        "Saldo Capitais": df_tot["saldo_capital"].map(lambda v: fmt_int(v, com_sinal=True)),
-        "Saldo Interior": df_tot["saldo_interior"].map(lambda v: fmt_int(v, com_sinal=True)),
-        "Salário Médio Capitais": df_tot["salario_capital"].map(fmt_moeda),
-        "Salário Médio Interior": df_tot["salario_interior"].map(fmt_moeda),
-        "Diferença Salarial (R$)": df_tot["diferenca_salario"].map(fmt_moeda),
-    })
-
-    c1, c2 = st.columns([3, 2])
-    with c1:
-        st.markdown("**Tabela Consolidada por Estado (Capitais vs. Interior)**")
-        st.dataframe(df_tab, width="stretch", hide_index=True)
-    with c2:
-        st.markdown("**Salário Médio Inicial: Capitais vs. Interior (R$)**")
-        df_plot = df_tot.set_index("recorte")[["salario_capital", "salario_interior"]].rename(
-            columns={"salario_capital": "Capitais", "salario_interior": "Interior"}
-        )
-        st.bar_chart(df_plot)
-
-
-def renderizar_resultado_p1(df_bruto: pd.DataFrame, filtros: dict[str, Any] | None = None) -> None:
-    """Consolida e exibe o ranking de setores econômicos nos últimos 12 meses."""
-    df_ativos = df_bruto[df_bruto["admissoes"] > 0].copy()
-    subtitulo_cargo = f" — Cargo: {filtros['termo_ocupacao']}" if (filtros and filtros.get("termo_ocupacao")) else ""
-    if not df_ativos.empty:
-        mais_contrata = df_ativos.sort_values("admissoes", ascending=False).iloc[0]
-        maior_saldo = df_ativos.sort_values("saldo", ascending=False).iloc[0]
-        ini_s = str(mais_contrata["inicio"])[:7]
-        fim_s = str(mais_contrata["fim"])[:7]
-        with st.container(border=True):
-            st.markdown(f"#### Destaques Setoriais (Janela de 12 meses: {ini_s} a {fim_s}){subtitulo_cargo}")
-            k1, k2, k3 = st.columns(3)
-            k1.metric(
-                "Setor que Mais Contratou",
-                f"Seção {mais_contrata['codigo_secao']} ({fmt_int(mais_contrata['admissoes'])})",
-                str(mais_contrata["descricao_secao"])[:45],
-                delta_color="off",
-            )
-            k2.metric(
-                "Setor com Maior Saldo Líquido",
-                f"Seção {maior_saldo['codigo_secao']} ({fmt_int(maior_saldo['saldo'], com_sinal=True)} vagas)",
-                str(maior_saldo["descricao_secao"])[:45],
-                delta_color="off",
-            )
-            k3.metric(
-                "Total de Setores Ativos",
-                f"{len(df_ativos)} seções CNAE",
-                f"{int(mais_contrata['competencias_disponiveis'])} meses com dados na janela",
-                delta_color="off",
-            )
-
-    df_tab = pd.DataFrame({
-        "Rank Contratações": df_bruto["ranking_admissoes"].map(lambda r: f"{int(r)}º"),
-        "Seção": df_bruto["codigo_secao"],
-        "Setor Econômico (CNAE)": df_bruto["descricao_secao"],
-        "Contratações (12m)": df_bruto["admissoes"].map(fmt_int),
-        "Demissões (12m)": df_bruto["desligamentos"].map(fmt_int),
-        "Saldo de Vagas (12m)": df_bruto["saldo"].map(lambda v: fmt_int(v, com_sinal=True)),
-        "Rank Demissões": df_bruto["ranking_desligamentos"].map(lambda r: f"{int(r)}º"),
-    })
-
-    c1, c2 = st.columns([3, 2])
-    with c1:
-        st.markdown("**Ranking dos Setores Econômicos (Últimos 12 Meses)**")
-        st.dataframe(df_tab, width="stretch", hide_index=True)
-    with c2:
-        st.markdown("**Top 10 Setores por Volume de Contratações**")
-        top10 = df_ativos.head(10).copy()
-        if not top10.empty:
-            top10["Setor"] = top10["codigo_secao"] + " - " + top10["descricao_secao"].str.slice(0, 24)
-            st.bar_chart(
-                top10.set_index("Setor")[["admissoes", "desligamentos"]].rename(
-                    columns={"admissoes": "Contratações", "desligamentos": "Demissões"}
-                )
-            )
-
-
-def renderizar_resultado_p2(df_bruto: pd.DataFrame, filtros: dict[str, Any] | None = None) -> None:
-    """Consolida e exibe o padrão sazonal por mês do ano (Janeiro a Dezembro)."""
-    df_val = df_bruto.dropna(subset=["admissoes", "desligamentos", "saldo"]).copy()
-    por_mes = (
-        df_val.groupby("mes", as_index=False)
-        .agg(
-            admissoes=("admissoes", "sum"),
-            desligamentos=("desligamentos", "sum"),
-            saldo=("saldo", "sum"),
-            anos=("ano", "nunique"),
-        )
-        .sort_values("mes")
-    )
-    por_mes["nome_mes"] = por_mes["mes"].map(lambda m: NOMES_MESES.get(int(m), str(m)))
-    por_mes["media_saldo"] = por_mes["saldo"] / por_mes["anos"].replace(0, 1)
-    subtitulo_cargo = f" — Cargo: {filtros['termo_ocupacao']}" if (filtros and filtros.get("termo_ocupacao")) else ""
-
-    if not por_mes.empty:
-        melhor = por_mes.sort_values("saldo", ascending=False).iloc[0]
-        pior = por_mes.sort_values("saldo", ascending=True).iloc[0]
-        with st.container(border=True):
-            st.markdown(f"#### Comportamento Sazonal Consolidado (Janeiro a Dezembro){subtitulo_cargo}")
-            k1, k2, k3 = st.columns(3)
-            k1.metric(
-                "Mês de Maior Saldo Positivo",
-                str(melhor["nome_mes"]),
-                f"Saldo acumulado: {fmt_int(melhor['saldo'], com_sinal=True)} vagas",
-                delta_color="off",
-            )
-            k2.metric(
-                "Mês de Maior Retração (Demissões)",
-                str(pior["nome_mes"]),
-                f"Saldo acumulado: {fmt_int(pior['saldo'], com_sinal=True)} vagas",
-                delta_color="off",
-            )
-            k3.metric(
-                "Meses Analisados na Série",
-                f"{df_val['competencia'].nunique()} competências",
-                f"De {str(df_val['competencia'].min())[:7]} a {str(df_val['competencia'].max())[:7]}",
-                delta_color="off",
-            )
-
-    df_tab = pd.DataFrame({
-        "Mês do Ano": por_mes["nome_mes"],
-        "Contratações Acumuladas": por_mes["admissoes"].map(fmt_int),
-        "Demissões Acumuladas": por_mes["desligamentos"].map(fmt_int),
-        "Saldo Líquido Acumulado": por_mes["saldo"].map(lambda v: fmt_int(v, com_sinal=True)),
-        "Média de Saldo por Ano": por_mes["media_saldo"].map(lambda v: fmt_int(v, com_sinal=True)),
-    })
-
-    c1, c2 = st.columns([3, 2])
-    with c1:
-        st.markdown("**Tabela Sazonal Consolidada pelos 12 Meses do Ano**")
-        st.dataframe(df_tab, width="stretch", hide_index=True)
-    with c2:
-        st.markdown("**Saldo Líquido por Mês do Calendário (Jan a Dez)**")
-        if not por_mes.empty:
-            st.bar_chart(
-                por_mes.set_index("nome_mes")[["saldo"]].rename(columns={"saldo": "Saldo Acumulado"}),
-                color="#2563eb",
-            )
-
-
-def renderizar_resultado_p4(df_bruto: pd.DataFrame, filtros: dict[str, Any] | None = None) -> None:
-    """Consolida e exibe a relação entre rotatividade (fluxos pareados) e salário médio setorial."""
-    df_val = df_bruto.dropna(subset=["salario_medio_admissao", "indice_fluxos_pareados_pct"]).copy()
-    corr_val = df_bruto["correlacao_pearson"].iloc[0] if "correlacao_pearson" in df_bruto.columns else None
-    corr_str = f"{float(corr_val):.3f}".replace(".", ",") if (corr_val is not None and not pd.isna(corr_val)) else "N/A"
-    subtitulo_cargo = f" — Cargo: {filtros['termo_ocupacao']}" if (filtros and filtros.get("termo_ocupacao")) else ""
-
-    if not df_val.empty:
-        maior_rot = df_val.sort_values("indice_fluxos_pareados_pct", ascending=False).iloc[0]
-        maior_sal = df_val.sort_values("salario_medio_admissao", ascending=False).iloc[0]
-        with st.container(border=True):
-            st.markdown(f"#### Relação entre Rotatividade (Fluxos Pareados) e Salário Inicial{subtitulo_cargo}")
-            k1, k2, k3 = st.columns(3)
-            k1.metric(
-                "Correlação de Pearson (r)",
-                corr_str,
-                "Entre equilíbrio de fluxos (%) e salário médio (R$)",
-                delta_color="off",
-            )
-            k2.metric(
-                f"Maior Rotatividade (Seção {maior_rot['codigo_secao']})",
-                fmt_pct(maior_rot["indice_fluxos_pareados_pct"]),
-                f"Salário médio: {fmt_moeda(maior_rot['salario_medio_admissao'])}",
-                delta_color="off",
-            )
-            k3.metric(
-                f"Maior Salário Médio (Seção {maior_sal['codigo_secao']})",
-                fmt_moeda(maior_sal["salario_medio_admissao"]),
-                f"Índice de fluxos: {fmt_pct(maior_sal['indice_fluxos_pareados_pct'])}",
-                delta_color="off",
-            )
-
-    df_ord = df_bruto.sort_values("indice_fluxos_pareados_pct", ascending=False).copy()
-    df_tab = pd.DataFrame({
-        "Seção": df_ord["codigo_secao"],
-        "Setor Econômico (CNAE)": df_ord["codigo_secao"].map(lambda s: SECOES_CNAE_OFICIAIS.get(str(s), str(s))),
-        "Índice de Fluxos / Rotatividade (%)": df_ord["indice_fluxos_pareados_pct"].map(fmt_pct),
-        "Salário Médio Inicial": df_ord["salario_medio_admissao"].map(fmt_moeda),
-        "Contratações": df_ord["admissoes"].map(fmt_int),
-        "Demissões": df_ord["desligamentos"].map(fmt_int),
-        "Saldo de Vagas": df_ord["saldo"].map(lambda v: fmt_int(v, com_sinal=True)),
-    })
-
-    c1, c2 = st.columns([3, 2])
-    with c1:
-        st.markdown("**Setores Ordenados por Índice de Rotatividade (Fluxos Pareados)**")
-        st.dataframe(df_tab, width="stretch", hide_index=True)
-    with c2:
-        st.markdown("**Salário Médio Inicial por Setor (R$)**")
-        if not df_val.empty:
-            df_plot = df_val.copy()
-            df_plot["Setor"] = df_plot["codigo_secao"] + " - " + df_plot["codigo_secao"].map(
-                lambda s: SECOES_CNAE_OFICIAIS.get(str(s), str(s))[:22]
-            )
-            st.bar_chart(
-                df_plot.set_index("Setor")[["salario_medio_admissao"]].rename(
-                    columns={"salario_medio_admissao": "Salário Médio (R$)"}
-                ),
-                color="#2563eb",
-            )
-
-
-def renderizar_drilldown_profissao(
+def renderizar_resposta_geral(
+    resposta: RespostaTextToSQL,
     caminho_str: str,
     assistente: AssistenteTextToSQL,
-    codigos_cbo: list[str],
-    rotulo_cargo: str,
-    uf_filtro: str | None,
-    ano_filtro: int | None,
-    chave_prefixo: str,
+    chave_prefixo: str = "geral",
 ) -> None:
-    """Exibe o detalhamento (drill-down) de uma profissão por Sexo, Escolaridade, Raça/Cor, Idade e Capital/Interior."""
-    st.markdown(f"#### Detalhamento de Perfil e Geografia para: {rotulo_cargo}")
-    opcoes_visao = {
-        "sexo": "Sexo (Homem vs. Mulher)",
-        "escolaridade": "Escolaridade",
-        "raca_cor": "Raça/Cor",
-        "faixa_etaria": "Faixa Etária",
-        "capital_interior": "Capitais vs. Interior",
-        "sazonalidade": "Sazonalidade Mensal (Jan–Dez)",
-    }
-    visao_escolhida = st.radio(
-        "Selecione o recorte para detalhar esta profissão:",
-        options=list(opcoes_visao.keys()),
-        format_func=lambda k: opcoes_visao[k],
-        horizontal=True,
-        key=f"{chave_prefixo}_visao",
-    )
+    df_bruto = pd.DataFrame(resposta.linhas, columns=resposta.colunas)
+    if df_bruto.empty:
+        st.warning("Nenhum registro encontrado para a consulta e filtros selecionados.")
+        return
 
-    with abrir_conexao_analitica(caminho_str, garantir_construcao=False) as conn:
-        if visao_escolhida in ("sexo", "escolaridade", "raca_cor", "faixa_etaria"):
-            resp_sub = assistente.responder(
-                conn,
-                "Como o perfil sociodemográfico impacta o salário médio de admissão?",
-                filtro_cargo=rotulo_cargo,
-                codigos_cbo_override=codigos_cbo,
-                sigla_uf_override=uf_filtro,
-                ano_override=ano_filtro,
-                eixo_override=visao_escolhida,
-            )
-            df_sub = pd.DataFrame(resp_sub.linhas, columns=resp_sub.colunas)
-            if df_sub.empty:
-                st.info("Não há movimentações registradas para este cargo no recorte selecionado.")
-            else:
-                renderizar_resultado_p5(
-                    df_sub,
-                    resp_sub.filtros_aplicados,
-                    chave_radio=f"{chave_prefixo}_p5_eixo",
-                )
-        elif visao_escolhida == "capital_interior":
-            resp_sub = assistente.responder(
-                conn,
-                "Qual é a diferença no saldo líquido e no salário médio entre as capitais e o interior?",
-                filtro_cargo=rotulo_cargo,
-                codigos_cbo_override=codigos_cbo,
-                sigla_uf_override=uf_filtro,
-                ano_override=ano_filtro,
-            )
-            df_sub = pd.DataFrame(resp_sub.linhas, columns=resp_sub.colunas)
-            if df_sub.empty:
-                st.info("Não há movimentações registradas para este cargo no recorte selecionado.")
-            else:
-                renderizar_resultado_p3(df_sub, resp_sub.filtros_aplicados)
-        elif visao_escolhida == "sazonalidade":
-            resp_sub = assistente.responder(
-                conn,
-                "Existe sazonalidade nas contratações e demissões ao longo dos meses do ano?",
-                filtro_cargo=rotulo_cargo,
-                codigos_cbo_override=codigos_cbo,
-                sigla_uf_override=uf_filtro,
-                ano_override=ano_filtro,
-            )
-            df_sub = pd.DataFrame(resp_sub.linhas, columns=resp_sub.colunas)
-            if df_sub.empty:
-                st.info("Não há movimentações registradas para este cargo no recorte selecionado.")
-            else:
-                renderizar_resultado_p2(df_sub, resp_sub.filtros_aplicados)
+    cargo_label = resposta.filtros_aplicados.get("termo_ocupacao", "")
+    if resposta.ocupacoes_resolvidas and resposta.intencao != "cbo_ocupacao":
+        cbo_tags = " • ".join([f"{o['codigo_cbo']} - {o['titulo_ocupacao']}" for o in resposta.ocupacoes_resolvidas[:2]])
+        st.info(f"🎯 **Filtro de Cargo Ativo (CBO):** {cbo_tags}")
+
+    if resposta.intencao == "p3_capitais_interior":
+        render_p3_capitais_interior(df_bruto, cargo_label)
+    elif resposta.intencao == "p1_setores_df":
+        render_p1_setores_df(df_bruto, cargo_label)
+    elif resposta.intencao == "p2_sazonalidade":
+        render_p2_sazonalidade(df_bruto, cargo_label)
+    elif resposta.intencao == "p4_fluxos_salarios":
+        render_p4_rotatividade(df_bruto, cargo_label)
+    elif resposta.intencao == "p5_perfil_remuneracao":
+        render_p5_sociodemografico(df_bruto, resposta.filtros_aplicados, caminho_str, assistente, chave_prefixo)
+    elif resposta.intencao == "cbo_ocupacao":
+        render_visao_cbo_detalhada(df_bruto, caminho_str, assistente, resposta.filtros_aplicados)
+    else:
+        st.dataframe(df_bruto, hide_index=True)
+
+    render_auditoria_expander(resposta)
 
 
-def renderizar_resultado_cbo(
+def render_visao_cbo_detalhada(
     df_bruto: pd.DataFrame,
-    caminho_str: str | None = None,
-    assistente: AssistenteTextToSQL | None = None,
-    filtros: dict[str, Any] | None = None,
+    caminho_str: str,
+    assistente: AssistenteTextToSQL,
+    filtros: dict[str, Any],
 ) -> None:
-    """Exibe de forma direta os indicadores para profissões CBO consultadas."""
+    lider = df_bruto.iloc[0]
     tot_adm = int(df_bruto["admissoes"].sum())
     tot_des = int(df_bruto["desligamentos"].sum())
     tot_saldo = int(df_bruto["saldo"].sum())
-    lider = df_bruto.iloc[0]
 
-    with st.container(border=True):
-        st.markdown(f"#### Indicadores para a Profissão: {lider['codigo_cbo']} — {lider['titulo_ocupacao']}")
-        k1, k2, k3, k4 = st.columns(4)
-        k1.metric("Contratações (Soma Top CBOs)", fmt_int(tot_adm))
-        k2.metric("Demissões (Soma Top CBOs)", fmt_int(tot_des))
-        k3.metric("Saldo de Vagas", fmt_int(tot_saldo, com_sinal=True))
-        k4.metric("Salário Médio (Cargo Principal)", fmt_moeda(lider["salario_medio_admissao"]))
+    st.markdown(f"### 🎯 Ocupação: {lider['codigo_cbo']} — {lider['titulo_ocupacao']}")
+    st.caption("Indicadores agregados no Centro-Oeste obtidos via integração da dimensão CBO com a fato de movimentações.")
 
-    df_tab = pd.DataFrame({
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+        render_kpi("Salário Inicial Médio", fmt_moeda(lider["salario_medio_admissao"]), "Para o cargo principal", "#10B981")
+    with c2:
+        render_kpi("Contratações (Admissões)", fmt_int(tot_adm), "Volume acumulado", "#2563EB")
+    with c3:
+        render_kpi("Demissões (Desligamentos)", fmt_int(tot_des), "Volume acumulado", "#EF4444")
+    with c4:
+        render_kpi("Saldo Líquido", fmt_int(tot_saldo, True), "Geração líquida de vagas", "#6366F1")
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("**Ocupações CBO Mais Próximas Identificadas**")
+    df_cbo_tab = pd.DataFrame({
         "Código CBO": df_bruto["codigo_cbo"],
-        "Profissão Oficial (CBO 2002)": df_bruto["titulo_ocupacao"],
+        "Título Oficial (MTE)": df_bruto["titulo_ocupacao"],
         "Contratações": df_bruto["admissoes"].map(fmt_int),
         "Demissões": df_bruto["desligamentos"].map(fmt_int),
-        "Saldo de Vagas": df_bruto["saldo"].map(lambda v: fmt_int(v, com_sinal=True)),
-        "Salário Médio Inicial": df_bruto["salario_medio_admissao"].map(fmt_moeda),
-        "Amostra de Salários (n)": df_bruto["qtd_salarios_admissao"].map(fmt_int),
+        "Saldo de Postos": df_bruto["saldo"].map(lambda v: fmt_int(v, True)),
+        "Salário Médio": df_bruto["salario_medio_admissao"].map(fmt_moeda),
     })
-    st.markdown("**Cargos CBO Encontrados e Seus Indicadores**")
-    st.dataframe(df_tab, width="stretch", hide_index=True)
-
-    if caminho_str and assistente and filtros and filtros.get("codigos_cbo"):
-        st.divider()
-        renderizar_drilldown_profissao(
-            caminho_str=caminho_str,
-            assistente=assistente,
-            codigos_cbo=list(filtros["codigos_cbo"]),
-            rotulo_cargo=str(filtros.get("termo_ocupacao") or lider["titulo_ocupacao"]),
-            uf_filtro=filtros.get("sigla_uf"),
-            ano_filtro=filtros.get("ano"),
-            chave_prefixo="drill_aba1_cbo",
-        )
+    st.dataframe(df_cbo_tab, hide_index=True)
 
 
-def renderizar_resposta_consolidada(
-    resposta: RespostaTextToSQL,
-    caminho_str: str | None = None,
-    assistente: AssistenteTextToSQL | None = None,
-    chave_prefixo: str = "resp_padrao",
+# ==============================================================================
+# VIEW 1: PAINEL EXECUTIVO (5 PERGUNTAS DE GESTÃO)
+# ==============================================================================
+
+def render_view_painel_executivo(
+    caminho_str: str,
+    assistente: AssistenteTextToSQL,
+    indice: IndiceVetorialCBO,
+    filtro_uf: str | None,
+    filtro_ano: int | None,
+    cargo_filtro: str | None,
 ) -> None:
-    """Direciona a resposta do assistente para a visualização consolidada correta."""
-    df_bruto = pd.DataFrame(resposta.linhas, columns=resposta.colunas)
-    if df_bruto.empty:
-        st.warning("Nenhum dado encontrado para os filtros informados.")
+    st.markdown("## 📊 Painel Executivo do Mercado de Trabalho")
+    st.caption("Acompanhamento das 5 Perguntas de Gestão estratégicas formuladas para a Região Centro-Oeste.")
+
+    tab_p3, tab_p1, tab_p2, tab_p4, tab_p5 = st.tabs([
+        "🏙️ Capitais vs. Interior (P3)",
+        "🏢 Setores no DF (P1)",
+        "📅 Sazonalidade (P2)",
+        "🔄 Rotatividade & Salário (P4)",
+        "👥 Perfil Demográfico (P5)",
+    ])
+
+    with tab_p3:
+        with abrir_conexao_analitica(caminho_str, garantir_construcao=False) as conn:
+            resp = assistente.responder(
+                conn,
+                "Qual é a diferença no saldo líquido e no salário médio entre as capitais e o interior?",
+                filtro_cargo=cargo_filtro,
+                sigla_uf_override=filtro_uf,
+                ano_override=filtro_ano,
+            )
+        renderizar_resposta_geral(resp, caminho_str, assistente, "painel_p3")
+
+    with tab_p1:
+        with abrir_conexao_analitica(caminho_str, garantir_construcao=False) as conn:
+            resp = assistente.responder(
+                conn,
+                "Qual setor econômico mais contratou e demitiu no Distrito Federal nos últimos 12 meses?",
+                filtro_cargo=cargo_filtro,
+                sigla_uf_override="DF",
+                ano_override=filtro_ano,
+            )
+        renderizar_resposta_geral(resp, caminho_str, assistente, "painel_p1")
+
+    with tab_p2:
+        with abrir_conexao_analitica(caminho_str, garantir_construcao=False) as conn:
+            resp = assistente.responder(
+                conn,
+                "Existe sazonalidade nas contratações e demissões?",
+                filtro_cargo=cargo_filtro,
+                sigla_uf_override=filtro_uf,
+                ano_override=filtro_ano,
+            )
+        renderizar_resposta_geral(resp, caminho_str, assistente, "painel_p2")
+
+    with tab_p4:
+        with abrir_conexao_analitica(caminho_str, garantir_construcao=False) as conn:
+            resp = assistente.responder(
+                conn,
+                "Os setores com maior rotatividade praticam salários médios mais baixos?",
+                filtro_cargo=cargo_filtro,
+                sigla_uf_override=filtro_uf,
+                ano_override=filtro_ano,
+            )
+        renderizar_resposta_geral(resp, caminho_str, assistente, "painel_p4")
+
+    with tab_p5:
+        with abrir_conexao_analitica(caminho_str, garantir_construcao=False) as conn:
+            resp = assistente.responder(
+                conn,
+                "Como o perfil sociodemográfico impacta o salário médio de admissão?",
+                filtro_cargo=cargo_filtro,
+                sigla_uf_override=filtro_uf,
+                ano_override=filtro_ano,
+                eixo_override="sexo",
+            )
+        renderizar_resposta_geral(resp, caminho_str, assistente, "painel_p5")
+
+
+# ==============================================================================
+# VIEW 2: EXPLORADOR OCUPACIONAL (BUSCA VETORIAL CBO 2002)
+# ==============================================================================
+
+def render_view_busca_cbo(
+    caminho_str: str,
+    indice: IndiceVetorialCBO,
+    assistente: AssistenteTextToSQL,
+    filtro_uf: str | None,
+    filtro_ano: int | None,
+) -> None:
+    st.markdown("## 🔍 Explorador Ocupacional (Busca Semântica CBO 2002)")
+    st.caption("Motor de busca vetorial híbrido com embeddings de 384 dimensões e similaridade de cosseno via DuckDB.")
+
+    if "busca_termo_ativo" not in st.session_state:
+        st.session_state["busca_termo_ativo"] = "professor"
+
+    # Barra de busca proeminente
+    col_input, col_btn = st.columns([5, 1])
+    with col_input:
+        termo_digitado = st.text_input(
+            "Buscar cargo ou ocupação:",
+            value=st.session_state["busca_termo_ativo"],
+            placeholder="Ex.: dev backend, caminhoneiro, professor, enfermeiro, 212405...",
+            label_visibility="collapsed",
+        )
+    with col_btn:
+        if st.button("Buscar Ocupação", type="primary", use_container_width=True):
+            st.session_state["busca_termo_ativo"] = termo_digitado
+            st.rerun()
+
+    # Chips de sugestão rápida
+    st.markdown("**Atalhos de Ocupações:**")
+    cols_sug = st.columns(len(SUGESTOES_PROFISSÕES))
+    for i, (label_sug, val_sug) in enumerate(SUGESTOES_PROFISSÕES):
+        if cols_sug[i].button(label_sug, key=f"sug_cbo_{i}", use_container_width=True):
+            st.session_state["busca_termo_ativo"] = val_sug
+            st.rerun()
+
+    termo_ativo = st.session_state["busca_termo_ativo"].strip()
+    if not termo_ativo:
         return
 
-    st.caption(f"Contrato acionado: **{resposta.titulo_intencao}**  |  {descrever_filtros(resposta.filtros_aplicados)}")
+    # Execução da busca vetorial
+    resultados = indice.buscar_semantico(termo_ativo, top_k=5, apenas_oficiais=True)
+    if not resultados:
+        resultados = indice.buscar_semantico(termo_ativo, top_k=5, apenas_oficiais=False)
 
-    if resposta.ocupacoes_resolvidas and resposta.intencao != "cbo_ocupacao":
-        nomes_cbo = [f"{o['codigo_cbo']} ({o['titulo_ocupacao']})" for o in resposta.ocupacoes_resolvidas]
-        st.info(f"**Recorte de Cargo Ativo (CBO 2002):** {'  |  '.join(nomes_cbo)}")
-
-    if resposta.intencao == "p5_perfil_remuneracao":
-        # Se a consulta retornou apenas 1 eixo, permite trocar para qualquer eixo demográfico mantendo o mesmo cargo/UF/ano
-        if caminho_str and assistente:
-            eixo_inicial = resposta.filtros_aplicados.get("eixo", "sexo")
-            opcoes_eixo = ["sexo", "escolaridade", "raca_cor", "faixa_etaria"]
-            idx_eixo = opcoes_eixo.index(eixo_inicial) if eixo_inicial in opcoes_eixo else 0
-            eixo_escolhido = st.radio(
-                "Dimensão demográfica exibida (clique para alternar mantendo o mesmo filtro de cargo/UF/ano):",
-                options=opcoes_eixo,
-                index=idx_eixo,
-                format_func=lambda e: MAPA_EIXOS_DEMOGRAFICOS.get(e, e),
-                horizontal=True,
-                key=f"{chave_prefixo}_seletor_eixo_p5",
-            )
-            if eixo_escolhido != eixo_inicial:
-                with abrir_conexao_analitica(caminho_str, garantir_construcao=False) as conn:
-                    resposta = assistente.responder(
-                        conn,
-                        resposta.pergunta_original,
-                        filtro_cargo=resposta.filtros_aplicados.get("termo_ocupacao"),
-                        codigos_cbo_override=resposta.filtros_aplicados.get("codigos_cbo"),
-                        sigla_uf_override=resposta.filtros_aplicados.get("sigla_uf"),
-                        ano_override=resposta.filtros_aplicados.get("ano"),
-                        eixo_override=eixo_escolhido,
-                    )
-                    df_bruto = pd.DataFrame(resposta.linhas, columns=resposta.colunas)
-        renderizar_resultado_p5(df_bruto, resposta.filtros_aplicados, chave_radio=f"{chave_prefixo}_p5_interno")
-    elif resposta.intencao == "p3_capitais_interior":
-        renderizar_resultado_p3(df_bruto, resposta.filtros_aplicados)
-    elif resposta.intencao == "p1_setores_df":
-        renderizar_resultado_p1(df_bruto, resposta.filtros_aplicados)
-    elif resposta.intencao == "p2_sazonalidade":
-        renderizar_resultado_p2(df_bruto, resposta.filtros_aplicados)
-    elif resposta.intencao == "p4_fluxos_salarios":
-        renderizar_resultado_p4(df_bruto, resposta.filtros_aplicados)
-    elif resposta.intencao == "cbo_ocupacao":
-        renderizar_resultado_cbo(df_bruto, caminho_str, assistente, resposta.filtros_aplicados)
-    else:
-        st.dataframe(df_bruto, width="stretch", hide_index=True)
-
-    with st.expander("Detalhes Técnicos, Fórmula e SQL Executado (Auditoria BD2 / ADR-0007)"):
-        st.markdown(f"- **Identificador do contrato:** `{resposta.intencao}`")
-        st.markdown(f"- **Fórmula da métrica:** `{resposta.formula_metrica}`")
-        st.markdown(f"- **Ressalva metodológica:** {resposta.ressalva_metodologica}")
-        if resposta.ocupacoes_resolvidas:
-            st.markdown("**Ocupações CBO resolvidas pelo índice vetorial (384d):**")
-            st.dataframe(pd.DataFrame(resposta.ocupacoes_resolvidas), width="stretch", hide_index=True)
-        st.markdown("**Consulta SQL executada em modo somente leitura (`READ_ONLY`) sobre o schema `gold`:**")
-        st.code(resposta.sql_gerado, language="sql")
-
-
-def renderizar_aba_assistente(caminho_str: str, assistente: AssistenteTextToSQL, indice: IndiceVetorialCBO) -> None:
-    if "pergunta_ativa" not in st.session_state:
-        st.session_state["pergunta_ativa"] = "Qual a diferença salarial entre homens e mulheres?"
-    if "filtro_cargo_aba1" not in st.session_state:
-        st.session_state["filtro_cargo_aba1"] = ""
-
-    with st.container(border=True):
-        st.markdown("#### Faça uma pergunta em português sobre empregos, salários, setores ou profissões")
-        with st.form("form_assistente", clear_on_submit=False, border=False):
-            c_input, c_btn = st.columns([5, 1])
-            with c_input:
-                texto_digitado = st.text_input(
-                    "Digite sua pergunta:",
-                    value=st.session_state["pergunta_ativa"],
-                    placeholder="Ex.: Qual a diferença salarial entre homens e mulheres para professor?",
-                    label_visibility="collapsed",
-                )
-            with c_btn:
-                enviado = st.form_submit_button("Consultar", type="primary", width="stretch")
-            if enviado:
-                st.session_state["pergunta_ativa"] = texto_digitado
-
-        st.markdown("**Filtrar / Detalhar a Consulta Atual por Cargo (CBO), Estado (UF) e Ano:**")
-        f1, f2, f3, f4 = st.columns([2, 2, 1, 1])
-        with f1:
-            mapa_rapido = dict(OPCOES_CARGO_RAPIDO)
-            escolha_rapida = st.selectbox(
-                "Seleção rápida de cargo:",
-                options=list(mapa_rapido.keys()),
-                index=0,
-                key="sel_cargo_rapido_aba1",
-            )
-        with f2:
-            valor_padrao_cargo = mapa_rapido[escolha_rapida] if mapa_rapido[escolha_rapida] else st.session_state["filtro_cargo_aba1"]
-            cargo_digitado = st.text_input(
-                "Ou digite qualquer cargo / profissão / CBO:",
-                value=valor_padrao_cargo,
-                placeholder="Ex.: professor, enfermeiro, motorista, 231210...",
-            )
-            st.session_state["filtro_cargo_aba1"] = cargo_digitado.strip()
-        with f3:
-            uf_aba1 = st.selectbox(
-                "Estado (UF):",
-                options=["Todos", "DF", "GO", "MT", "MS"],
-                index=0,
-                key="sel_uf_aba1",
-            )
-        with f4:
-            ano_aba1 = st.selectbox(
-                "Ano:",
-                options=["Todos", 2023, 2024, 2025, 2026],
-                index=0,
-                key="sel_ano_aba1",
-            )
-
-        st.caption("Atalhos rápidos de perguntas (funcionam tanto para o Mercado Geral quanto para o Cargo selecionado acima):")
-        cols_a1 = st.columns(5)
-        for i in range(5):
-            rotulo, perg = ATALHOS_PERGUNTAS[i]
-            if cols_a1[i].button(rotulo, key=f"btn_p_{i}", width="stretch"):
-                st.session_state["pergunta_ativa"] = perg
-                st.rerun()
-
-        cols_a2 = st.columns(5)
-        for j in range(5):
-            rotulo, perg = ATALHOS_PERGUNTAS[5 + j]
-            if cols_a2[j].button(rotulo, key=f"btn_p_{5 + j}", width="stretch"):
-                st.session_state["pergunta_ativa"] = perg
-                st.rerun()
-
-    pergunta_atual = st.session_state["pergunta_ativa"].strip()
-    if not pergunta_atual:
+    if not resultados:
+        st.warning(f"Nenhuma ocupação encontrada para o termo '{termo_ativo}'.")
         return
 
-    filtro_cargo_efetivo = cargo_digitado.strip() or None
-    uf_override = None if uf_aba1 == "Todos" else uf_aba1
-    ano_override = None if ano_aba1 == "Todos" else int(ano_aba1)
+    top1 = resultados[0]
+    codigos_encontrados = [r.codigo_cbo for r in resultados]
 
-    # Se houver um filtro de cargo explícito na caixa de filtro, permite refinar os códigos CBO exatos
-    codigos_cbo_override: list[str] | None = None
-    if filtro_cargo_efetivo:
-        candidatos_cbo = indice.buscar_semantico(filtro_cargo_efetivo, top_k=5, apenas_oficiais=True)
-        if not candidatos_cbo:
-            candidatos_cbo = indice.buscar_semantico(filtro_cargo_efetivo, top_k=5, apenas_oficiais=False)
-        if candidatos_cbo:
-            opcoes_c = [r.codigo_cbo for r in candidatos_cbo]
-            mapa_t = {r.codigo_cbo: r.titulo_ocupacao for r in candidatos_cbo}
-            codigos_cbo_override = st.multiselect(
-                f"Ocupações CBO consideradas para o cargo \"{filtro_cargo_efetivo}\" (você pode marcar/desmarcar para isolar um CBO específico):",
-                options=opcoes_c,
-                default=opcoes_c[:3],
-                format_func=lambda c: f"{c} — {mapa_t.get(c, c)}",
-                key=f"multi_cbo_aba1_{filtro_cargo_efetivo}",
+    # Indicadores reais no DuckDB
+    with abrir_conexao_analitica(caminho_str, garantir_construcao=False) as conn:
+        ind_sel = consultar_indicadores_cbo(conn, codigos_cbo=[top1.codigo_cbo], sigla_uf=filtro_uf, ano=filtro_ano)
+        ind_grupo = consultar_indicadores_cbo(conn, codigos_cbo=codigos_encontrados, sigla_uf=filtro_uf, ano=filtro_ano)
+
+    st.markdown(f"### Ocupação Identificada: `{top1.codigo_cbo}` — {top1.titulo_ocupacao}")
+    
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+        render_kpi("Salário Médio Inicial", fmt_moeda(ind_sel["salario_medio_admissao"]), "Salário oficial de admissão", "#10B981")
+    with c2:
+        render_kpi("Similaridade Semântica", f"{top1.score * 100:.1f}%", f"Método: {top1.metodo}", "#8B5CF6")
+    with c3:
+        render_kpi("Total Contratações", fmt_int(ind_sel["admissoes"]), f"Demissões: {fmt_int(ind_sel['desligamentos'])}", "#2563EB")
+    with c4:
+        render_kpi("Saldo Líquido", fmt_int(ind_sel["saldo"], True), "Postos criados", "#6366F1")
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # Abas de detalhamento do cargo
+    tab_similares, tab_perfil, tab_geo = st.tabs([
+        "📋 Ocupações Relacionadas (Top 5)",
+        "👥 Perfil Demográfico do Cargo",
+        "📍 Distribuição Geográfica",
+    ])
+
+    with tab_similares:
+        mapa_ind = {item["codigo_cbo"]: item for item in ind_grupo["por_ocupacao"]}
+        linhas_tab = []
+        for r in resultados:
+            d = mapa_ind.get(r.codigo_cbo, {})
+            linhas_tab.append({
+                "Código CBO": r.codigo_cbo,
+                "Título da Ocupação": r.titulo_ocupacao,
+                "Similaridade": f"{r.score * 100:.1f}%",
+                "Contratações": fmt_int(d.get("admissoes", 0)),
+                "Demissões": fmt_int(d.get("desligamentos", 0)),
+                "Saldo de Postos": fmt_int(d.get("saldo", 0), True),
+                "Salário Inicial Médio": fmt_moeda(d.get("salario_medio_admissao")),
+            })
+        st.dataframe(pd.DataFrame(linhas_tab), hide_index=True)
+
+    with tab_perfil:
+        with abrir_conexao_analitica(caminho_str, garantir_construcao=False) as conn:
+            resp_perfil = assistente.responder(
+                conn,
+                "Como o perfil sociodemográfico impacta o salário médio de admissão?",
+                filtro_cargo=termo_ativo,
+                codigos_cbo_override=[top1.codigo_cbo],
+                sigla_uf_override=filtro_uf,
+                ano_override=filtro_ano,
+                eixo_override="sexo",
             )
+        df_p = pd.DataFrame(resp_perfil.linhas, columns=resp_perfil.colunas)
+        if not df_p.empty:
+            render_p5_sociodemografico(df_p, resp_perfil.filtros_aplicados, caminho_str, assistente, "cbo_view")
+        else:
+            st.info("Não há dados demográficos suficientes para esta ocupação no filtro selecionado.")
+
+    with tab_geo:
+        with abrir_conexao_analitica(caminho_str, garantir_construcao=False) as conn:
+            resp_geo = assistente.responder(
+                conn,
+                "Qual é a diferença no saldo líquido e no salário médio entre as capitais e o interior?",
+                filtro_cargo=termo_ativo,
+                codigos_cbo_override=[top1.codigo_cbo],
+                sigla_uf_override=filtro_uf,
+                ano_override=filtro_ano,
+            )
+        df_g = pd.DataFrame(resp_geo.linhas, columns=resp_geo.colunas)
+        if not df_g.empty:
+            render_p3_capitais_interior(df_g, top1.titulo_ocupacao)
+        else:
+            st.info("Não há dados geográficos suficientes para esta ocupação no filtro selecionado.")
+
+
+# ==============================================================================
+# VIEW 3: ASSISTENTE INTELIGENTE TEXT-TO-SQL
+# ==============================================================================
+
+def render_view_assistente_sql(
+    caminho_str: str,
+    assistente: AssistenteTextToSQL,
+    indice: IndiceVetorialCBO,
+    filtro_uf: str | None,
+    filtro_ano: int | None,
+    cargo_filtro: str | None,
+) -> None:
+    st.markdown("## 💬 Assistente Inteligente (Text-to-SQL Governado)")
+    st.caption("Tradução determinística de perguntas em linguagem natural para consultas SQL seguras sobre a camada Gold.")
+
+    if "pergunta_input" not in st.session_state:
+        st.session_state["pergunta_input"] = "Qual a diferença salarial entre homens e mulheres?"
+
+    col_input, col_btn = st.columns([5, 1])
+    with col_input:
+        pergunta_digitada = st.text_input(
+            "Faça sua pergunta:",
+            value=st.session_state["pergunta_input"],
+            placeholder="Ex.: Qual a diferença salarial entre homens e mulheres para professor?",
+            label_visibility="collapsed",
+        )
+    with col_btn:
+        if st.button("Consultar IA", type="primary", use_container_width=True):
+            st.session_state["pergunta_input"] = pergunta_digitada
+            st.rerun()
+
+    # Atalhos rápidos de perguntas categorizadas
+    st.markdown("**Perguntas Frequentes:**")
+    cols_p = st.columns(len(PERGUNTAS_RAPIDAS))
+    for i, (categoria, perg) in enumerate(PERGUNTAS_RAPIDAS):
+        if cols_p[i].button(categoria, key=f"btn_faq_{i}", use_container_width=True):
+            st.session_state["pergunta_input"] = perg
+            st.rerun()
+
+    pergunta_ativa = st.session_state["pergunta_input"].strip()
+    if not pergunta_ativa:
+        return
 
     with abrir_conexao_analitica(caminho_str, garantir_construcao=False) as conn:
         resposta = assistente.responder(
             conn,
-            pergunta_atual,
-            filtro_cargo=filtro_cargo_efetivo,
-            codigos_cbo_override=codigos_cbo_override,
-            sigla_uf_override=uf_override,
-            ano_override=ano_override,
+            pergunta_ativa,
+            filtro_cargo=cargo_filtro,
+            sigla_uf_override=filtro_uf,
+            ano_override=filtro_ano,
         )
 
     if not resposta.suportada:
-        with st.container(border=True):
-            if resposta.intencao == "bloqueada_seguranca":
-                st.error(f"**Consulta Bloqueada pela Camada de Segurança / LGPD**\n\n{resposta.motivo_recusa}")
-            else:
-                st.warning(f"**Consulta Fora do Escopo Metodológico**\n\n{resposta.motivo_recusa}")
-            st.caption(f"Nota metodológica: {resposta.ressalva_metodologica}")
+        if resposta.intencao == "bloqueada_seguranca":
+            st.error(f"🛡️ **Consulta Bloqueada pela Camada de Segurança / LGPD**\n\n{resposta.motivo_recusa}")
+        else:
+            st.warning(f"⚠️ **Consulta Fora do Escopo Metodológico**\n\n{resposta.motivo_recusa}")
+        st.caption(f"Nota metodológica: {resposta.ressalva_metodologica}")
         return
 
-    renderizar_resposta_consolidada(resposta, caminho_str, assistente, chave_prefixo="aba1")
+    renderizar_resposta_geral(resposta, caminho_str, assistente, "assistente_sql")
 
 
-def renderizar_aba_busca_cbo(caminho_str: str, indice: IndiceVetorialCBO, assistente: AssistenteTextToSQL) -> None:
-    if "busca_cbo_termo" not in st.session_state:
-        st.session_state["busca_cbo_termo"] = "professor"
-
-    with st.container(border=True):
-        st.markdown("#### Pesquisar Profissão e Analisar Perfil Completo (CBO 2002)")
-        st.caption(
-            "Pesquise por nome popular, sinônimo ou código CBO de 6 dígitos "
-            "(ex.: professor, programador, caminhoneiro, caixa de supermercado, enfermeiro, 231210)."
-        )
-        c_busca, c_uf, c_ano = st.columns([3, 1, 1])
-        with c_busca:
-            termo_cbo = st.text_input(
-                "Profissão ou código CBO:",
-                value=st.session_state["busca_cbo_termo"],
-                label_visibility="collapsed",
-            )
-            st.session_state["busca_cbo_termo"] = termo_cbo
-        with c_uf:
-            uf_sel = st.selectbox(
-                "Estado (UF):",
-                options=["Todos (Centro-Oeste)", "DF", "GO", "MT", "MS"],
-                index=0,
-                label_visibility="collapsed",
-            )
-        with c_ano:
-            ano_sel = st.selectbox(
-                "Ano:",
-                options=["Todos (2023–2026)", 2023, 2024, 2025, 2026],
-                index=0,
-                label_visibility="collapsed",
-            )
-
-        st.caption("Atalhos de profissões:")
-        cols_p = st.columns(len(ATALHOS_PROFISSOES))
-        for idx, (rot, val) in enumerate(ATALHOS_PROFISSOES):
-            if cols_p[idx].button(rot, key=f"btn_cbo_{idx}", width="stretch"):
-                st.session_state["busca_cbo_termo"] = val
-                st.rerun()
-
-    consulta_limpa = st.session_state["busca_cbo_termo"].strip()
-    if not consulta_limpa:
-        return
-
-    uf_filtro = None if uf_sel.startswith("Todos") else uf_sel
-    ano_filtro = None if str(ano_sel).startswith("Todos") else int(ano_sel)
-
-    resultados_sem = indice.buscar_semantico(consulta_limpa, top_k=5, apenas_oficiais=True)
-    if not resultados_sem:
-        resultados_sem = indice.buscar_semantico(consulta_limpa, top_k=5, apenas_oficiais=False)
-    resultados_lex = indice.buscar_lexico(consulta_limpa, top_k=5, apenas_oficiais=True)
-
-    if not resultados_sem:
-        st.warning("Nenhuma ocupação CBO encontrada para o termo informado.")
-        return
-
-    opcoes_cod = [r.codigo_cbo for r in resultados_sem]
-    mapa_tit = {r.codigo_cbo: r.titulo_ocupacao for r in resultados_sem}
-
-    codigos_escolhidos = st.multiselect(
-        "Ocupações CBO selecionadas para cálculo dos indicadores e perfil demográfico (marque uma ou mais):",
-        options=opcoes_cod,
-        default=opcoes_cod[:3],
-        format_func=lambda c: f"{c} — {mapa_tit.get(c, c)}",
-        key=f"multi_aba2_{consulta_limpa}",
-    )
-
-    if codigos_escolhidos:
-        with abrir_conexao_analitica(caminho_str, garantir_construcao=False) as conn:
-            ind_sel = consultar_indicadores_cbo(
-                conn,
-                codigos_cbo=codigos_escolhidos,
-                sigla_uf=uf_filtro,
-                ano=ano_filtro,
-            )
-            ind_top5 = consultar_indicadores_cbo(
-                conn,
-                codigos_cbo=opcoes_cod,
-                sigla_uf=uf_filtro,
-                ano=ano_filtro,
-            )
-
-        with st.container(border=True):
-            st.markdown(f"#### Indicadores Consolidados da Profissão: \"{consulta_limpa}\"")
-            k1, k2, k3, k4 = st.columns(4)
-            k1.metric("Contratações (Admissões)", fmt_int(ind_sel["admissoes"]))
-            k2.metric("Demissões (Desligamentos)", fmt_int(ind_sel["desligamentos"]))
-            k3.metric("Saldo Líquido de Vagas", fmt_int(ind_sel["saldo"], com_sinal=True))
-            k4.metric("Salário Médio Inicial", fmt_moeda(ind_sel["salario_medio_admissao"]))
-
-        mapa_ind = {item["codigo_cbo"]: item for item in ind_top5["por_ocupacao"]}
-        linhas_cbo = []
-        for r in resultados_sem:
-            d = mapa_ind.get(r.codigo_cbo, {})
-            linhas_cbo.append({
-                "Código CBO": r.codigo_cbo,
-                "Título Oficial da Ocupação (MTE)": r.titulo_ocupacao,
-                "Similaridade": f"{r.score:.3f}",
-                "Contratações": fmt_int(d.get("admissoes", 0)),
-                "Demissões": fmt_int(d.get("desligamentos", 0)),
-                "Saldo de Vagas": fmt_int(d.get("saldo", 0), com_sinal=True),
-                "Salário Médio Inicial": fmt_moeda(d.get("salario_medio_admissao")),
-            })
-
-        c_t, c_g = st.columns([3, 2])
-        with c_t:
-            st.markdown("**Top 5 Ocupações Encontradas por Similaridade Semântica**")
-            st.dataframe(pd.DataFrame(linhas_cbo), width="stretch", hide_index=True)
-        with c_g:
-            if ind_sel["por_uf"]:
-                st.markdown("**Salário Médio Inicial por Estado (UF)**")
-                df_uf = pd.DataFrame(ind_sel["por_uf"])
-                st.bar_chart(
-                    df_uf.set_index("sigla_uf")[["salario_medio_admissao"]].rename(
-                        columns={"salario_medio_admissao": "Salário Médio (R$)"}
-                    ),
-                    color="#2563eb",
-                )
-
-        st.divider()
-        renderizar_drilldown_profissao(
-            caminho_str=caminho_str,
-            assistente=assistente,
-            codigos_cbo=codigos_escolhidos,
-            rotulo_cargo=consulta_limpa,
-            uf_filtro=uf_filtro,
-            ano_filtro=ano_filtro,
-            chave_prefixo="drill_aba2",
-        )
-
-        with st.expander("Auditoria Técnica: Comparação com Busca Léxica Tradicional (ADR-0007)"):
-            st.markdown(
-                f"- **Índice vetorial:** `{indice.versao_indice}` (`384 dimensões L2`)\n"
-                f"- **Ocupações indexadas em `gold.dim_cbo`:** `{fmt_int(len(indice.registros))}`"
-            )
-            if not resultados_lex:
-                st.info(
-                    "A busca textual tradicional (`ILIKE` por palavras exatas) retornou 0 resultados para este termo, "
-                    "enquanto a busca vetorial de 384 dimensões recuperou as ocupações por proximidade semântica."
-                )
-            else:
-                st.dataframe(
-                    pd.DataFrame([
-                        {
-                            "Código CBO": r.codigo_cbo,
-                            "Título Oficial": r.titulo_ocupacao,
-                            "Score Léxico": f"{r.score:.3f}",
-                        }
-                        for r in resultados_lex
-                    ]),
-                    width="stretch",
-                    hide_index=True,
-                )
-
-
-def renderizar_aba_perguntas_gestao(caminho_str: str, assistente: AssistenteTextToSQL, indice: IndiceVetorialCBO) -> None:
-    st.markdown("#### Painel Direto das 5 Perguntas Estratégicas do Projeto")
-    mapa_p = {
-        "P3 (Central) — Capitais vs. Interior": "Qual é a diferença no saldo líquido e no salário médio entre as capitais e o interior?",
-        "P1 — Setores Econômicos no DF (12 Meses)": "Qual setor econômico mais contratou e demitiu no Distrito Federal nos últimos 12 meses?",
-        "P2 — Sazonalidade Mensal": "Existe sazonalidade nas contratações e demissões?",
-        "P4 — Rotatividade vs. Salários": "Os setores com maior rotatividade praticam salários médios mais baixos?",
-        "P5 — Perfil Sociodemográfico e Remuneração": "Como o perfil sociodemográfico impacta o salário médio de admissão?",
-    }
-
-    with st.container(border=True):
-        escolha = st.radio(
-            "Selecione a pergunta de gestão:",
-            options=list(mapa_p.keys()),
-            horizontal=True,
-        )
-        p1, p2, p3 = st.columns([2, 1, 1])
-        with p1:
-            cargo_p = st.text_input(
-                "Filtrar por Cargo / Profissão (opcional):",
-                value="",
-                placeholder="Deixe em branco para Mercado Geral ou digite ex.: professor, enfermeiro, motorista...",
-                key="cargo_aba3",
-            )
-        with p2:
-            uf_p = st.selectbox(
-                "Estado (UF):",
-                options=["Todos", "DF", "GO", "MT", "MS"],
-                index=0,
-                key="uf_aba3",
-            )
-        with p3:
-            ano_p = st.selectbox(
-                "Ano:",
-                options=["Todos", 2023, 2024, 2025, 2026],
-                index=0,
-                key="ano_aba3",
-            )
-
-    with abrir_conexao_analitica(caminho_str, garantir_construcao=False) as conn:
-        resp = assistente.responder(
-            conn,
-            mapa_p[escolha],
-            filtro_cargo=cargo_p.strip() or None,
-            sigla_uf_override=None if uf_p == "Todos" else uf_p,
-            ano_override=None if ano_p == "Todos" else int(ano_p),
-        )
-    renderizar_resposta_consolidada(resp, caminho_str, assistente, chave_prefixo="aba3")
-
+# ==============================================================================
+# FUNÇÃO PRINCIPAL (APP ENTRYPOINT)
+# ==============================================================================
 
 def main() -> None:
     st.set_page_config(
-        page_title="METRA — Painel Analítico do Mercado de Trabalho (Centro-Oeste)",
+        page_title="METRA — Inteligência e Engenharia do Mercado de Trabalho",
+        page_icon="💼",
         layout="wide",
+        initial_sidebar_state="expanded",
     )
 
-    st.markdown("## METRA — Monitoramento e Engenharia de Dados do Trabalho")
-    st.caption(
-        "Universidade de Brasília (FCTE/UnB) — Banco de Dados 2 (Squad G4)  |  "
-        "Base: Novo CAGED (Centro-Oeste: DF, GO, MT e MS)  |  Motor Analítico: DuckDB (Camada Gold)"
-    )
+    st.markdown(ESTILO_CSS_CUSTOMIZADO, unsafe_allow_html=True)
 
     caminho_duckdb = obter_caminho_duckdb()
-    indice, assistente, resumo_geral = carregar_recursos_analiticos(str(caminho_duckdb))
+    indice, assistente, resumo = carregar_recursos_analiticos(str(caminho_duckdb))
 
-    with st.container(border=True):
-        m1, m2, m3, m4 = st.columns(4)
-        m1.metric(
-            "Movimentações Analisadas (2023–2026)",
-            fmt_int(resumo_geral["total_movimentacoes"]),
+    # --------------------------------------------------------------------------
+    # SIDEBAR: IDENTIDADE, NAVEGAÇÃO E FILTROS GLOBAIS
+    # --------------------------------------------------------------------------
+    with st.sidebar:
+        st.markdown("### 💼 METRA")
+        st.caption("Monitoramento e Engenharia de Dados do Trabalho  \n**FCTE-UnB • Banco de Dados 2 (Squad G4)**")
+        st.markdown('<span class="metra-badge badge-success">● DuckDB Gold Ativo</span>', unsafe_allow_html=True)
+        st.divider()
+
+        st.markdown("#### 🧭 Navegação")
+        opcao_menu = st.radio(
+            "Selecione o Módulo:",
+            options=[
+                "📊 Painel Executivo (5 Perguntas)",
+                "🔍 Explorador de Ocupações (CBO)",
+                "💬 Assistente Text-to-SQL",
+            ],
+            index=0,
+            label_visibility="collapsed",
         )
-        m2.metric("Total de Contratações", fmt_int(resumo_geral["admissoes"]))
-        m3.metric("Total de Demissões", fmt_int(resumo_geral["desligamentos"]))
-        m4.metric(
-            "Salário Médio Inicial (Centro-Oeste)",
-            fmt_moeda(resumo_geral["salario_medio"]),
-            f"Saldo acumulado: {fmt_int(resumo_geral['saldo'], com_sinal=True)} vagas",
-            delta_color="off",
+        st.divider()
+
+        st.markdown("#### ⚙️ Filtros Globais")
+        uf_selecionada = st.selectbox(
+            "Estado (UF):",
+            options=["Todas (Centro-Oeste)", "DF", "GO", "MT", "MS"],
+            index=0,
+        )
+        ano_selecionado = st.selectbox(
+            "Ano Calendário:",
+            options=["Todos (2023–2026)", 2023, 2024, 2025, 2026],
+            index=0,
         )
 
-    aba_consulta, aba_cbo, aba_painel = st.tabs([
-        "1. Consulta em Linguagem Natural (Text-to-SQL)",
-        "2. Busca de Profissões e Salários (CBO 2002)",
-        "3. Painel das 5 Perguntas do Projeto",
-    ])
+        cargo_global = st.text_input(
+            "Filtrar por Cargo (Opcional):",
+            value="",
+            placeholder="Ex.: professor, enfermeiro...",
+            help="Filtra todas as visualizações para este cargo específico através da CBO 2002.",
+        )
 
-    with aba_consulta:
-        renderizar_aba_assistente(str(caminho_duckdb), assistente, indice)
-    with aba_cbo:
-        renderizar_aba_busca_cbo(str(caminho_duckdb), indice, assistente)
-    with aba_painel:
-        renderizar_aba_perguntas_gestao(str(caminho_duckdb), assistente, indice)
+        filtro_uf_efetivo = None if uf_selecionada.startswith("Todas") else uf_selecionada
+        filtro_ano_efetivo = None if str(ano_selecionado).startswith("Todos") else int(ano_selecionado)
+        cargo_efetivo = cargo_global.strip() or None
+
+        st.divider()
+        st.markdown("#### 📈 Resumo da Base")
+        st.markdown(f"""
+            - **Movimentações:** `{fmt_int(resumo['total_movimentacoes'])}`
+            - **Contratações:** `{fmt_int(resumo['admissoes'])}`
+            - **Saldo Líquido:** `{fmt_int(resumo['saldo'], True)}`
+            - **Período:** `{resumo['comp_min']} a {resumo['comp_max']}`
+        """)
+
+    # --------------------------------------------------------------------------
+    # CABEÇALHO SUPERIOR DA PÁGINA
+    # --------------------------------------------------------------------------
+    col_t1, col_t2 = st.columns([3, 1])
+    with col_t1:
+        st.markdown(f"# METRA • Monitoramento do Mercado de Trabalho")
+        filtros_desc = []
+        if filtro_uf_efetivo:
+            filtros_desc.append(f"UF: **{filtro_uf_efetivo}**")
+        else:
+            filtros_desc.append("Região: **Centro-Oeste**")
+        if filtro_ano_efetivo:
+            filtros_desc.append(f"Ano: **{filtro_ano_efetivo}**")
+        else:
+            filtros_desc.append("Período: **2023–2026**")
+        if cargo_efetivo:
+            filtros_desc.append(f"Cargo: **{cargo_efetivo}**")
+        
+        st.caption("Filtros Ativos: " + "  •  ".join(filtros_desc))
+
+    with col_t2:
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown(
+            f'<div style="text-align: right;"><span class="metra-badge badge-primary">Salário Médio: {fmt_moeda(resumo["salario_medio"])}</span></div>',
+            unsafe_allow_html=True,
+        )
+
+    st.markdown("---")
+
+    # --------------------------------------------------------------------------
+    # RENDERIZAÇÃO DO MÓDULO SELECIONADO
+    # --------------------------------------------------------------------------
+    if opcao_menu == "📊 Painel Executivo (5 Perguntas)":
+        render_view_painel_executivo(
+            str(caminho_duckdb),
+            assistente,
+            indice,
+            filtro_uf_efetivo,
+            filtro_ano_efetivo,
+            cargo_efetivo,
+        )
+    elif opcao_menu == "🔍 Explorador de Ocupações (CBO)":
+        render_view_busca_cbo(
+            str(caminho_duckdb),
+            indice,
+            assistente,
+            filtro_uf_efetivo,
+            filtro_ano_efetivo,
+        )
+    elif opcao_menu == "💬 Assistente Text-to-SQL":
+        render_view_assistente_sql(
+            str(caminho_duckdb),
+            assistente,
+            indice,
+            filtro_uf_efetivo,
+            filtro_ano_efetivo,
+            cargo_efetivo,
+        )
 
 
 if __name__ == "__main__":
