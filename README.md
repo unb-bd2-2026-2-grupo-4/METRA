@@ -376,6 +376,8 @@ O comando sobe o `dagster-webserver` e o `dagster-daemon` com o mesmo `DAGSTER_H
 
 Na interface, materialize `executar_pipeline` para executar as migrações e cargas E1, e em seguida, materialize `exportar_parquet` para gerar os arquivos Parquet. Depois, os assets dbt podem então ser materializados para executar `dbt build` sobre o lake. Os sources `lake/*` são virtuais: representam os Parquets produzidos pela extração e aparecem como parte da linhagem, sem uma materialização adicional. O arquivo DuckDB e os Parquets são montados a partir de `data/`.
 
+O procedimento operacional detalhado está em [`docs/orquestracao.md`](./docs/orquestracao.md), enquanto a decisão arquitetural foi registrada na [ADR 0006](./docs/adr/0006-orquestracao-com-dagster.md).
+
 ### Busca Semântica CBO, Assistente Text-to-SQL e Painel Streamlit (E4)
 
 A camada de consumo interativa (`src/app/dashboard.py`) integra duas abas conectadas em modo somente leitura (`read_only=True`) ao banco analítico `data/metra_analitico.duckdb` (construindo-o automaticamente a partir da amostra versionada quando ausente):

@@ -1,6 +1,6 @@
 # Camada analítica com dbt
 
-**Estado em 03/11/2026:** a base deste PR já contém as cinco fontes Parquet, os quatro modelos Silver, as cinco dimensões e quatro fatos Gold de Tiago e a integração Dagster de Davi. Esta entrega acrescenta os **122 testes genéricos das fontes/Silver**, o benchmark e a documentação de modelagem. Os testes genéricos específicos da Gold e a implementação de SCD continuam pendentes; os testes Python de negócio da Gold já existem na base. O diagrama abaixo representa os modelos atuais.
+O projeto contém as cinco fontes Parquet, os quatro modelos Silver, as cinco dimensões e quatro fatos Gold. Esta entrega acrescenta os **122 testes genéricos das fontes/Silver**, o benchmark e a documentação de modelagem. Os testes genéricos específicos da Gold e a implementação de SCD continuam pendentes, enquanto os testes Python de negócio da Gold já existem na base. O diagrama abaixo representa os modelos atuais.
 
 ## Fluxo e arquivos
 
@@ -17,9 +17,11 @@ As fontes são `movimentacao`, `municipio`, `cbo_2002`, `cnae_subclasse` e `cnae
 
 O destino padrão é **`data/metra_analitico.duckdb`**, schema `silver`. `data/metra.duckdb` é usado pela análise anterior: o painel e o Dagster devem respeitar `METRA_DUCKDB` ou alinhar essa configuração antes da integração. Execuções concorrentes de escrita devem ser coordenadas pelo orquestrador.
 
+---
+
 ## Executar e inspecionar os testes
 
-Após a carga OLTP e a exportação descritas no [README](https://github.com/unb-bd2-2026-2-grupo-4/ProjetoIntegrado#readme), na raiz do repositório:
+Após a carga OLTP e a exportação descritas no [README](https://github.com/unb-bd2-2026-2-grupo-4/METRA#readme), na raiz do repositório:
 
 ```bash
 python3 -m pip install -r requirements-pipeline.txt
@@ -67,6 +69,8 @@ python -m unittest discover -s tests -p 'test_dbt_quality.py' -v
 ```
 
 A suíte cria cinco conjuntos Parquet sintéticos em diretório temporário, executa o dbt real e remove os arquivos ao terminar. Não usa `data/lake/` nem exige PostgreSQL ou rede depois da instalação. O cenário válido tem 12 movimentos em três competências, incluindo nulos permitidos, sentinelas e códigos com zero inicial. Os cenários negativos verificam alteração de tipo, dados inválidos, duplicação, referências ausentes, mudança de distribuição sem mudança do total, tabela vazia e mês ausente. Isso valida os testes, não substitui a execução sobre a carga real completa.
+
+---
 
 ## Star Schema implementado na Gold
 
@@ -159,6 +163,8 @@ Um campo futuro `referencia_cadastro_em` seria o instante de associação do fat
 | Distribuição | Mesmos totais por UF, competência, setor e perfil antes e depois da modelagem |
 
 Os testes genéricos deste PR se limitam às fontes e à Silver. Para completar a cobertura Gold, acrescentar os testes ao YAML de contratos já existente (`models/marts/_gold__models.yml`), sem duplicar patches de modelos em outro arquivo. Os testes de negócio em `tests/test_gold.py` complementam, mas não substituem, esses contratos. Os testes SCD dependem da implementação do histórico.
+
+---
 
 ## Freshness e próximos critérios de aceite
 
