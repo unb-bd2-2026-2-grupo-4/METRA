@@ -220,3 +220,12 @@ Abaixo constam os registros de todas as atividades:
 - **O que foi pedido:** Investigar falhas repetidas de materialização do asset `exportar_parquet`, causadas por `OSError: [Errno 39] Directory not empty` na substituição de `data/lake/parquet.tmp` por `data/lake/parquet`.
 - **O que foi aproveitado:** Diagnóstico de que o diretório temporário fixo não era seguro para execuções concorrentes; inclusão de `FileLock` para serializar a exportação; criação de diretório temporário exclusivo por execução; troca com diretório de backup e restauração da extração anterior se a substituição falhar; declaração explícita da dependência `filelock`.
 - **Como foi verificado:** Compilação e importação do módulo sem erro, `git diff --check`, execução dos 13 testes existentes com resultado `OK`, reconstrução das imagens Docker e nova materialização de `exportar_parquet` no Compose com `ASSET_MATERIALIZATION`, `STEP_SUCCESS` e `RUN_SUCCESS`.
+
+### 03/11/2026 - Separação da entrega de qualidade e documentação de Euller
+
+- **Ferramenta:** Codex (OpenAI).
+- **Onde:** contratos e testes em `dbt_metra/models/staging/` e `dbt_metra/tests/generic/qualidade.sql`, `tests/test_dbt_quality.py`, `src/qualidade/avaliar_granularidade.py`, `docs/adr/0005-modelagem-analitica-dbt.md`, suas evidências, `docs/camada-analitica-dbt.md`, `README.md`, `mkdocs.yml` e este registro.
+- **O que foi pedido:** Abrir um PR restrito à parte já implementada de Euller na E3, preservando a branch `feat/qualidade-analitica` para continuar o trabalho compartilhado com Arthur.
+- **O que foi aproveitado:** Separação dos 122 testes genéricos de fontes/Silver, sete cenários de integração, benchmark de granularidade e documentação analítica em branch baseada na main atual. O Star Schema foi alinhado aos nomes e relacionamentos da Gold existente. A cobertura genérica da Gold e o SCD continuam explicitamente pendentes. ADR-0007 e consumo/governança não fazem parte desta entrega.
+- **Como foi verificado:** Execução dos sete cenários de integração com dbt real e Parquet sintético; build estrito MkDocs; repetição do benchmark sobre as 49.178 linhas da amostra, com reconciliação de métricas e reprodução das contagens/tamanhos. As evidências versionadas da ADR preservam a medição original de 29/10. Comparação do commit e estado local da branch original para garantir sua preservação. A revisão visual do diagrama e a aprovação formal da ADR permanecem pendentes.
+- **Quem revisou:** Euller Júlio.
