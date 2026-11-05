@@ -229,3 +229,12 @@ Abaixo constam os registros de todas as atividades:
 - **O que foi aproveitado:** Separação dos 122 testes genéricos de fontes/Silver, sete cenários de integração, benchmark de granularidade e documentação analítica em branch baseada na main atual. O Star Schema foi alinhado aos nomes e relacionamentos da Gold existente. A cobertura genérica da Gold e o SCD continuam explicitamente pendentes. ADR-0007 e consumo/governança não fazem parte desta entrega.
 - **Como foi verificado:** Execução dos sete cenários de integração com dbt real e Parquet sintético; build estrito MkDocs; repetição do benchmark sobre as 49.178 linhas da amostra, com reconciliação de métricas e reprodução das contagens/tamanhos. As evidências versionadas da ADR preservam a medição original de 29/10. Comparação do commit e estado local da branch original para garantir sua preservação. A revisão visual do diagrama e a aprovação formal da ADR permanecem pendentes.
 - **Quem revisou:** Euller Júlio.
+
+### 05/11/2026 - ADR-0006 e documentação da orquestração com Dagster (E3)
+
+- **Ferramenta:** Codex (OpenAI).
+- **Onde:** `docs/adr/0006-orquestracao-com-dagster.md`, `docs/orquestracao.md`, `docs/arquitetura.md` e `README.md`.
+- **O que foi pedido:** Elaborar a base da ADR-0006 e a documentação operacional da orquestração após a integração dos assets Python e dbt no Dagster.
+- **O que foi aproveitado:** Registro da adoção do Dagster para o pipeline; documentação da sequência `executar_pipeline` → `exportar_parquet` → `lake/*` → Silver → Gold; explicação de que os cinco sources Parquet são assets virtuais; instruções para execução local e via Docker Compose, uso do manifesto dbt, materialização na UI e diagnóstico; inclusão do grafo visual existente; correção da descrição arquitetural que ainda tratava Dagster como alternativa em avaliação.
+- **Como foi verificado:** `dagster definitions validate -w workspace.yaml` concluído com sucesso; `docker compose config --quiet` concluído com sucesso; `git diff --check` sem erros. Além disso, as informações do texto foram revisadas e algumas poucas, alteradas.
+- **Quem revisou:** Davi Camilo

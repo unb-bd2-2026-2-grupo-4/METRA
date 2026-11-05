@@ -1,14 +1,18 @@
 # 0005 - Preservar o grão de movimentação na Gold e validar as camadas com dbt
 
-- **Status:** proposto para revisão; grão detalhado e estrela já implementados na base, SCD ainda pendente.
-- **Data:** 29/10/2026; atualização de escopo em 03/11/2026
-- **Responsável pela proposta:** Euller Júlio;
+- **Status:** Aceito
+- **Data:** 29/10/2026 (atualização de escopo em 03/11/2026)
+- **Decisores:** Euller Júlio
+
+---
 
 ## 1. Contexto
 
-A Silver de Lucas já transforma cinco conjuntos Parquet em quatro tabelas DuckDB. A E3 exige modelagem dimensional, grão explícito, dimensão de variação lenta e testes de esquema, volume, unicidade, integridade e distribuição. As cinco perguntas incluem recortes geográficos, temporais, setoriais e demográficos; uma agregação precoce pode eliminar os recortes necessários à P5.
+A Silver já transforma cinco conjuntos Parquet em quatro tabelas DuckDB. A E3 exige modelagem dimensional, grão explícito, dimensão de variação lenta e testes de esquema, volume, unicidade, integridade e distribuição. As cinco perguntas incluem recortes geográficos, temporais, setoriais e demográficos; uma agregação precoce pode eliminar os recortes necessários à P5.
 
 A amostra versionada tem 49.178 movimentações; o volume completo documentado pelo projeto é de aproximadamente 14,7 milhões e não foi executado neste experimento. A proposta usa ambiente local, sem novo servidor de banco. A Gold de Tiago já está na base deste PR com cinco dimensões, uma fato detalhada e três fatos mensais. Esta ADR documenta a escolha do grão e os testes acrescentados por Euller; a proposta de histórico SCD continua pendente.
+
+---
 
 ## 2. Alternativas consideradas
 
@@ -23,6 +27,8 @@ Reduz linhas e espaço; pode conservar saldo, admissões, desligamentos e média
 ### C. Fato por movimentação, dimensões e agregados derivados no dbt — proposta
 
 Preserva os recortes e a rastreabilidade. A estrela implementada contém competência, município, CBO, CNAE e perfil; os agregados mensais são derivados para consumo. Exige joins e mais armazenamento. A evolução para SCD exigirá gerenciamento de chaves por versão. Reutiliza o projeto dbt já presente, com testes declarados junto aos modelos.
+
+---
 
 ## 3. Medição e Prototipação
 
@@ -46,9 +52,13 @@ python -m unittest discover -s tests -p 'test_dbt_quality.py' -v
 
 A suíte de qualidade usa Parquet sintético independente: valida o dbt real, os casos aceitos e a detecção de falhas. Não é evidência de qualidade da carga completa. O catálogo dos testes e comandos da carga real está na [página da camada analítica](../camada-analitica-dbt.md).
 
+---
+
 ## 4. Decisão
 
 **Manter o grão de uma movimentação por linha, dimensões compartilhadas e agregados de consumo derivados, usando dbt para transformação e validação.** Esse desenho já corresponde à Gold disponível na base. O histórico observado da CBO por SCD2 permanece como evolução proposta, ainda não implementada; o diagrama da página analítica reflete as chaves atuais, sem atribuir SCD ao modelo existente. A aprovação formal desta ADR cabe à Squad.
+
+---
 
 ## 5. Consequências e Tradeoffs
 
@@ -68,6 +78,8 @@ A suíte de qualidade usa Parquet sintético independente: valida o dbt real, os
 ### O que restringe o sistema futuro
 
 As chaves e métricas virarão contratos do painel. A CBO atual não oferece vigência histórica: os intervalos documentam observação, não validade retroativa. Trocar o grão ou reconstruir versões SCD exige preservar as associações e revalidar agregados e consumidores. A seleção de ferramentas continua reversível; os dados permanecem em formatos locais abertos.
+
+---
 
 ## 6. Gatilho de Revisão
 
