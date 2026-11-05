@@ -55,15 +55,15 @@ flowchart TD
 
 O orquestrador atua como o **maestro** da plataforma de dados: é o componente responsável por gerenciar a ordem de execução das tarefas, monitorar o sucesso de cada etapa, realizar retentativas automáticas em caso de falha e garantir que transformações dependentes só iniciem após a conclusão dos estágios anteriores.
 
-### Onde o Orquestrador atua:
+### Onde o Orquestrador atua?
 1. **Agendamento da Ingestão:** Dispara as rotinas de extração de novos lotes de dados públicos com base na periodicidade de publicação oficial;
 2. **Controle de Dependências:** Garante que as tabelas de referência (IBGE e CBO) sejam populadas antes da carga transacional do CAGED;
 3. **Disparo do Motor Analítico:** Aciona a extração para Parquet e as transformações dbt-duckdb das camadas Silver e Gold assim que o banco transacional é atualizado;
 4. **Monitoramento e Alertas:** Registra métricas de tempo de execução e envia notificações caso ocorra inconsistência em testes de qualidade.
 
-### Evolução da Orquestração no Projeto:
-- **Entrega E1 (Atual):** A orquestração é realizada localmente de forma determinística pelo script coordenador `executar_pipeline.py`, garantindo reprodutibilidade em comando único sem adicionar containers pesados;
-- **Entrega E3 (Camada Transformada e Orquestrada):** Formalização da ferramenta de orquestração do pipeline. Para evitar o peso excessivo de soluções corporativas tradicionais como o Apache Airflow (que requer 4 containers dedicados e consome mais de 2 GB de RAM), a Squad avaliará alternativas modernas e leves como **Dagster**, **Prefect** ou **Mage**, integradas diretamente ao ecossistema Python e dbt-duckdb.
+### Evolução da Orquestração no Projeto
+- **Execução base:** Os scripts `executar_pipeline.py` e `exportar_parquet.py` continuam sendo as implementações determinísticas das etapas e podem ser executados diretamente;
+- **Entrega E3 (Camada Transformada e Orquestrada):** O **Dagster** coordena essas etapas, integra os modelos dbt-duckdb e expõe a linhagem completa como um grafo de assets. A decisão e o procedimento operacional estão descritos na [ADR 0006](adr/0006-orquestracao-com-dagster.md) e em [Orquestração com Dagster](orquestracao.md).
 
 ---
 

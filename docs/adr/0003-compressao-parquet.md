@@ -2,7 +2,7 @@
 
 - **Status:** Aceito para o recorte amostral; revisão com a carga completa prevista abaixo
 - **Data:** 15/10/2026
-- **Responsável pela tarefa:** Euller Júlio 
+- **Decisores:** Euller Júlio
 
 ---
 
