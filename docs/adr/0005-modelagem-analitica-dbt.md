@@ -1,14 +1,14 @@
 # 0005 - Preservar o grão de movimentação na Gold e validar as camadas com dbt
 
-- **Status:** implementado
-- **Data:** 29/10/2026
+- **Status:** proposto para revisão; grão detalhado e estrela já implementados na base, SCD ainda pendente.
+- **Data:** 29/10/2026; atualização de escopo em 03/11/2026
 - **Responsável pela proposta:** Euller Júlio;
 
 ## 1. Contexto
 
 A Silver de Lucas já transforma cinco conjuntos Parquet em quatro tabelas DuckDB. A E3 exige modelagem dimensional, grão explícito, dimensão de variação lenta e testes de esquema, volume, unicidade, integridade e distribuição. As cinco perguntas incluem recortes geográficos, temporais, setoriais e demográficos; uma agregação precoce pode eliminar os recortes necessários à P5.
 
-A amostra versionada tem 49.178 movimentações; o volume completo documentado pelo projeto é de aproximadamente 14,7 milhões e não foi executado neste experimento. A proposta usa ambiente local, sem novo servidor de banco. A modelagem Gold é tarefa de Tiago; esta ADR antecipa o contrato a revisar com ele.
+A amostra versionada tem 49.178 movimentações; o volume completo documentado pelo projeto é de aproximadamente 14,7 milhões e não foi executado neste experimento. A proposta usa ambiente local, sem novo servidor de banco. A Gold de Tiago já está na base deste PR com cinco dimensões, uma fato detalhada e três fatos mensais. Esta ADR documenta a escolha do grão e os testes acrescentados por Euller; a proposta de histórico SCD continua pendente.
 
 ## 2. Alternativas consideradas
 
@@ -22,7 +22,7 @@ Reduz linhas e espaço; pode conservar saldo, admissões, desligamentos e média
 
 ### C. Fato por movimentação, dimensões e agregados derivados no dbt — proposta
 
-Preserva os recortes e a rastreabilidade. A proposta de estrela contém competência, município, CBO versionada, CNAE e perfil; os agregados mensais são derivados para consumo. Exige joins, gerenciamento de chaves SCD e mais armazenamento. Reutiliza o projeto dbt já presente, com testes declarados junto aos modelos.
+Preserva os recortes e a rastreabilidade. A estrela implementada contém competência, município, CBO, CNAE e perfil; os agregados mensais são derivados para consumo. Exige joins e mais armazenamento. A evolução para SCD exigirá gerenciamento de chaves por versão. Reutiliza o projeto dbt já presente, com testes declarados junto aos modelos.
 
 ## 3. Medição e Prototipação
 
@@ -48,7 +48,7 @@ A suíte de qualidade usa Parquet sintético independente: valida o dbt real, os
 
 ## 4. Decisão
 
-**Propor fato com uma linha por movimentação, dimensões compartilhadas e agregados de consumo derivados, mantendo dbt como transformação e validação.** Preservar o histórico observado da CBO por SCD2. Esta proposta depende da revisão dos nomes, chaves e estratégia de SCD com Tiago; não declara a Gold implementada ou aceita pela Squad.
+**Manter o grão de uma movimentação por linha, dimensões compartilhadas e agregados de consumo derivados, usando dbt para transformação e validação.** Esse desenho já corresponde à Gold disponível na base. O histórico observado da CBO por SCD2 permanece como evolução proposta, ainda não implementada; o diagrama da página analítica reflete as chaves atuais, sem atribuir SCD ao modelo existente. A aprovação formal desta ADR cabe à Squad.
 
 ## 5. Consequências e Tradeoffs
 

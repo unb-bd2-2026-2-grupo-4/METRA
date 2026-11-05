@@ -1,6 +1,6 @@
 # Camada analítica com dbt
 
-**Estado em 29/10/2026:** as cinco fontes Parquet, os quatro modelos Silver e seus testes estão implementados. A pasta `dbt_metra/models/marts/` ainda não contém modelos Gold. O Star Schema desta página é uma **proposta de contrato para integração com Tiago**, não um retrato de tabelas já criadas.
+**Estado em 03/11/2026:** a base deste PR já contém as cinco fontes Parquet, os quatro modelos Silver, as cinco dimensões e quatro fatos Gold de Tiago e a integração Dagster de Davi. Esta entrega acrescenta os **122 testes genéricos das fontes/Silver**, o benchmark e a documentação de modelagem. Os testes genéricos específicos da Gold e a implementação de SCD continuam pendentes; os testes Python de negócio da Gold já existem na base. O diagrama abaixo representa os modelos atuais.
 
 ## Fluxo e arquivos
 
@@ -9,7 +9,7 @@ flowchart LR
     O[PostgreSQL: oltp] -->|exportar_parquet.py| P[Parquet por tabela]
     P -->|dbt sources| S[Silver: quatro modelos stg]
     S --> T[Testes de qualidade]
-    S -. proposta .-> G[Gold: dimensões e fato]
+    S --> G[Gold: dimensões e fatos]
     G -. integração pendente .-> D[Streamlit]
 ```
 
@@ -68,37 +68,40 @@ python -m unittest discover -s tests -p 'test_dbt_quality.py' -v
 
 A suíte cria cinco conjuntos Parquet sintéticos em diretório temporário, executa o dbt real e remove os arquivos ao terminar. Não usa `data/lake/` nem exige PostgreSQL ou rede depois da instalação. O cenário válido tem 12 movimentos em três competências, incluindo nulos permitidos, sentinelas e códigos com zero inicial. Os cenários negativos verificam alteração de tipo, dados inválidos, duplicação, referências ausentes, mudança de distribuição sem mudança do total, tabela vazia e mês ausente. Isso valida os testes, não substitui a execução sobre a carga real completa.
 
-## Star Schema proposto
+## Star Schema implementado na Gold
 
 **Grão da fato:** uma linha por movimentação de admissão ou desligamento do Novo CAGED, identificada por `id_movimentacao` da origem. Não é uma linha por trabalhador, por vínculo ativo ou por município/mês. Os microdados utilizados não permitem estimar individualmente a probabilidade de recolocação.
 
+As marcações PK/FK abaixo expressam as chaves e relações lógicas dos modelos dbt; não significam que o DuckDB tenha constraints físicas declaradas. Os nomes correspondem aos arquivos de `models/marts/`.
+
 ```mermaid
 erDiagram
-    DIM_COMPETENCIA ||--o{ FATO_MOVIMENTACAO : competencia
-    DIM_MUNICIPIO ||--o{ FATO_MOVIMENTACAO : id_municipio
-    DIM_CBO_SCD2 ||--o{ FATO_MOVIMENTACAO : cbo_sk
-    DIM_CNAE ||--o{ FATO_MOVIMENTACAO : codigo_cnae_subclasse
-    DIM_PERFIL ||--o{ FATO_MOVIMENTACAO : perfil_sk
+    DIM_COMPETENCIA ||--o{ FCT_MOVIMENTACAO : competencia
+    DIM_MUNICIPIO ||--o{ FCT_MOVIMENTACAO : id_municipio
+    DIM_CBO ||--o{ FCT_MOVIMENTACAO : codigo_cbo
+    DIM_CNAE ||--o{ FCT_MOVIMENTACAO : codigo_cnae_subclasse
+    DIM_PERFIL_DEMOGRAFICO ||--o{ FCT_MOVIMENTACAO : id_perfil_demografico
 
-    FATO_MOVIMENTACAO {
+    FCT_MOVIMENTACAO {
         bigint id_movimentacao PK
         date competencia FK
         varchar id_municipio FK
-        varchar cbo_sk FK
+        varchar codigo_cbo FK
         varchar codigo_cnae_subclasse FK
-        varchar perfil_sk FK
+        varchar id_perfil_demografico FK
         integer idade
         integer saldo_movimentacao
         decimal salario_mensal
         boolean salario_valido
         bigint id_ingestao
         bigint numero_linha
-        timestamp referencia_cadastro_em
     }
     DIM_COMPETENCIA {
         date competencia PK
         integer ano
         integer mes
+        integer trimestre
+        boolean tem_dados
     }
     DIM_MUNICIPIO {
         varchar id_municipio PK
@@ -107,12 +110,11 @@ erDiagram
         boolean is_capital
         boolean is_identificado
     }
-    DIM_CBO_SCD2 {
-        varchar cbo_sk PK
-        varchar codigo_cbo
+    DIM_CBO {
+        varchar codigo_cbo PK
         varchar titulo_ocupacao
-        timestamp observado_desde
-        timestamp observado_ate
+        varchar codigo_grande_grupo
+        boolean is_cadastro_oficial
     }
     DIM_CNAE {
         varchar codigo_cnae_subclasse PK
@@ -120,21 +122,32 @@ erDiagram
         varchar codigo_secao
         varchar descricao_secao
     }
-    DIM_PERFIL {
-        varchar perfil_sk PK
+    DIM_PERFIL_DEMOGRAFICO {
+        varchar id_perfil_demografico PK
         integer codigo_sexo
         integer codigo_raca_cor
         integer codigo_grau_instrucao
+        integer codigo_faixa_etaria
     }
 ```
 
-Os nomes e chaves acima precisam ser alinhados com Tiago. A idade permanece na fato para permitir faixas sem multiplicar a dimensão de perfil. Os códigos naturais de município/CNAE podem servir como PK; a CBO versionada exige uma chave por versão. Tabelas agregadas para o painel podem derivar da fato, preservando contagens e somas necessárias para recalcular médias ponderadas.
+`fct_movimentacao` preserva o detalhe da Silver e acrescenta os atributos das dimensões por `left join`. A chave do perfil é a combinação dos códigos de sexo, raça/cor, escolaridade e faixa etária. A dimensão de competência preenche o intervalo mensal observado e marca os meses que possuem registros com `tem_dados`.
+
+As três fatos agregadas derivam de `fct_movimentacao`, filtrando municípios identificados do Centro-Oeste e anos de 2023 a 2026:
+
+| Modelo | Grão: uma linha por combinação de |
+|---|---|
+| `fct_setor_mensal` | `competencia`, `sigla_uf`, `codigo_secao` |
+| `fct_geografia_mensal` | `competencia`, `sigla_uf`, `is_capital` |
+| `fct_perfil_mensal` | `competencia`, `sigla_uf`, `is_capital`, `codigo_secao`, `id_perfil_demografico` |
+
+As métricas são compartilhadas pela macro `metricas_movimentacao`; incluem contagens, saldo, soma salarial e quantidade de salários de admissão elegíveis, para recompor médias ponderadas. A implementação das perguntas P1–P5 é descrita em `dbt_metra/analyses/README.md` no repositório.
 
 ### Variação lenta e testes Gold a integrar
 
-A proposta é preservar mudanças do título CBO por **SCD tipo 2**, em vez de sobrescrever versões. Os intervalos `[observado_desde, observado_ate)` registram quando o projeto observou cada cadastro; a fonte atual não fornece vigência histórica da ocupação. Não atribuir retroativamente a 2023 uma validade que só começou a ser observada em 2026.
+A dimensão `dim_cbo` atual copia `stg_cbo` e não mantém histórico de versões. Como evolução ainda não implementada, a proposta é preservar mudanças do título CBO por **SCD tipo 2**, em vez de sobrescrever versões. Os intervalos `[observado_desde, observado_ate)` registram quando o projeto observou cada cadastro; a fonte atual não fornece vigência histórica da ocupação. Não atribuir retroativamente a 2023 uma validade que só começou a ser observada em 2026.
 
-`referencia_cadastro_em` seria o instante de associação do fato ao cadastro observado, distinto da competência de negócio e de `registrado_em` da origem. Essa associação deve ser persistida; um rebuild que troca todas as chaves pela versão atual destruiria a história. Snapshot, política de associação da carga inicial e preservação de chaves ainda precisam de implementação na Gold.
+Um campo futuro `referencia_cadastro_em` seria o instante de associação do fato ao cadastro observado, distinto da competência de negócio e de `registrado_em` da origem. Essa associação deve ser persistida; um rebuild que troca todas as chaves pela versão atual destruiria a história. Snapshot, política de associação da carga inicial e preservação de chaves ainda precisam de implementação na Gold.
 
 | Contrato Gold pendente | Testes a conectar ao modelo real |
 |---|---|
@@ -145,7 +158,7 @@ A proposta é preservar mudanças do título CBO por **SCD tipo 2**, em vez de s
 | Agregados de consumo | Admissões/desligamentos/saldo reconciliados; salário calculado por soma/contagem válida, nunca média de médias |
 | Distribuição | Mesmos totais por UF, competência, setor e perfil antes e depois da modelagem |
 
-Não há testes habilitados referenciando tabelas Gold fictícias. Após a implementação dos modelos, adicionar `models/marts/schema.yml` e os testes SCD com seus nomes definitivos.
+Os testes genéricos deste PR se limitam às fontes e à Silver. Para completar a cobertura Gold, acrescentar os testes ao YAML de contratos já existente (`models/marts/_gold__models.yml`), sem duplicar patches de modelos em outro arquivo. Os testes de negócio em `tests/test_gold.py` complementam, mas não substituem, esses contratos. Os testes SCD dependem da implementação do histórico.
 
 ## Freshness e próximos critérios de aceite
 

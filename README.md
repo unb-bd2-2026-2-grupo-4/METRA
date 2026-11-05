@@ -301,13 +301,17 @@ Os modelos `stg_movimentacao`, `stg_municipio`, `stg_cbo` e `stg_cnae` leem o Pa
 
 O `profiles.yml` versionado em `dbt_metra/` dispensa configuração em `~/.dbt/`. As variáveis `METRA_LAKE_PARQUET` (diretório do Parquet, relativo a `dbt_metra/`) e `METRA_DUCKDB` (arquivo de destino) permitem apontar para outros caminhos, como em contêineres ou no orquestrador.
 
-Os testes das fontes e da Silver são executados por `dbt build` ou `dbt test --profiles-dir .`, dentro de `dbt_metra/`. Cobrem schema, chaves, referências, domínios, volume, distribuição e linhagem. Para validar a detecção de falhas com Parquet sintético isolado, execute na raiz:
+### Qualidade das fontes e da Silver
+
+Os 122 testes genéricos de qualidade são definidos em `dbt_metra/models/staging/schema.yml` e `_lake__sources.yml`. Verificam schema, chaves, referências, domínios, volume, distribuição e linhagem. Execute `dbt test --profiles-dir .` dentro de `dbt_metra/`, depois de materializar os modelos, ou `dbt build --profiles-dir .` para construir e validar.
+
+Para validar a detecção de falhas com Parquet sintético isolado, na raiz:
 
 ```bash
 python -m unittest discover -s tests -p 'test_dbt_quality.py' -v
 ```
 
-Veja a [camada analítica e o Star Schema](docs/camada-analitica-dbt.md) e a [ADR-0005](docs/adr/0005-modelagem-analitica-dbt.md).
+Veja a [camada analítica e o Star Schema](docs/camada-analitica-dbt.md) e a [ADR-0005](docs/adr/0005-modelagem-analitica-dbt.md). A cobertura genérica específica da Gold e o histórico SCD permanecem pendentes; os testes de negócio Gold abaixo continuam disponíveis.
 
 ### Camada Gold e perguntas de gestão (E3)
 
