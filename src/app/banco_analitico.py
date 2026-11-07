@@ -1,8 +1,7 @@
-"""Gerenciamento de conexão somente leitura e bootstrap reproduzível do DuckDB analítico (Gold)."""
+"""Gerenciamento de conexão somente leitura do DuckDB analítico (Gold) e fixture de testes."""
 
 from __future__ import annotations
 
-import argparse
 import json
 import os
 from pathlib import Path
@@ -18,11 +17,19 @@ ROOT = Path(__file__).resolve().parents[2]
 DBT_PROJECT_DIR = ROOT / "dbt_metra"
 CAMINHO_PADRAO_DUCKDB = ROOT / "data" / "metra_analitico.duckdb"
 CAMINHO_AMOSTRA_CSV = ROOT / "data" / "caged_centro_oeste_amostra.csv"
-CAMINHOS_COMPLETOS_CSV = (
-    ROOT / "data" / "caged_2023_2024.csv",
-    ROOT / "data" / "caged_2025_2026.csv",
-)
 CAMINHO_REFERENCIAS_JSON = Path(__file__).resolve().parent / "referencias_oficiais.json"
+
+TABELAS_GOLD_ESPERADAS = (
+    "dim_cbo",
+    "dim_cnae",
+    "dim_municipio",
+    "dim_competencia",
+    "dim_perfil_demografico",
+    "fct_movimentacao",
+    "fct_setor_mensal",
+    "fct_geografia_mensal",
+    "fct_perfil_mensal",
+)
 
 CAPITAIS_CO = {
     "5300108": ("Brasília", "DF", "Distrito Federal"),
@@ -65,53 +72,96 @@ SECOES_CNAE_OFICIAIS = {
 
 
 def obter_caminho_duckdb(caminho: str | Path | None = None) -> Path:
-    """Resolve o caminho do banco DuckDB analítico a partir de parâmetro ou variável `METRA_DUCKDB`."""
+    """Resolve o caminho do banco DuckDB analítico alinhado ao `dbt_metra/profiles.yml`.
+
+    Quando `METRA_DUCKDB` contém um caminho relativo, resolve-o a partir de `dbt_metra/`
+    (mesmo diretório de referência do `profiles.yml` do dbt), garantindo que dbt e app
+    abram exatamente o mesmo arquivo.
+    """
     if caminho is not None:
-        return Path(caminho).resolve()
+        p = Path(caminho)
+        return p.resolve() if p.is_absolute() else (ROOT / p).resolve()
     env_val = os.environ.get("METRA_DUCKDB")
     if env_val:
         p = Path(env_val)
-        return p.resolve() if p.is_absolute() else (ROOT / p).resolve()
+        return p.resolve() if p.is_absolute() else (DBT_PROJECT_DIR / p).resolve()
     return CAMINHO_PADRAO_DUCKDB.resolve()
 
 
+def _contar_tabelas_gold(conn: duckdb.DuckDBPyConnection) -> int:
+    placeholders = ", ".join(f"'{t}'" for t in TABELAS_GOLD_ESPERADAS)
+    row = conn.execute(f"""
+        SELECT COUNT(*)
+        FROM information_schema.tables
+        WHERE table_schema = 'gold'
+          AND table_name IN ({placeholders})
+    """).fetchone()
+    return int(row[0] or 0) if row else 0
+
+
 def banco_possui_camada_gold(caminho_banco: Path) -> bool:
-    """Verifica se o arquivo DuckDB existe e já possui as 9 tabelas do schema `gold`."""
+    """Verifica em modo somente leitura se o arquivo DuckDB existe e possui as 9 tabelas `gold`."""
     if not caminho_banco.exists():
         return False
+    with duckdb.connect(str(caminho_banco), read_only=True) as conn:
+        return _contar_tabelas_gold(conn) == len(TABELAS_GOLD_ESPERADAS)
+
+
+def abrir_conexao_analitica(
+    caminho: str | Path | None = None,
+    garantir_construcao: bool = False,
+) -> duckdb.DuckDBPyConnection:
+    """Abre conexão DuckDB exclusivamente em modo `read_only=True` e sem acesso a arquivos externos.
+
+    O aplicativo de consumo nunca cria, apaga ou reconstrói o banco analítico de produção.
+    Caso o banco ou a camada Gold não existam, levanta erro instruindo a execução do dbt/Dagster.
+    """
+    _ = garantir_construcao  # Mantido apenas por compatibilidade de assinatura; o app nunca reconstrói o banco.
+    caminho_resolvido = obter_caminho_duckdb(caminho)
+    if not caminho_resolvido.exists():
+        raise FileNotFoundError(
+            f"Banco analítico Gold não encontrado em '{caminho_resolvido}'. "
+            "Materialize a camada Gold pelo pipeline oficial antes de iniciar o painel:\n"
+            "  1) Via dbt: cd dbt_metra && dbt build --profiles-dir .\n"
+            "  2) Via Dagster: dagster dev -w workspace.yaml"
+        )
+
+    conn = duckdb.connect(str(caminho_resolvido), read_only=True)
     try:
-        with duckdb.connect(str(caminho_banco), read_only=True) as conn:
-            qtd = conn.execute("""
-                SELECT COUNT(*)
-                FROM information_schema.tables
-                WHERE table_schema = 'gold'
-                  AND table_name IN (
-                      'dim_cbo', 'dim_cnae', 'dim_municipio', 'dim_competencia',
-                      'dim_perfil_demografico', 'fct_movimentacao',
-                      'fct_setor_mensal', 'fct_geografia_mensal', 'fct_perfil_mensal'
-                  )
-            """).fetchone()[0]
-            return int(qtd) == 9
+        qtd = _contar_tabelas_gold(conn)
+        if qtd != len(TABELAS_GOLD_ESPERADAS):
+            raise RuntimeError(
+                f"O banco '{caminho_resolvido}' não possui todas as tabelas da camada Gold "
+                f"({qtd}/{len(TABELAS_GOLD_ESPERADAS)} encontradas). "
+                "Execute `cd dbt_metra && dbt build --profiles-dir .` ou materialize os assets no Dagster."
+            )
+        conn.execute("SET enable_external_access = false; SET lock_configuration = true;")
     except Exception:
-        return False
+        conn.close()
+        raise
+    return conn
 
 
-def construir_gold_de_amostra(
-    caminho_banco: Path,
-    usar_arquivos_completos: bool = False,
-) -> None:
-    """Materializa a camada Silver e Gold via `dbt build` a partir da amostra ou dos CSVs completos."""
-    caminho_banco.parent.mkdir(parents=True, exist_ok=True)
-    if caminho_banco.exists():
-        caminho_banco.unlink()
+def construir_gold_de_amostra(caminho_banco: Path) -> None:
+    """Materializa um banco DuckDB temporário de teste/benchmark via `dbt build` sobre a amostra versionada.
 
-    arquivos_completos_existem = all(p.exists() for p in CAMINHOS_COMPLETOS_CSV)
-    if usar_arquivos_completos and arquivos_completos_existem:
-        lista_csv = [str(p).replace("'", "''") for p in CAMINHOS_COMPLETOS_CSV]
-    else:
-        lista_csv = [str(CAMINHO_AMOSTRA_CSV).replace("'", "''")]
+    Restrito exclusivamente a diretórios temporários isolados para testes automatizados e benchmarks;
+    recusa-se a sobrescrever arquivos existentes ou tocar no caminho padrão de produção.
+    """
+    caminho_resolvido = Path(caminho_banco).resolve()
+    if caminho_resolvido == CAMINHO_PADRAO_DUCKDB.resolve():
+        raise PermissionError(
+            f"Operação negada: '{CAMINHO_PADRAO_DUCKDB}' é gerenciado exclusivamente pelo fluxo "
+            "PostgreSQL -> Parquet -> dbt/Dagster e não pode ser construído a partir de CSV pelo app."
+        )
+    if caminho_resolvido.exists():
+        raise FileExistsError(
+            f"O arquivo '{caminho_resolvido}' já existe. 'construir_gold_de_amostra' exige um destino novo "
+            "em diretório temporário e nunca remove bancos existentes."
+        )
 
-    lit_csv = "[" + ", ".join(f"'{c}'" for c in lista_csv) + "]"
+    caminho_resolvido.parent.mkdir(parents=True, exist_ok=True)
+    arq_amostra = str(CAMINHO_AMOSTRA_CSV.resolve()).replace("'", "''")
 
     with tempfile.TemporaryDirectory(prefix="metra_bootstrap_") as tmp_dir:
         pasta_tmp = Path(tmp_dir)
@@ -158,7 +208,7 @@ def construir_gold_de_amostra(
                         1::BIGINT AS id_ingestao,
                         row_number() OVER ()::BIGINT AS numero_linha,
                         '2026-10-30 12:00:00+00'::TIMESTAMPTZ AS registrado_em
-                    FROM read_csv({lit_csv}, all_varchar=true)
+                    FROM read_csv('{arq_amostra}', all_varchar=true)
                     WHERE sigla_uf IN ('DF', 'GO', 'MT', 'MS')
                       AND ano::INTEGER BETWEEN 2023 AND 2026
                 ) TO '{arq_mov_parquet}' (FORMAT PARQUET, COMPRESSION SNAPPY)
@@ -173,7 +223,7 @@ def construir_gold_de_amostra(
                 SELECT
                     lpad(COALESCE(NULLIF(id_municipio, ''), '9999999'), 7, '0') AS id_mun,
                     COALESCE(MAX(NULLIF(sigla_uf, '')), 'NI') AS uf
-                FROM read_csv({lit_csv}, all_varchar=true)
+                FROM read_csv('{arq_amostra}', all_varchar=true)
                 GROUP BY 1
             """).fetchall()
 
@@ -210,7 +260,7 @@ def construir_gold_de_amostra(
                 SELECT
                     lpad(COALESCE(NULLIF(cnae_2_subclasse, ''), '9999999'), 7, '0') AS cod,
                     COALESCE(MAX(NULLIF(cnae_2_secao, '')), 'Z') AS sec
-                FROM read_csv({lit_csv}, all_varchar=true)
+                FROM read_csv('{arq_amostra}', all_varchar=true)
                 GROUP BY 1
             """).fetchall()
             mapa_sub = {cod: (sec if sec in SECOES_CNAE_OFICIAIS else "Z") for cod, sec in subclasses_rows}
@@ -258,7 +308,7 @@ def construir_gold_de_amostra(
         env = {
             **os.environ,
             "METRA_LAKE_PARQUET": str(pasta_lake),
-            "METRA_DUCKDB": str(caminho_banco),
+            "METRA_DUCKDB": str(caminho_resolvido),
             "DBT_SEND_ANONYMOUS_USAGE_STATS": "false",
         }
         res = subprocess.run(
@@ -285,34 +335,3 @@ def construir_gold_de_amostra(
         )
         if res.returncode != 0:
             raise RuntimeError(f"Falha ao construir camada Gold com dbt:\n{res.stdout}\n{res.stderr}")
-
-
-def abrir_conexao_analitica(
-    caminho: str | Path | None = None,
-    garantir_construcao: bool = True,
-) -> duckdb.DuckDBPyConnection:
-    """Abre conexão DuckDB exclusivamente em modo `read_only=True` sobre o banco analítico Gold."""
-    caminho_resolvido = obter_caminho_duckdb(caminho)
-    if garantir_construcao and not banco_possui_camada_gold(caminho_resolvido):
-        usar_completos = caminho_resolvido == CAMINHO_PADRAO_DUCKDB.resolve()
-        construir_gold_de_amostra(caminho_resolvido, usar_arquivos_completos=usar_completos)
-    return duckdb.connect(str(caminho_resolvido), read_only=True)
-
-
-def main() -> None:
-    parser = argparse.ArgumentParser(description="Constrói o banco analítico DuckDB (Silver + Gold) do METRA.")
-    parser.add_argument(
-        "--completo",
-        action="store_true",
-        help="Constrói usando os arquivos completos (caged_2023_2024.csv + caged_2025_2026.csv) se presentes.",
-    )
-    args = parser.parse_args()
-    caminho = obter_caminho_duckdb()
-    construir_gold_de_amostra(caminho, usar_arquivos_completos=args.completo)
-    with duckdb.connect(str(caminho), read_only=True) as conn:
-        tot = conn.execute("SELECT COUNT(*) FROM gold.fct_movimentacao").fetchone()[0]
-        print(f"Banco analítico construído com sucesso em {caminho}: {tot:,} movimentações na camada Gold.")
-
-
-if __name__ == "__main__":
-    main()

@@ -41,31 +41,40 @@ STOPWORDS_PT = frozenset({
 # mapeando jargões, sinônimos coloquiais e termos técnicos para o mesmo subespaço vetorial.
 CONCEITOS_OCUPACIONAIS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("ti_desenvolvimento", (
-        "desenvolvedor", "programador", "software", "sistemas", "informacao", "backend",
-        "frontend", "fullstack", "web", "aplicativos", "codigo", "codificador", "dev",
-        "engenheiro de software", "arquiteto de sistemas", "computacao", "multimidia",
+        "desenvolvedor", "desenvolvimento", "software", "sistemas", "backend",
+        "frontend", "aplicativos", "web", "dev", "engenheiro de software", "arquiteto de sistemas",
+    )),
+    ("ti_programacao_codigo", (
+        "programador", "programacao", "codificador", "codigo", "fullstack",
+        "algoritmos", "sistemas de informacao", "computacao",
     )),
     ("ti_dados_ia", (
-        "dados", "cientista de dados", "analista de dados", "banco de dados", "dba",
-        "administrador de banco de dados", "business intelligence", "bi", "estatistico",
+        "banco de dados", "dba", "administrador de banco de dados", "modelagem de dados",
+        "cientista de dados", "analista de dados", "business intelligence", "bi", "sql",
         "machine learning", "inteligencia artificial", "engenharia de dados",
     )),
     ("ti_suporte_redes", (
-        "suporte", "tecnico de informatica", "helpdesk", "redes", "infraestrutura",
-        "computadores", "manutencao de computadores", "telecomunicacoes", "seguranca da informacao",
-        "operador de computador", "microinformatica",
+        "suporte", "apoio ao usuario", "tecnico de informatica", "helpdesk", "redes",
+        "infraestrutura", "manutencao de computadores", "telecomunicacoes",
+        "seguranca da informacao", "operador de computador", "microinformatica",
     )),
-    ("saude_medicina", (
-        "medico", "clinico", "cirurgiao", "pediatra", "cardiologista", "coracao",
-        "ginecologista", "obstetra", "ortopedista", "psiquiatra", "anestesista",
-        "familia", "comunidade", "plantonista", "medicina", "oftalmologista", "dermatologista",
+    ("saude_medicina_clinica", (
+        "medico", "clinico", "cirurgiao", "pediatra", "ginecologista", "obstetra",
+        "ortopedista", "psiquiatra", "anestesista", "familia", "comunidade",
+        "plantonista", "medicina", "oftalmologista", "dermatologista", "doutor",
+    )),
+    ("saude_cardiologia", (
+        "cardiologista", "cardiologia", "coracao", "cardiaco", "cardiovascular",
     )),
     ("saude_enfermagem", (
         "enfermeiro", "enfermagem", "tecnico de enfermagem", "auxiliar de enfermagem",
         "socorrista", "instrumentador", "hospitalar", "cuidados", "paciente", "parteira",
     )),
-    ("saude_odontologia_farmacia", (
-        "dentista", "cirurgiao dentista", "odontologista", "odontologico", "saude bucal",
+    ("saude_odontologia", (
+        "dentista", "cirurgiao dentista", "odontologista", "odontologico",
+        "odontologia", "saude bucal", "ortodontista",
+    )),
+    ("saude_farmacia", (
         "farmaceutico", "bioquimico", "farmacia", "botica", "medicamentos", "laboratorio",
     )),
     ("saude_terapias_apoio", (
@@ -74,52 +83,62 @@ CONCEITOS_OCUPACIONAIS: tuple[tuple[str, tuple[str, ...]], ...] = (
         "radiologia", "hemoterapia", "analises clinicas",
     )),
     ("saude_veterinaria_zootecnia", (
-        "veterinario", "medico veterinario", "zootecnista", "saude animal", "pecuaria",
-        "rebanho", "inseminador", "auxiliar veterinario",
+        "veterinario", "medico veterinario", "zootecnista", "saude animal",
+        "inseminador", "auxiliar veterinario",
     )),
     ("agro_lavoura_cultivo", (
         "trabalhador rural", "agropecuario", "agricola", "lavoura", "soja", "milho",
-        "algodao", "cana de acucar", "cortador de cana", "boia fria", "colheita",
-        "plantio", "cultura", "horticultura", "fruticultura", "graos", "campo", "fazenda",
+        "sorgo", "algodao", "plantio", "horticultura", "fruticultura", "graos", "fazenda",
+    )),
+    ("agro_volante_colheita", (
+        "volante", "trabalhador volante", "boia fria", "colheita", "sazonal", "safra",
+    )),
+    ("agro_cana_acucar", (
+        "cana", "cana de acucar", "cortador de cana", "canavial", "usina de cana",
     )),
     ("agro_pecuaria_criacao", (
-        "pecuarista", "trabalhador da pecuaria", "gado", "bovinos", "vaqueiro", "peao",
-        "ordenha", "suinocultura", "avicultura", "granja", "tratador de animais", "pastagem",
+        "pecuarista", "pecuaria", "gado", "bovinos", "bovino", "vaqueiro", "peao",
+        "rebanho", "ordenha", "suinocultura", "avicultura", "granja", "pastagem",
     )),
     ("agro_maquinas_mecanizacao", (
-        "tratorista", "operador de maquinas agricolas", "colheitadeira", "pulverizador",
-        "mecanizacao agricola", "implementos agricolas", "piloto agricola",
+        "tratorista", "operacao de maquinas agricolas", "maquinas agricolas",
+        "colheitadeira", "pulverizador", "mecanizacao agricola", "implementos agricolas",
     )),
     ("agro_engenharia_florestal", (
         "agronomo", "engenheiro agronomo", "tecnico agricola", "tecnico agropecuario",
         "florestal", "silvicultura", "reflorestamento", "viveirista", "meio ambiente",
     )),
     ("transporte_cargas_caminhao", (
-        "motorista", "motorista de caminhao", "caminhoneiro", "carreteiro", "bitrem", "rodotrem",
-        "cargas", "frete", "transporte rodoviario", "furgão", "entregador", "caminhao pesado",
+        "motorista de caminhao", "caminhao", "caminhoneiro", "carreteiro", "bitrem",
+        "rodotrem", "cargas", "frete", "rotas regionais", "caminhao pesado",
     )),
     ("transporte_passageiros", (
-        "motorista", "motorista de onibus", "onibus", "transporte coletivo", "rodoviario de passageiros",
-        "taxista", "motorista de aplicativo", "motorista de carro", "escolar", "ambulancia",
-        "cobrador de onibus", "trocador",
+        "motorista de onibus", "onibus", "transporte coletivo", "rodoviario",
+        "urbano", "passageiros", "taxista", "escolar", "ambulancia", "cobrador",
     )),
     ("transporte_motofrete", (
-        "motoboy", "motociclista", "motofretista", "entregador de moto", "mototaxi",
-        "delivery", "mensageiro",
+        "motocicleta", "condutor de motocicleta", "motoboy", "motociclista",
+        "motofretista", "entregador de moto", "moto", "mototaxi", "delivery", "mensageiro",
     )),
     ("logistica_armazem_estoque", (
-        "almoxarife", "estoquista", "conferente", "armazem", "deposito", "logistica",
-        "expedicao", "repositor de mercadorias", "embalador", "empilhadeira",
-        "operador de empilhadeira", "carregador", "chapa", "estivador",
+        "almoxarife", "estoquista", "armazenista", "conferente", "armazem", "deposito",
+        "logistica", "expedicao", "embalador", "empilhadeira", "carregador", "estivador",
+    )),
+    ("comercio_reposicao_gondola", (
+        "repositor", "repositor de mercadorias", "mercadorias", "prateleiras",
+        "gondolas", "abastecedor",
     )),
     ("construcao_alvenaria_acabamento", (
-        "pedreiro", "servente de obras", "ajudante de pedreiro", "construcao civil",
-        "canteiro de obras", "azulejista", "pintor de obras", "gesso", "gesseiro",
+        "pedreiro", "alvenaria", "azulejista", "pintor de obras", "gesso", "gesseiro",
         "carpinteiro", "armador de ferragens", "mestre de obras", "encarregado de obras",
     )),
+    ("construcao_servente_apoio", (
+        "servente de obras", "ajudante de pedreiro", "canteiro de obras", "canteiro",
+        "construcao civil", "demolicao",
+    )),
     ("construcao_engenharia_arquitetura", (
-        "engenheiro", "engenharia", "engenheiro civil", "arquiteto", "urbanista", "tecnico em edificacoes",
-        "topografo", "agrimensor", "orcamentista de obras", "calculista", "infraestrutura civil",
+        "engenheiro", "engenharia", "engenheiro civil", "arquiteto", "urbanista",
+        "tecnico em edificacoes", "topografo", "agrimensor", "orcamentista de obras",
     )),
     ("construcao_hidraulica_eletrica", (
         "encanador", "bombeiro hidraulico", "instalador hidraulico", "eletricista",
@@ -127,11 +146,11 @@ CONCEITOS_OCUPACIONAIS: tuple[tuple[str, tuple[str, ...]], ...] = (
     )),
     ("construcao_maquinas_pesadas", (
         "operador de escavadeira", "retroescavadeira", "patrola", "motoniveladora",
-        "trator de esteira", "guindaste", "maquinas de construcao", "terraplenagem", "pavimentacao",
+        "trator de esteira", "guindaste", "terraplenagem", "pavimentacao",
     )),
     ("comercio_vendas_atendimento", (
-        "vendedor", "comercio", "varejo", "lojista", "atendente de loja", "balconista",
-        "consultor de vendas", "representante comercial", "promotor de vendas", "demonstrador",
+        "vendedor", "comercio varejista", "varejo", "lojista", "atendente de lojas",
+        "atendimento de loja", "balconista", "consultor de vendas", "representante comercial",
     )),
     ("comercio_caixa_frente", (
         "operador de caixa", "caixa de supermercado", "caixa de loja", "frente de caixa",
@@ -143,40 +162,44 @@ CONCEITOS_OCUPACIONAIS: tuple[tuple[str, tuple[str, ...]], ...] = (
     )),
     ("adm_escritorio_recepcao", (
         "auxiliar de escritorio", "assistente administrativo", "auxiliar administrativo",
-        "escriturario", "secretaria", "recepcionista", "atendente", "protocolo", "arquivo",
+        "escriturario", "secretaria", "recepcionista", "protocolo", "arquivo",
         "digitador", "apoio administrativo",
     )),
     ("adm_financas_contabilidade", (
-        "contador", "contabilista", "tecnico em contabilidade", "auxiliar contabil",
+        "contador", "contabilista", "contabilidade", "auxiliar contabil",
         "financeiro", "analista financeiro", "tesoureiro", "auditor", "fiscal", "tributario",
-        "bancario", "caixa de banco", "economista",
+        "balanco", "bancario", "economista",
     )),
-    ("adm_rh_gestao", (
+    ("adm_rh_pessoal", (
         "recursos humanos", "rh", "departamento pessoal", "dp", "folha de pagamento",
-        "recrutador", "selecao de pessoal", "administrador", "gerente administrativo",
-        "gerente comercial", "gerente de loja", "diretor", "coordenador", "supervisor",
+        "recrutador", "recrutamento", "selecao de pessoal",
+    )),
+    ("adm_gerencia_direcao", (
+        "administrador", "gerente administrativo", "gerente comercial", "gerente de loja",
+        "diretor", "coordenador", "supervisor", "executivo",
     )),
     ("juridico_direito", (
         "advogado", "juridico", "assessor juridico", "juiz", "promotor", "defensor",
         "procurador", "tabeliao", "cartorio", "paralegal", "direito",
     )),
     ("educacao_ensino_basico", (
-        "professor", "docente", "magisterio", "educacao infantil", "pre escola", "creche",
-        "ensino fundamental", "professor primario", "ensino medio", "pedagogo",
-        "orientador educacional", "coordenador pedagogico", "instrutor", "monitor escolar",
+        "professor", "docente", "magisterio", "educacao infantil", "pre escolar", "creche",
+        "ensino fundamental", "professor primario", "primeira a quarta serie",
+        "ensino medio", "pedagogo", "orientador educacional", "instrutor",
     )),
     ("educacao_ensino_superior", (
         "professor universitario", "ensino superior", "pesquisador", "pos graduacao",
         "catedratico", "universidade", "faculdade",
     )),
     ("servicos_limpeza_conservacao", (
-        "faxineiro", "auxiliar de limpeza", "servente de limpeza", "zelador",
-        "conservacao", "asseio", "varredor", "gari", "coletor de lixo", "camareira",
-        "copeiro", "lavador", "jardineiro",
+        "faxineiro", "auxiliar de limpeza", "servente de limpeza", "zelador", "zeladoria",
+        "conservacao", "conservacao predial", "asseio", "varredor", "gari", "coletor de lixo",
+        "camareira", "copeiro", "lavador", "jardineiro",
     )),
     ("servicos_seguranca_portaria", (
-        "vigilante", "seguranca", "guarda", "porteiro", "vigia", "controlador de acesso",
-        "guarita", "escolta", "bombeiro civil", "brigadista", "monitoramento eletronico",
+        "vigilante", "seguranca", "seguranca patrimonial", "patrimonial", "guarda",
+        "porteiro", "vigia", "controlador de acesso", "guarita", "escolta",
+        "bombeiro civil", "brigadista", "monitoramento",
     )),
     ("servicos_alimentacao_gastronomia", (
         "cozinheiro", "chefe de cozinha", "auxiliar de cozinha", "ajudante de cozinha",
@@ -222,100 +245,100 @@ CONCEITOS_OCUPACIONAIS: tuple[tuple[str, tuple[str, ...]], ...] = (
 # do mercado de trabalho e do conjunto de avaliação, garantindo correspondência fiel mesmo
 # quando a tabela dim_cbo local contiver títulos sintéticos ou abreviados.
 SINONIMOS_CBO_OFICIAIS: dict[str, str] = {
-    "010105": "Oficial general da aeronáutica militar forças armadas",
-    "010205": "Oficial da aeronáutica militar aviação",
-    "111415": "Dirigente do serviço público estadual e distrital gestor público",
-    "121010": "Diretor geral de empresa e organizações executivo ceo",
-    "141410": "Comerciante varejista lojista dono de loja comércio",
-    "142105": "Gerente administrativo gestão empresarial escritório",
+    "010105": "Oficial general aeronáutica forças armadas defesa",
+    "010205": "Oficial aeronáutica aviação militar",
+    "111415": "Dirigente serviço público estadual distrital administração pública",
+    "121010": "Diretor geral empresa organizações executivo direção",
+    "141410": "Comerciante varejista comércio lojista",
+    "142105": "Gerente administrativo gestão escritório",
     "142305": "Gerente comercial vendas negócios",
-    "212205": "Engenheiro de aplicativos em computação software sistemas",
-    "212305": "Administrador de banco de dados dba dados sql",
-    "212315": "Administrador de sistemas operacionais infraestrutura servidor",
-    "212320": "Administrador em segurança da informação cibersegurança",
-    "212405": "Analista de desenvolvimento de sistemas desenvolvedor de software engenheiro de software dev backend frontend programador",
-    "212410": "Analista de redes e de comunicação de dados infraestrutura telecom",
-    "212415": "Analista de sistemas de automação industrial",
-    "212420": "Analista de suporte computacional helpdesk suporte técnico ti",
-    "214205": "Engenheiro civil engenharia construção civil",
-    "222105": "Engenheiro agrônomo agronomia lavoura agricultura campo",
-    "223104": "Médico cardiologista coração cardiologia clínica médica",
-    "223115": "Médico clínico geral medicina clínica",
-    "223149": "Médico pediatra saúde infantil criança",
-    "225125": "Médico clínico geral medicina",
-    "223208": "Cirurgião dentista clínico geral odontologista dentista saúde bucal",
-    "223405": "Farmacêutico farmácia medicamentos bioquímico",
-    "223505": "Enfermeiro enfermagem hospital cuidados paciente",
-    "223605": "Fisioterapeuta reabilitação física",
-    "223710": "Nutricionista alimentação nutrição dieta",
-    "231105": "Professor de ensino pré-escolar educação infantil docente",
-    "231205": "Professor da educação de jovens e adultos ensino fundamental docente",
-    "231210": "Professor de nível superior do ensino fundamental professor primário docente",
-    "232115": "Professor de disciplinas pedagógicas no ensino médio docente",
-    "234410": "Professor de educação física no ensino superior universidade",
-    "331205": "Professor de nível médio no ensino fundamental docente",
-    "241005": "Advogado direito jurídico advocacia causas",
-    "252105": "Administrador gestão empresas negócios",
-    "252210": "Contador contabilista contabilidade balanço fiscal",
-    "252405": "Analista de recursos humanos rh departamento pessoal recrutamento seleção",
-    "317110": "Programador de sistemas de informação desenvolvedor de software codificador de programas de computador dev programador",
-    "317205": "Operador de computador microinformática suporte técnico",
-    "317210": "Técnico de apoio ao usuário de informática helpdesk suporte ti",
-    "322205": "Técnico de enfermagem hospital clínica cuidados enfermagem",
-    "322230": "Auxiliar de enfermagem hospital posto de saúde",
-    "351305": "Técnico em administração gestão empresarial escritório",
-    "351505": "Técnico em secretariado secretária assessoria",
-    "411005": "Auxiliar de escritório em geral administrativo expediente atendimento",
-    "411010": "Assistente administrativo apoio administrativo gestão escritório",
-    "413110": "Auxiliar de contabilidade contábil fiscal financeiro",
-    "414105": "Almoxarife estoque armazém depósito logística",
-    "414110": "Armazenista estoquista depósito mercadorias",
-    "414125": "Estoquista conferente de estoque armazém logística",
-    "421125": "Operador de caixa caixa de supermercado caixa de loja frente de caixa comércio",
-    "422105": "Recepcionista em geral atendimento portaria consultório escritório",
-    "422310": "Operador de telemarketing ativo e receptivo call center teleatendimento sac",
-    "422315": "Operador de telemarketing receptivo call center atendimento ao cliente",
-    "513205": "Cozinheiro geral restaurante cozinha alimentação gastronomia",
-    "513405": "Garçom restaurante atendimento de mesa bar lanchonete",
-    "513505": "Auxiliar nos serviços de alimentação ajudante de cozinha lanchonete",
-    "514205": "Coletor de lixo domiciliar gari limpeza urbana",
-    "514225": "Trabalhador de serviços de limpeza e conservação de áreas públicas gari varredor",
-    "514320": "Faxineiro auxiliar de limpeza servente de limpeza conservação zeladoria predial",
-    "515105": "Agente comunitário de saúde saúde da família prevenção",
-    "516110": "Cabeleireiro salão de beleza estética",
-    "516210": "Cuidador de idosos assistência domiciliar saúde",
-    "517330": "Vigilante segurança patrimonial guarda escolta",
-    "517410": "Porteiro de edifícios portaria condomínio controlador de acesso",
-    "517420": "Vigia ronda segurança portaria",
-    "521110": "Vendedor de comércio varejista balconista atendente de loja vendas",
-    "521125": "Repositor de mercadorias supermercado prateleiras gôndolas estoque",
-    "521140": "Atendente de lojas e mercados balconista comércio varejo",
-    "612005": "Produtor agrícola polivalente agricultor lavoura",
-    "621005": "Trabalhador agropecuário em geral trabalhador rural fazenda campo lavoura",
-    "622020": "Trabalhador volante da agricultura bóia-fria colheita safra lavoura",
-    "622110": "Trabalhador da cultura de cana-de-açúcar cortador de cana safra",
-    "622115": "Trabalhador da cultura de milho e sorgo lavoura grãos soja",
-    "623110": "Trabalhador da pecuária bovinos de corte gado peão vaqueiro fazenda",
-    "641015": "Trabalhador da operação de máquinas agrícolas tratorista colheitadeira soja milho",
-    "715210": "Pedreiro alvenaria construção civil obras",
-    "715505": "Carpinteiro obras madeira construção civil",
-    "716610": "Pintor de obras construção civil acabamento",
-    "717020": "Servente de obras ajudante de pedreiro construção civil canteiro",
-    "724315": "Soldador solda metalurgia serralheria manutenção industrial",
-    "731150": "Eletrotécnico eletricista industrial manutenção elétrica",
-    "782305": "Motorista de carro de passeio transporte automóvel",
-    "782310": "Motorista de furgão ou veículo similar entregador cargas leves",
-    "782405": "Motorista de ônibus rodoviário transporte de passageiros",
-    "782410": "Motorista de ônibus urbano transporte coletivo",
-    "782510": "Motorista de caminhão rotas regionais e internacionais caminhoneiro carreteiro transporte de cargas frete",
-    "782820": "Condutor de motocicleta motoboy motofretista entregador delivery",
-    "784105": "Embalador a mão expedição produção",
-    "784205": "Alimentador de linha de produção auxiliar de produção fábrica indústria",
-    "841408": "Magarefe abatedor desossador frigorífico carne",
-    "848305": "Padeiro padaria panificação confeitaria",
-    "848510": "Açougueiro corte de carnes frigorífico supermercado",
-    "914405": "Mecânico de manutenção de automóveis oficina mecânica",
-    "951105": "Eletricista de instalações prediais e industriais rede elétrica",
+    "212205": "Engenheiro aplicativos computação sistemas",
+    "212305": "Administrador banco dados dba sistemas informação",
+    "212315": "Administrador sistemas operacionais infraestrutura",
+    "212320": "Administrador segurança informação redes",
+    "212405": "Analista desenvolvimento sistemas engenheiro software",
+    "212410": "Analista redes comunicação dados telecomunicações",
+    "212415": "Analista sistemas automação",
+    "212420": "Analista suporte computacional usuário",
+    "214205": "Engenheiro civil obras edificações",
+    "222105": "Engenheiro agrônomo agronomia",
+    "223104": "Médico cardiologista clínica",
+    "223115": "Médico clínico medicina",
+    "223149": "Médico pediatra pediatria",
+    "225125": "Médico clínico medicina",
+    "223208": "Cirurgião dentista clínico geral odontologia",
+    "223405": "Farmacêutico bioquímico",
+    "223505": "Enfermeiro assistência hospitalar",
+    "223605": "Fisioterapeuta reabilitação",
+    "223710": "Nutricionista dietista",
+    "231105": "Professor ensino pré-escolar educação infantil",
+    "231205": "Professor educação jovens adultos ensino fundamental",
+    "231210": "Professor nível superior ensino fundamental",
+    "232115": "Professor disciplinas pedagógicas ensino médio",
+    "234410": "Professor educação física ensino superior",
+    "331205": "Professor nível médio ensino fundamental",
+    "241005": "Advogado jurídico",
+    "252105": "Administrador empresas",
+    "252210": "Contador contabilidade auditoria",
+    "252405": "Analista recursos humanos pessoal",
+    "317110": "Programador sistemas informação",
+    "317205": "Operador computador microinformática",
+    "317210": "Técnico apoio usuário informática",
+    "322205": "Técnico enfermagem",
+    "322230": "Auxiliar enfermagem",
+    "351305": "Técnico administração",
+    "351505": "Técnico secretariado",
+    "411005": "Auxiliar escritório administrativo",
+    "411010": "Assistente administrativo escritório",
+    "413110": "Auxiliar contabilidade",
+    "414105": "Almoxarife armazém",
+    "414110": "Armazenista depósito",
+    "414125": "Estoquista conferente",
+    "421125": "Operador caixa comércio",
+    "422105": "Recepcionista atendimento",
+    "422310": "Operador telemarketing ativo receptivo",
+    "422315": "Operador telemarketing receptivo",
+    "513205": "Cozinheiro restaurante",
+    "513405": "Garçom restaurante",
+    "513505": "Auxiliar serviços alimentação cozinha",
+    "514205": "Coletor lixo domiciliar",
+    "514225": "Trabalhador limpeza conservação áreas públicas",
+    "514320": "Faxineiro servente limpeza",
+    "515105": "Agente comunitário saúde",
+    "516110": "Cabeleireiro estética",
+    "516210": "Cuidador idosos",
+    "517330": "Vigilante segurança",
+    "517410": "Porteiro edifícios condomínio",
+    "517420": "Vigia portaria",
+    "521110": "Vendedor comércio varejista",
+    "521125": "Repositor mercadorias",
+    "521140": "Atendente lojas mercados",
+    "612005": "Produtor agrícola polivalente",
+    "621005": "Trabalhador agropecuário geral",
+    "622020": "Trabalhador volante agricultura",
+    "622110": "Trabalhador cultura cana-de-açúcar",
+    "622115": "Trabalhador cultura milho sorgo",
+    "623110": "Trabalhador pecuária bovinos corte",
+    "641015": "Trabalhador operação máquinas agrícolas",
+    "715210": "Pedreiro alvenaria",
+    "715505": "Carpinteiro madeira",
+    "716610": "Pintor obras",
+    "717020": "Servente obras construção",
+    "724315": "Soldador metalurgia",
+    "731150": "Eletrotécnico manutenção elétrica",
+    "782305": "Motorista carro passeio",
+    "782310": "Motorista furgão veículo similar",
+    "782405": "Motorista ônibus rodoviário",
+    "782410": "Motorista ônibus urbano",
+    "782510": "Motorista caminhão rotas regionais internacionais",
+    "782820": "Condutor motocicleta",
+    "784105": "Embalador mão",
+    "784205": "Alimentador linha produção",
+    "841408": "Magarefe frigorífico",
+    "848305": "Padeiro panificação",
+    "848510": "Açougueiro carnes",
+    "914405": "Mecânico manutenção automóveis",
+    "951105": "Eletricista instalações",
 }
 
 CATALOGO_CBO_PADRAO: tuple[tuple[str, str], ...] = (
@@ -704,35 +727,41 @@ class IndiceVetorialCBO:
         tabela: str = "temp_indice_cbo_vetorial",
         forcar: bool = False,
     ) -> str:
-        """Registra os vetores em uma relação Arrow/DuckDB com coluna `FLOAT[384]` para consulta SQL."""
+        """Materializa os vetores em uma tabela temporária DuckDB com coluna `FLOAT[384]` para consulta SQL.
+
+        Utiliza `CREATE OR REPLACE TEMP TABLE ... FROM unnest(...)` para operar em conexões
+        `read_only=True` mesmo com `enable_external_access = false` e `lock_configuration = true`.
+        """
+        if not re.fullmatch(r"[a-zA-Z_][a-zA-Z0-9_]*", tabela):
+            raise ValueError(f"Nome de tabela temporária inválido: '{tabela}'")
         chave_cache = (id(conn), tabela)
         if not forcar and chave_cache in self._conexoes_materializadas:
             return tabela
 
-        import pyarrow as pa
-
-        tipo_vetor = pa.list_(pa.float32(), DIMENSAO_VETOR)
-        vetores_arrow = pa.FixedSizeListArray.from_arrays(
-            pa.array(self.matriz_vetores.reshape(-1), type=pa.float32()),
-            DIMENSAO_VETOR,
+        linhas_struct = [
+            {
+                "codigo_cbo": r.codigo_cbo,
+                "titulo_ocupacao": r.titulo_ocupacao,
+                "codigo_grande_grupo": r.codigo_grande_grupo,
+                "is_cadastro_oficial": r.is_cadastro_oficial,
+                "vetor": self.matriz_vetores[i].tolist(),
+            }
+            for i, r in enumerate(self.registros)
+        ]
+        conn.execute(
+            f"""
+            CREATE OR REPLACE TEMP TABLE {tabela} AS
+            SELECT u.*
+            FROM unnest(?::STRUCT(
+                codigo_cbo VARCHAR,
+                titulo_ocupacao VARCHAR,
+                codigo_grande_grupo VARCHAR,
+                is_cadastro_oficial BOOLEAN,
+                vetor FLOAT[{DIMENSAO_VETOR}]
+            )[]) AS t(u)
+            """,
+            [linhas_struct],
         )
-        arrow_tbl = pa.Table.from_arrays(
-            [
-                pa.array([r.codigo_cbo for r in self.registros], type=pa.string()),
-                pa.array([r.titulo_ocupacao for r in self.registros], type=pa.string()),
-                pa.array([r.codigo_grande_grupo for r in self.registros], type=pa.string()),
-                pa.array([r.is_cadastro_oficial for r in self.registros], type=pa.bool_()),
-                vetores_arrow.cast(tipo_vetor),
-            ],
-            names=[
-                "codigo_cbo",
-                "titulo_ocupacao",
-                "codigo_grande_grupo",
-                "is_cadastro_oficial",
-                "vetor",
-            ],
-        )
-        conn.register(tabela, arrow_tbl)
         self._conexoes_materializadas.add(chave_cache)
         return tabela
 
@@ -792,7 +821,10 @@ class IndiceVetorialCBO:
                     array_cosine_similarity(vetor::FLOAT[{DIMENSAO_VETOR}], ?::FLOAT[{DIMENSAO_VETOR}]) AS score
                 FROM {tabela}
                 {filtro_oficial}
-                ORDER BY score DESC, is_cadastro_oficial DESC, codigo_cbo ASC
+                ORDER BY
+                    (score + CASE WHEN is_cadastro_oficial THEN 0.005 ELSE 0.0 END) DESC,
+                    is_cadastro_oficial DESC,
+                    codigo_cbo ASC
                 LIMIT ?
                 """,
                 [vetor_q.tolist(), top_k + len(codigos_vistos)],

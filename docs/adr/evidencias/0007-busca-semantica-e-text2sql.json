@@ -1,144 +1,148 @@
 {
   "experimento": "ADR-0007: Busca Semântica CBO 2002 e Assistente Text-to-SQL Governado",
   "ambiente": {
-    "python": "3.11.16",
+    "python": "3.12.10",
     "duckdb": "1.5.6",
-    "numpy": "2.4.6",
-    "plataforma": "Windows-10-10.0.26200-SP0"
+    "numpy": "2.5.4",
+    "plataforma": "Windows-11-10.0.26200-SP0"
   },
   "catalogo_e_indice": {
     "fonte_amostra_csv": "data/caged_centro_oeste_amostra.csv",
     "sha256_amostra_csv": "40e7c4e7832d02b1b84b42d094ce5d48be915fa134f21a4435f8aaf472620b88",
     "movimentacoes_gold": 49178,
-    "ocupacoes_indexadas_dim_cbo": 1272,
-    "ocupacoes_cadastro_oficial": 1220,
+    "ocupacoes_indexadas_dim_cbo": 2388,
+    "ocupacoes_cadastro_oficial": 2336,
     "ocupacoes_genericas_atualizacao_mte": 52,
     "modelo_vetorial": "metra-cbo-hybrid-384d-v1",
-    "versao_indice": "metra-cbo-hybrid-384d-v1:43712e0c8519",
-    "sha256_catalogo_cbo": "43712e0c8519375e8399c0423246c5c0accfbcaff7276bc106eb5dd78e85b4fc",
+    "versao_indice": "metra-cbo-hybrid-384d-v1:5072860f9951",
+    "sha256_catalogo_cbo": "5072860f995145a81b376ff235bc0bba20c009019193730c79355082011fcf98",
     "dimensao_vetor": 384,
     "metrica_distancia": "cosine_similarity (L2 normalized dot product / DuckDB array_cosine_similarity)",
-    "memoria_matriz_vetorial_bytes": 1953792
+    "memoria_matriz_vetorial_bytes": 3667968
   },
   "experimento_1_busca_sinonimos": {
+    "auditoria_independencia": {
+      "total_consultas": 24,
+      "consultas_copiadas_em_sinonimos_cbo_oficiais": 0,
+      "todas_fora_do_dicionario": true
+    },
     "lexica_opcao_nula": {
       "total_consultas": 24,
-      "acertos_top1": 8,
-      "acertos_top5": 15,
-      "hit_at_1_pct": 33.33,
-      "hit_at_5_pct": 62.5,
-      "mrr": 0.4514,
+      "acertos_top1": 3,
+      "acertos_top5": 10,
+      "hit_at_1_pct": 12.5,
+      "hit_at_5_pct": 41.67,
+      "mrr": 0.2285,
       "codigos_inexistentes": 0,
       "detalhes": [
         {
-          "consulta": "dev backend software",
+          "consulta": "programacao backend de aplicativos web",
           "esperados": [
             "212405",
             "317110",
             "212205"
           ],
           "retornados_top5": [
-            "212215"
-          ],
-          "hit_at_1": false,
-          "hit_at_5": false,
-          "reciprocal_rank": 0.0
-        },
-        {
-          "consulta": "codificador de programas de computador",
-          "esperados": [
-            "317110",
-            "212405"
-          ],
-          "retornados_top5": [
-            "317205"
-          ],
-          "hit_at_1": false,
-          "hit_at_5": false,
-          "reciprocal_rank": 0.0
-        },
-        {
-          "consulta": "administrador dba banco de dados sql",
-          "esperados": [
-            "212305"
-          ],
-          "retornados_top5": [
-            "212305",
-            "131210",
-            "142210",
-            "212310",
-            "212315"
+            "212205",
+            "371305",
+            "391130"
           ],
           "hit_at_1": true,
           "hit_at_5": true,
           "reciprocal_rank": 1.0
         },
         {
-          "consulta": "suporte helpdesk tecnico de informatica",
+          "consulta": "desenvolvedor fullstack de codigo",
+          "esperados": [
+            "317110",
+            "212405",
+            "212205"
+          ],
+          "retornados_top5": [],
+          "hit_at_1": false,
+          "hit_at_5": false,
+          "reciprocal_rank": 0.0
+        },
+        {
+          "consulta": "especialista em modelagem de banco de dados e bi",
+          "esperados": [
+            "212305"
+          ],
+          "retornados_top5": [
+            "212305",
+            "111505",
+            "201210",
+            "201215",
+            "201220"
+          ],
+          "hit_at_1": true,
+          "hit_at_5": true,
+          "reciprocal_rank": 1.0
+        },
+        {
+          "consulta": "atendimento de helpdesk e manutencao de computadores",
           "esperados": [
             "317210",
             "212420",
             "317205"
           ],
           "retornados_top5": [
-            "317210",
-            "142530",
-            "313220",
-            "203105",
-            "212420"
+            "123805",
+            "142705",
+            "214315",
+            "214325",
+            "214335"
           ],
-          "hit_at_1": true,
-          "hit_at_5": true,
-          "reciprocal_rank": 1.0
+          "hit_at_1": false,
+          "hit_at_5": false,
+          "reciprocal_rank": 0.0
         },
         {
-          "consulta": "caminhoneiro carreteiro transporte de cargas",
+          "consulta": "carreteiro de caminhao pesado e bitrem",
           "esperados": [
             "782510",
             "782505"
           ],
           "retornados_top5": [
-            "334115",
-            "342110",
-            "342125",
-            "782505"
-          ],
-          "hit_at_1": false,
-          "hit_at_5": true,
-          "reciprocal_rank": 0.25
-        },
-        {
-          "consulta": "motorista de transporte coletivo onibus",
-          "esperados": [
-            "782410",
-            "782405"
-          ],
-          "retornados_top5": [
-            "782405",
-            "782410",
-            "224125",
-            "334115",
-            "342110"
-          ],
-          "hit_at_1": true,
-          "hit_at_5": true,
-          "reciprocal_rank": 1.0
-        },
-        {
-          "consulta": "motoboy entregador delivery motocicleta",
-          "esperados": [
-            "782820"
-          ],
-          "retornados_top5": [
-            "415215",
-            "782820"
+            "711205",
+            "782510",
+            "913120"
           ],
           "hit_at_1": false,
           "hit_at_5": true,
           "reciprocal_rank": 0.5
         },
         {
-          "consulta": "caixa de supermercado frente de caixa",
+          "consulta": "condutor de onibus de transporte coletivo",
+          "esperados": [
+            "782410",
+            "782405"
+          ],
+          "retornados_top5": [
+            "122620",
+            "224125",
+            "334115",
+            "341305",
+            "341310"
+          ],
+          "hit_at_1": false,
+          "hit_at_5": false,
+          "reciprocal_rank": 0.0
+        },
+        {
+          "consulta": "entregador de delivery de moto",
+          "esperados": [
+            "782820"
+          ],
+          "retornados_top5": [
+            "415215"
+          ],
+          "hit_at_1": false,
+          "hit_at_5": false,
+          "reciprocal_rank": 0.0
+        },
+        {
+          "consulta": "frente de caixa de supermercado e hipermercado",
           "esperados": [
             "421125"
           ],
@@ -153,107 +157,102 @@
           "reciprocal_rank": 0.3333
         },
         {
-          "consulta": "atendente de call center teleatendimento sac",
+          "consulta": "teleatendimento de call center e sac",
           "esperados": [
             "422310",
             "422315"
           ],
           "retornados_top5": [
-            "331110",
-            "342535",
-            "411015",
-            "413205",
-            "421105"
+            "422215"
           ],
           "hit_at_1": false,
           "hit_at_5": false,
           "reciprocal_rank": 0.0
         },
         {
-          "consulta": "balconista de loja varejo vendas",
+          "consulta": "balconista de varejo e atendimento de loja",
           "esperados": [
             "521110",
             "521140"
           ],
           "retornados_top5": [
             "141415",
-            "142320",
-            "354120",
-            "354125",
-            "354130"
+            "354140",
+            "420105",
+            "517425"
           ],
           "hit_at_1": false,
           "hit_at_5": false,
           "reciprocal_rank": 0.0
         },
         {
-          "consulta": "repositor de gondolas supermercado",
+          "consulta": "abastecedor de mercadorias em supermercado",
           "esperados": [
             "521125"
           ],
           "retornados_top5": [
             "141415",
-            "521125"
+            "253305",
+            "521120",
+            "521125",
+            "862160"
           ],
           "hit_at_1": false,
           "hit_at_5": true,
-          "reciprocal_rank": 0.5
+          "reciprocal_rank": 0.25
         },
         {
-          "consulta": "boia fria colheita lavoura agricultura",
+          "consulta": "boia fria na colheita de lavoura",
           "esperados": [
             "622020",
             "621005"
           ],
-          "retornados_top5": [
-            "622005",
+          "retornados_top5": [],
+          "hit_at_1": false,
+          "hit_at_5": false,
+          "reciprocal_rank": 0.0
+        },
+        {
+          "consulta": "cortador de cana na lavoura",
+          "esperados": [
+            "622110",
             "622020"
+          ],
+          "retornados_top5": [
+            "612110",
+            "622110",
+            "712205",
+            "724310",
+            "752210"
           ],
           "hit_at_1": false,
           "hit_at_5": true,
           "reciprocal_rank": 0.5
         },
         {
-          "consulta": "cortador de cana safra",
-          "esperados": [
-            "622110"
-          ],
-          "retornados_top5": [
-            "622110",
-            "712205",
-            "724310",
-            "752210",
-            "763110"
-          ],
-          "hit_at_1": true,
-          "hit_at_5": true,
-          "reciprocal_rank": 1.0
-        },
-        {
-          "consulta": "tratorista operador de colheitadeira soja",
+          "consulta": "tratorista de colheitadeira e pulverizador agricola",
           "esperados": [
             "641015",
             "641005"
           ],
           "retornados_top5": [
-            "641005",
-            "253225",
-            "317205",
-            "324110",
-            "324115"
+            "233205",
+            "341120",
+            "612005",
+            "620105",
+            "641005"
           ],
-          "hit_at_1": true,
+          "hit_at_1": false,
           "hit_at_5": true,
-          "reciprocal_rank": 1.0
+          "reciprocal_rank": 0.2
         },
         {
-          "consulta": "peao vaqueiro criacao de gado bovino",
+          "consulta": "vaqueiro e peao de rebanho bovino",
           "esperados": [
             "623110"
           ],
           "retornados_top5": [
             "620115",
-            "623115",
             "623120"
           ],
           "hit_at_1": false,
@@ -261,147 +260,151 @@
           "reciprocal_rank": 0.0
         },
         {
-          "consulta": "medico do coracao cardiologia",
+          "consulta": "doutor especialista do coracao",
           "esperados": [
             "223104"
           ],
           "retornados_top5": [
-            "223104",
-            "223115",
-            "223149",
-            "223305",
-            "225112"
+            "111505",
+            "201210",
+            "201215",
+            "201220",
+            "201225"
           ],
-          "hit_at_1": true,
-          "hit_at_5": true,
-          "reciprocal_rank": 1.0
+          "hit_at_1": false,
+          "hit_at_5": false,
+          "reciprocal_rank": 0.0
         },
         {
-          "consulta": "odontologista saude bucal dentista",
+          "consulta": "odontologista de saude bucal",
           "esperados": [
             "223208"
           ],
           "retornados_top5": [
             "322405",
             "322415",
+            "322425",
             "322430",
-            "223208",
-            "223288"
+            "142710"
           ],
           "hit_at_1": false,
-          "hit_at_5": true,
-          "reciprocal_rank": 0.25
+          "hit_at_5": false,
+          "reciprocal_rank": 0.0
         },
         {
-          "consulta": "cuidados hospitalares enfermagem",
+          "consulta": "profissional de enfermagem para cuidados de paciente",
           "esperados": [
             "223505",
             "322205",
             "322230"
           ],
           "retornados_top5": [
+            "131315",
             "233125",
-            "322205",
-            "322210",
-            "322215",
-            "322230"
+            "234415",
+            "252550",
+            "322205"
+          ],
+          "hit_at_1": false,
+          "hit_at_5": true,
+          "reciprocal_rank": 0.2
+        },
+        {
+          "consulta": "docente de magisterio do ensino fundamental",
+          "esperados": [
+            "231210",
+            "231205",
+            "331205"
+          ],
+          "retornados_top5": [
+            "231205",
+            "231210",
+            "231305",
+            "231310",
+            "231315"
+          ],
+          "hit_at_1": true,
+          "hit_at_5": true,
+          "reciprocal_rank": 1.0
+        },
+        {
+          "consulta": "contabilista do setor fiscal e tributario",
+          "esperados": [
+            "252210",
+            "413110"
+          ],
+          "retornados_top5": [
+            "251225",
+            "254205",
+            "254305",
+            "254405",
+            "254410"
+          ],
+          "hit_at_1": false,
+          "hit_at_5": false,
+          "reciprocal_rank": 0.0
+        },
+        {
+          "consulta": "recrutador de selecao de pessoal e folha de pagamento",
+          "esperados": [
+            "252405"
+          ],
+          "retornados_top5": [
+            "413105",
+            "142210",
+            "351315"
+          ],
+          "hit_at_1": false,
+          "hit_at_5": false,
+          "reciprocal_rank": 0.0
+        },
+        {
+          "consulta": "zelador de asseio e conservacao predial",
+          "esperados": [
+            "514320",
+            "514225"
+          ],
+          "retornados_top5": [
+            "514120",
+            "514225",
+            "514310",
+            "514325",
+            "991115"
           ],
           "hit_at_1": false,
           "hit_at_5": true,
           "reciprocal_rank": 0.5
         },
         {
-          "consulta": "professor primario primeira a quarta serie",
+          "consulta": "guarda de guarita e monitoramento patrimonial",
           "esperados": [
-            "231210",
-            "231205"
+            "517330",
+            "517410",
+            "517420"
           ],
           "retornados_top5": [
-            "231205",
-            "231210",
-            "231305",
-            "231105",
-            "231110"
-          ],
-          "hit_at_1": true,
-          "hit_at_5": true,
-          "reciprocal_rank": 1.0
-        },
-        {
-          "consulta": "contabilista balanco fiscal tributario",
-          "esperados": [
-            "252210",
-            "413110"
-          ],
-          "retornados_top5": [
-            "254405",
-            "254505",
-            "342515",
-            "352310",
-            "511205"
+            "410220",
+            "513325",
+            "517215",
+            "517320",
+            "517335"
           ],
           "hit_at_1": false,
           "hit_at_5": false,
           "reciprocal_rank": 0.0
         },
         {
-          "consulta": "recrutador departamento pessoal rh",
-          "esperados": [
-            "252405"
-          ],
-          "retornados_top5": [
-            "142205",
-            "142210"
-          ],
-          "hit_at_1": false,
-          "hit_at_5": false,
-          "reciprocal_rank": 0.0
-        },
-        {
-          "consulta": "auxiliar de limpeza conservacao predial zeladoria",
-          "esperados": [
-            "514320",
-            "514225"
-          ],
-          "retornados_top5": [
-            "514225",
-            "514310",
-            "514325",
-            "224135",
-            "311515"
-          ],
-          "hit_at_1": true,
-          "hit_at_5": true,
-          "reciprocal_rank": 1.0
-        },
-        {
-          "consulta": "seguranca patrimonial guarda escolta",
-          "esperados": [
-            "517330"
-          ],
-          "retornados_top5": [
-            "212320",
-            "214915",
-            "214935",
-            "254310",
-            "351605"
-          ],
-          "hit_at_1": false,
-          "hit_at_5": false,
-          "reciprocal_rank": 0.0
-        },
-        {
-          "consulta": "ajudante de pedreiro canteiro de obras",
+          "consulta": "ajudante de pedreiro no canteiro de construcao civil",
           "esperados": [
             "717020",
             "715210"
           ],
           "retornados_top5": [
-            "122305",
             "141305",
-            "312105",
-            "342205",
-            "516315"
+            "214280",
+            "318115",
+            "318510",
+            "782125"
           ],
           "hit_at_1": false,
           "hit_at_5": false,
@@ -411,298 +414,300 @@
     },
     "semantica_vetorial_384d": {
       "total_consultas": 24,
-      "acertos_top1": 21,
+      "acertos_top1": 23,
       "acertos_top5": 24,
-      "hit_at_1_pct": 87.5,
+      "hit_at_1_pct": 95.83,
       "hit_at_5_pct": 100.0,
-      "mrr": 0.9271,
+      "mrr": 0.9722,
       "codigos_inexistentes": 0,
       "detalhes": [
         {
-          "consulta": "dev backend software",
+          "consulta": "programacao backend de aplicativos web",
           "esperados": [
             "212405",
             "317110",
             "212205"
           ],
           "retornados_top5": [
-            "212405",
-            "415205",
-            "212215",
             "317110",
-            "414115"
+            "212205",
+            "212405",
+            "212415",
+            "142510"
           ],
           "hit_at_1": true,
           "hit_at_5": true,
           "reciprocal_rank": 1.0
         },
         {
-          "consulta": "codificador de programas de computador",
+          "consulta": "desenvolvedor fullstack de codigo",
           "esperados": [
             "317110",
-            "212405"
+            "212405",
+            "212205"
           ],
           "retornados_top5": [
             "317110",
-            "821220",
-            "239425",
-            "317205",
-            "510105"
+            "212205",
+            "212415",
+            "212405",
+            "317105"
           ],
           "hit_at_1": true,
           "hit_at_5": true,
           "reciprocal_rank": 1.0
         },
         {
-          "consulta": "administrador dba banco de dados sql",
+          "consulta": "especialista em modelagem de banco de dados e bi",
           "esperados": [
             "212305"
           ],
           "retornados_top5": [
             "212305",
-            "212310",
-            "413210",
-            "142210",
-            "422125"
+            "782305",
+            "731150",
+            "351505",
+            "782310"
           ],
           "hit_at_1": true,
           "hit_at_5": true,
           "reciprocal_rank": 1.0
         },
         {
-          "consulta": "suporte helpdesk tecnico de informatica",
+          "consulta": "atendimento de helpdesk e manutencao de computadores",
           "esperados": [
             "317210",
             "212420",
             "317205"
           ],
           "retornados_top5": [
+            "317205",
             "317210",
-            "351105",
+            "212410",
             "212420",
-            "313220",
-            "142530"
+            "212320"
           ],
           "hit_at_1": true,
           "hit_at_5": true,
           "reciprocal_rank": 1.0
         },
         {
-          "consulta": "caminhoneiro carreteiro transporte de cargas",
+          "consulta": "carreteiro de caminhao pesado e bitrem",
           "esperados": [
             "782510",
             "782505"
           ],
           "retornados_top5": [
-            "782505",
             "782510",
-            "342110",
-            "334115",
-            "342125"
+            "782505",
+            "711205",
+            "782125",
+            "777205"
           ],
           "hit_at_1": true,
           "hit_at_5": true,
           "reciprocal_rank": 1.0
         },
         {
-          "consulta": "motorista de transporte coletivo onibus",
+          "consulta": "condutor de onibus de transporte coletivo",
           "esperados": [
             "782410",
             "782405"
           ],
           "retornados_top5": [
-            "782410",
             "782405",
-            "783225",
-            "334115",
-            "782305"
+            "782410",
+            "782320",
+            "511215",
+            "334115"
           ],
           "hit_at_1": true,
           "hit_at_5": true,
           "reciprocal_rank": 1.0
         },
         {
-          "consulta": "motoboy entregador delivery motocicleta",
+          "consulta": "entregador de delivery de moto",
           "esperados": [
             "782820"
           ],
           "retornados_top5": [
             "782820",
-            "415215",
-            "351425",
-            "768325",
-            "514120"
+            "519110",
+            "519105",
+            "914425",
+            "911120"
           ],
           "hit_at_1": true,
           "hit_at_5": true,
           "reciprocal_rank": 1.0
         },
         {
-          "consulta": "caixa de supermercado frente de caixa",
+          "consulta": "frente de caixa de supermercado e hipermercado",
           "esperados": [
             "421125"
           ],
           "retornados_top5": [
             "421125",
-            "413210",
-            "421205",
-            "351405",
-            "141415"
+            "511220",
+            "421115",
+            "141415",
+            "420105"
           ],
           "hit_at_1": true,
           "hit_at_5": true,
           "reciprocal_rank": 1.0
         },
         {
-          "consulta": "atendente de call center teleatendimento sac",
+          "consulta": "teleatendimento de call center e sac",
           "esperados": [
             "422310",
             "422315"
           ],
           "retornados_top5": [
-            "515110",
-            "413205",
-            "331110",
             "422310",
-            "517405"
+            "422315",
+            "422305",
+            "422320",
+            "422215"
           ],
-          "hit_at_1": false,
+          "hit_at_1": true,
           "hit_at_5": true,
-          "reciprocal_rank": 0.25
+          "reciprocal_rank": 1.0
         },
         {
-          "consulta": "balconista de loja varejo vendas",
+          "consulta": "balconista de varejo e atendimento de loja",
           "esperados": [
             "521110",
             "521140"
           ],
           "retornados_top5": [
             "521110",
-            "517425",
-            "141415",
-            "354120",
-            "521115"
+            "521140",
+            "141410",
+            "354705",
+            "524215"
           ],
           "hit_at_1": true,
           "hit_at_5": true,
           "reciprocal_rank": 1.0
         },
         {
-          "consulta": "repositor de gondolas supermercado",
+          "consulta": "abastecedor de mercadorias em supermercado",
           "esperados": [
             "521125"
           ],
           "retornados_top5": [
             "521125",
-            "782810",
-            "711130",
-            "716105",
-            "782815"
+            "862160",
+            "521120",
+            "253305",
+            "421125"
           ],
           "hit_at_1": true,
           "hit_at_5": true,
           "reciprocal_rank": 1.0
         },
         {
-          "consulta": "boia fria colheita lavoura agricultura",
+          "consulta": "boia fria na colheita de lavoura",
           "esperados": [
             "622020",
             "621005"
           ],
           "retornados_top5": [
             "622020",
-            "376225",
-            "225150",
-            "222105",
-            "252515"
+            "622115",
+            "612005",
+            "621005",
+            "612125"
           ],
           "hit_at_1": true,
           "hit_at_5": true,
           "reciprocal_rank": 1.0
         },
         {
-          "consulta": "cortador de cana safra",
+          "consulta": "cortador de cana na lavoura",
           "esperados": [
-            "622110"
+            "622110",
+            "622020"
           ],
           "retornados_top5": [
             "622110",
-            "828105",
-            "752210",
-            "763110",
-            "724310"
+            "612110",
+            "612005",
+            "622115",
+            "621005"
           ],
           "hit_at_1": true,
           "hit_at_5": true,
           "reciprocal_rank": 1.0
         },
         {
-          "consulta": "tratorista operador de colheitadeira soja",
+          "consulta": "tratorista de colheitadeira e pulverizador agricola",
           "esperados": [
             "641015",
             "641005"
           ],
           "retornados_top5": [
+            "641015",
+            "725310",
             "641005",
-            "711210",
-            "862405",
-            "715145",
-            "862510"
+            "612005",
+            "622115"
           ],
           "hit_at_1": true,
           "hit_at_5": true,
           "reciprocal_rank": 1.0
         },
         {
-          "consulta": "peao vaqueiro criacao de gado bovino",
+          "consulta": "vaqueiro e peao de rebanho bovino",
           "esperados": [
             "623110"
           ],
           "retornados_top5": [
-            "620115",
             "623110",
-            "716405",
+            "620115",
             "623120",
-            "623115"
+            "613005",
+            "623015"
           ],
-          "hit_at_1": false,
+          "hit_at_1": true,
           "hit_at_5": true,
-          "reciprocal_rank": 0.5
+          "reciprocal_rank": 1.0
         },
         {
-          "consulta": "medico do coracao cardiologia",
+          "consulta": "doutor especialista do coracao",
           "esperados": [
             "223104"
           ],
           "retornados_top5": [
             "223104",
-            "223305",
-            "225133",
-            "225265",
-            "225125"
+            "225210",
+            "223115",
+            "225125",
+            "223149"
           ],
           "hit_at_1": true,
           "hit_at_5": true,
           "reciprocal_rank": 1.0
         },
         {
-          "consulta": "odontologista saude bucal dentista",
+          "consulta": "odontologista de saude bucal",
           "esperados": [
             "223208"
           ],
           "retornados_top5": [
-            "223208",
             "322405",
             "322415",
-            "322430",
-            "516220"
+            "223208",
+            "223232",
+            "223276"
           ],
-          "hit_at_1": true,
+          "hit_at_1": false,
           "hit_at_5": true,
-          "reciprocal_rank": 1.0
+          "reciprocal_rank": 0.3333
         },
         {
-          "consulta": "cuidados hospitalares enfermagem",
+          "consulta": "profissional de enfermagem para cuidados de paciente",
           "esperados": [
             "223505",
             "322205",
@@ -710,109 +715,112 @@
           ],
           "retornados_top5": [
             "322205",
+            "322230",
             "223505",
             "515135",
-            "322215",
-            "322210"
+            "322215"
           ],
           "hit_at_1": true,
           "hit_at_5": true,
           "reciprocal_rank": 1.0
         },
         {
-          "consulta": "professor primario primeira a quarta serie",
+          "consulta": "docente de magisterio do ensino fundamental",
           "esperados": [
             "231210",
-            "231205"
+            "231205",
+            "331205"
           ],
           "retornados_top5": [
             "231210",
-            "231110",
             "231205",
-            "231320",
-            "232135"
+            "331205",
+            "232115",
+            "231105"
           ],
           "hit_at_1": true,
           "hit_at_5": true,
           "reciprocal_rank": 1.0
         },
         {
-          "consulta": "contabilista balanco fiscal tributario",
+          "consulta": "contabilista do setor fiscal e tributario",
           "esperados": [
             "252210",
             "413110"
           ],
           "retornados_top5": [
+            "413110",
             "252210",
-            "254505",
-            "511205",
-            "352310",
-            "517425"
+            "254205",
+            "254305",
+            "251215"
           ],
           "hit_at_1": true,
           "hit_at_5": true,
           "reciprocal_rank": 1.0
         },
         {
-          "consulta": "recrutador departamento pessoal rh",
+          "consulta": "recrutador de selecao de pessoal e folha de pagamento",
           "esperados": [
             "252405"
           ],
           "retornados_top5": [
-            "142205",
             "252405",
-            "142210",
-            "203025",
-            "410235"
+            "413105",
+            "351315",
+            "142205",
+            "782310"
           ],
-          "hit_at_1": false,
+          "hit_at_1": true,
           "hit_at_5": true,
-          "reciprocal_rank": 0.5
+          "reciprocal_rank": 1.0
         },
         {
-          "consulta": "auxiliar de limpeza conservacao predial zeladoria",
+          "consulta": "zelador de asseio e conservacao predial",
           "esperados": [
             "514320",
             "514225"
           ],
           "retornados_top5": [
+            "514225",
+            "514205",
             "514320",
-            "514325",
-            "519305",
-            "411025",
-            "314115"
+            "514120",
+            "514325"
           ],
           "hit_at_1": true,
           "hit_at_5": true,
           "reciprocal_rank": 1.0
         },
         {
-          "consulta": "seguranca patrimonial guarda escolta",
+          "consulta": "guarda de guarita e monitoramento patrimonial",
           "esperados": [
-            "517330"
+            "517330",
+            "517410",
+            "517420"
           ],
           "retornados_top5": [
             "517330",
-            "510310",
-            "517310",
-            "214935",
-            "351605"
+            "517420",
+            "517410",
+            "517335",
+            "517320"
           ],
           "hit_at_1": true,
           "hit_at_5": true,
           "reciprocal_rank": 1.0
         },
         {
-          "consulta": "ajudante de pedreiro canteiro de obras",
+          "consulta": "ajudante de pedreiro no canteiro de construcao civil",
           "esperados": [
             "717020",
             "715210"
           ],
           "retornados_top5": [
             "717020",
-            "821205",
-            "715210",
-            "775115",
+            "318510",
+            "214280",
+            "318115",
             "711110"
           ],
           "hit_at_1": true,
@@ -886,13 +894,23 @@
     ]
   },
   "experimento_3_fidelidade_e_guardrails_text2sql": {
-    "perguntas_suportadas_total": 6,
+    "perguntas_suportadas_total": 7,
     "perguntas_suportadas_100pct_iguais": true,
     "detalhes_suportadas": [
       {
         "pergunta": "Qual setor econômico mais contratou e demitiu no Distrito Federal nos últimos 12 meses?",
         "intencao_esperada": "p1_setores_df",
         "intencao_obtida": "p1_setores_df",
+        "fonte_gabarito_sql": "dbt_analysis:p1_setores_df",
+        "suportada": true,
+        "linhas_retornadas": 19,
+        "igualdade_exata_referencia": true
+      },
+      {
+        "pergunta": "Qual setor econômico mais contratou e demitiu no Distrito Federal em 2024?",
+        "intencao_esperada": "p1_setores_df",
+        "intencao_obtida": "p1_setores_df",
+        "fonte_gabarito_sql": "manual:p1_df_2024",
         "suportada": true,
         "linhas_retornadas": 19,
         "igualdade_exata_referencia": true
@@ -901,6 +919,7 @@
         "pergunta": "Existe sazonalidade evidente nas contratações e demissões?",
         "intencao_esperada": "p2_sazonalidade",
         "intencao_obtida": "p2_sazonalidade",
+        "fonte_gabarito_sql": "dbt_analysis:p2_sazonalidade",
         "suportada": true,
         "linhas_retornadas": 2886,
         "igualdade_exata_referencia": true
@@ -909,6 +928,7 @@
         "pergunta": "Qual é a diferença no saldo líquido de empregos gerados e no salário médio entre as capitais e os municípios do interior?",
         "intencao_esperada": "p3_capitais_interior",
         "intencao_obtida": "p3_capitais_interior",
+        "fonte_gabarito_sql": "dbt_analysis:p3_capitais_interior",
         "suportada": true,
         "linhas_retornadas": 210,
         "igualdade_exata_referencia": true
@@ -917,6 +937,7 @@
         "pergunta": "Os setores com maior taxa de rotatividade praticam salários médios mais baixos?",
         "intencao_esperada": "p4_fluxos_salarios",
         "intencao_obtida": "p4_fluxos_salarios",
+        "fonte_gabarito_sql": "dbt_analysis:p4_fluxos_salarios",
         "suportada": true,
         "linhas_retornadas": 21,
         "igualdade_exata_referencia": true
@@ -925,20 +946,22 @@
         "pergunta": "Como o perfil sociodemográfico impacta o nível salarial e as movimentações?",
         "intencao_esperada": "p5_perfil_remuneracao",
         "intencao_obtida": "p5_perfil_remuneracao",
+        "fonte_gabarito_sql": "dbt_analysis:p5_perfil_remuneracao",
         "suportada": true,
         "linhas_retornadas": 2647,
         "igualdade_exata_referencia": true
       },
       {
-        "pergunta": "Qual o saldo e o salário médio de desenvolvedor de software no Centro-Oeste?",
+        "pergunta": "Qual o saldo e o salário médio de caminhoneiro no Centro-Oeste?",
         "intencao_esperada": "cbo_ocupacao",
         "intencao_obtida": "cbo_ocupacao",
+        "fonte_gabarito_sql": "manual:cbo_caminhoneiro",
         "suportada": true,
         "linhas_retornadas": 3,
         "igualdade_exata_referencia": true
       }
     ],
-    "perguntas_recusa_total": 5,
+    "perguntas_recusa_total": 7,
     "perguntas_recusa_100pct_corretas": true,
     "detalhes_recusas": [
       {
@@ -949,6 +972,18 @@
       },
       {
         "pergunta": "SELECT * FROM read_parquet('data/lake/parquet/movimentacao/*.parquet')",
+        "tipo_esperado": "bloqueada_seguranca",
+        "tipo_obtido": "bloqueada_seguranca",
+        "recusada_corretamente": true
+      },
+      {
+        "pergunta": "SELECT count(*) FROM '/etc/passwd', gold.dim_cbo",
+        "tipo_esperado": "bloqueada_seguranca",
+        "tipo_obtido": "bloqueada_seguranca",
+        "recusada_corretamente": true
+      },
+      {
+        "pergunta": "SELECT * FROM gold.fct_movimentacao WHERE 'count(' <> ''",
         "tipo_esperado": "bloqueada_seguranca",
         "tipo_obtido": "bloqueada_seguranca",
         "recusada_corretamente": true
@@ -972,45 +1007,45 @@
         "recusada_corretamente": true
       }
     ],
-    "guardrails_sql_testados": 10,
-    "guardrails_sql_bloqueados": 10
+    "guardrails_sql_testados": 13,
+    "guardrails_sql_bloqueados": 13
   },
   "experimento_4_latencias": {
     "repeticoes": 7,
     "indexacao_catalogo_cbo": {
-      "mediana_ms": 434.147,
-      "p95_ms": 1071.223,
-      "media_ms": 527.568,
-      "min_ms": 427.876,
-      "max_ms": 1071.223
+      "mediana_ms": 359.064,
+      "p95_ms": 697.552,
+      "media_ms": 398.155,
+      "min_ms": 322.948,
+      "max_ms": 697.552
     },
     "busca_lexica_por_consulta": {
-      "mediana_ms": 16.276,
-      "p95_ms": 37.266,
-      "media_ms": 19.761,
-      "min_ms": 14.254,
-      "max_ms": 59.171
+      "mediana_ms": 14.093,
+      "p95_ms": 18.032,
+      "media_ms": 14.74,
+      "min_ms": 13.14,
+      "max_ms": 25.366
     },
     "busca_vetorial_384d_numpy_por_consulta": {
-      "mediana_ms": 1.212,
-      "p95_ms": 2.401,
-      "media_ms": 1.543,
-      "min_ms": 0.913,
-      "max_ms": 16.025
+      "mediana_ms": 0.961,
+      "p95_ms": 1.845,
+      "media_ms": 1.058,
+      "min_ms": 0.653,
+      "max_ms": 2.729
     },
     "busca_vetorial_384d_duckdb_sql_por_consulta": {
-      "mediana_ms": 6.518,
-      "p95_ms": 10.279,
-      "media_ms": 7.085,
-      "min_ms": 4.742,
-      "max_ms": 16.848
+      "mediana_ms": 6.036,
+      "p95_ms": 12.357,
+      "media_ms": 7.448,
+      "min_ms": 5.072,
+      "max_ms": 15.272
     },
     "text_to_sql_end_to_end_por_pergunta": {
-      "mediana_ms": 30.133,
-      "p95_ms": 139.107,
-      "media_ms": 46.056,
-      "min_ms": 7.661,
-      "max_ms": 148.708
+      "mediana_ms": 12.741,
+      "p95_ms": 91.877,
+      "media_ms": 33.528,
+      "min_ms": 5.098,
+      "max_ms": 122.597
     }
   }
 }

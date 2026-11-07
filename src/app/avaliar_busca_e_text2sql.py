@@ -2,16 +2,19 @@
 
 Executa os 5 experimentos definidos no protocolo da ADR 0007 sobre a camada Gold real
 construída a partir da amostra versionada (`data/caged_centro_oeste_amostra.csv`):
-1. Busca por sinônimo coloquial/técnico em português (24 consultas versionadas):
-   Compara Hit@1, Hit@5 e MRR entre Alternativa A (Busca Léxica) e Alternativa B (Vetorial 384d).
+1. Busca por consultas coloquiais fora do dicionário de sinônimos (24 consultas versionadas):
+   Compara Hit@1, Hit@5 e MRR entre Alternativa A (Busca Léxica) e Alternativa B (Vetorial 384d),
+   auditando que nenhuma consulta de teste está copiada em `SINONIMOS_CBO_OFICIAIS`.
 2. Busca por código exato de 6 dígitos (inclusive com zero à esquerda):
    Verifica 100% de precisão na 1ª posição (Hit@1).
-3. Fidelidade do Assistente Text-to-SQL (P1 a P5, Ocupação CBO e casos fora de escopo):
-   Compara multiconjunto de resultados contra o SQL de referência da camada Gold.
+3. Fidelidade do Assistente Text-to-SQL (P1 a P5 nas análises oficiais `dbt_metra/analyses/*.sql`
+   + consultas parametrizadas com SQL de referência escrito à mão):
+   Compara as linhas retornadas sem jamais usar as funções internas do gerador como gabarito.
 4. Latência (1 aquecimento descartado + 7 rodadas válidas):
    Mede mediana e p95 de indexação, busca léxica, busca vetorial (NumPy e DuckDB) e Text-to-SQL.
 5. Guardrails de Segurança e Governança/LGPD:
-   Verifica bloqueio determinístico de DDL/DML, leitura externa, múltiplas instruções e linhas brutas.
+   Verifica bloqueio determinístico de DDL/DML, leitura externa (inclusive caminhos entre aspas
+   na cláusula FROM), múltiplas instruções e bypasses de linhas individuais (`WHERE 'count(' <> ''`).
 
 Uso:
     python -m src.app.avaliar_busca_e_text2sql --saida docs/adr/evidencias/0007-busca-semantica-e-text2sql.json
@@ -24,6 +27,7 @@ import hashlib
 import json
 from pathlib import Path
 import platform
+import re
 import statistics
 import sys
 import tempfile
@@ -35,52 +39,49 @@ import numpy as np
 
 from src.app.banco_analitico import (
     CAMINHO_AMOSTRA_CSV,
+    DBT_PROJECT_DIR,
     abrir_conexao_analitica,
     construir_gold_de_amostra,
 )
 from src.app.busca_cbo import (
     DIMENSAO_VETOR,
     MODELO_VETORIAL_ID,
+    SINONIMOS_CBO_OFICIAIS,
     IndiceVetorialCBO,
+    normalizar_texto,
 )
 from src.app.text_to_sql import (
     AssistenteTextToSQL,
     ViolacaoSegurancaSQL,
-    _gerar_sql_p1,
-    _gerar_sql_p2,
-    _gerar_sql_p3,
-    _gerar_sql_p4,
-    _gerar_sql_p5,
     validar_sql_seguro,
 )
 
-# Conjunto versionado de 24 consultas em português (sinônimos coloquiais, termos de mercado e siglas)
-# com os respectivos códigos CBO 2002 oficiais esperados.
+# Conjunto de 24 consultas de busca em linguagem coloquial/mercado formuladas fora de SINONIMOS_CBO_OFICIAIS
 CONJUNTO_AVALIACAO_SINONIMOS: tuple[tuple[str, tuple[str, ...]], ...] = (
-    ("dev backend software", ("212405", "317110", "212205")),
-    ("codificador de programas de computador", ("317110", "212405")),
-    ("administrador dba banco de dados sql", ("212305",)),
-    ("suporte helpdesk tecnico de informatica", ("317210", "212420", "317205")),
-    ("caminhoneiro carreteiro transporte de cargas", ("782510", "782505")),
-    ("motorista de transporte coletivo onibus", ("782410", "782405")),
-    ("motoboy entregador delivery motocicleta", ("782820",)),
-    ("caixa de supermercado frente de caixa", ("421125",)),
-    ("atendente de call center teleatendimento sac", ("422310", "422315")),
-    ("balconista de loja varejo vendas", ("521110", "521140")),
-    ("repositor de gondolas supermercado", ("521125",)),
-    ("boia fria colheita lavoura agricultura", ("622020", "621005")),
-    ("cortador de cana safra", ("622110",)),
-    ("tratorista operador de colheitadeira soja", ("641015", "641005")),
-    ("peao vaqueiro criacao de gado bovino", ("623110",)),
-    ("medico do coracao cardiologia", ("223104",)),
-    ("odontologista saude bucal dentista", ("223208",)),
-    ("cuidados hospitalares enfermagem", ("223505", "322205", "322230")),
-    ("professor primario primeira a quarta serie", ("231210", "231205")),
-    ("contabilista balanco fiscal tributario", ("252210", "413110")),
-    ("recrutador departamento pessoal rh", ("252405",)),
-    ("auxiliar de limpeza conservacao predial zeladoria", ("514320", "514225")),
-    ("seguranca patrimonial guarda escolta", ("517330",)),
-    ("ajudante de pedreiro canteiro de obras", ("717020", "715210")),
+    ("programacao backend de aplicativos web", ("212405", "317110", "212205")),
+    ("desenvolvedor fullstack de codigo", ("317110", "212405", "212205")),
+    ("especialista em modelagem de banco de dados e bi", ("212305",)),
+    ("atendimento de helpdesk e manutencao de computadores", ("317210", "212420", "317205")),
+    ("carreteiro de caminhao pesado e bitrem", ("782510", "782505")),
+    ("condutor de onibus de transporte coletivo", ("782410", "782405")),
+    ("entregador de delivery de moto", ("782820",)),
+    ("frente de caixa de supermercado e hipermercado", ("421125",)),
+    ("teleatendimento de call center e sac", ("422310", "422315")),
+    ("balconista de varejo e atendimento de loja", ("521110", "521140")),
+    ("abastecedor de mercadorias em supermercado", ("521125",)),
+    ("boia fria na colheita de lavoura", ("622020", "621005")),
+    ("cortador de cana na lavoura", ("622110", "622020")),
+    ("tratorista de colheitadeira e pulverizador agricola", ("641015", "641005")),
+    ("vaqueiro e peao de rebanho bovino", ("623110",)),
+    ("doutor especialista do coracao", ("223104",)),
+    ("odontologista de saude bucal", ("223208",)),
+    ("profissional de enfermagem para cuidados de paciente", ("223505", "322205", "322230")),
+    ("docente de magisterio do ensino fundamental", ("231210", "231205", "331205")),
+    ("contabilista do setor fiscal e tributario", ("252210", "413110")),
+    ("recrutador de selecao de pessoal e folha de pagamento", ("252405",)),
+    ("zelador de asseio e conservacao predial", ("514320", "514225")),
+    ("guarda de guarita e monitoramento patrimonial", ("517330", "517410", "517420")),
+    ("ajudante de pedreiro no canteiro de construcao civil", ("717020", "715210")),
 )
 
 CODIGOS_EXATOS_TESTE: tuple[str, ...] = (
@@ -94,30 +95,106 @@ CODIGOS_EXATOS_TESTE: tuple[str, ...] = (
     "782510",
 )
 
-PERGUNTAS_TEXT_TO_SQL_SUPORTADAS: tuple[tuple[str, str], ...] = (
+
+def _carregar_sql_analise_dbt(nome_analise: str) -> str:
+    """Lê o arquivo SQL canônico em `dbt_metra/analyses/<nome>.sql` e resolve `{{ ref('...') }}`."""
+    caminho = DBT_PROJECT_DIR / "analyses" / f"{nome_analise}.sql"
+    conteudo = caminho.read_text(encoding="utf-8")
+    return re.sub(r"\{\{\s*ref\(\s*'([^']+)'\s*\)\s*\}\}", r"gold.\1", conteudo)
+
+
+# SQLs de referência escritos à mão (independentes do gerador em text_to_sql.py) para consultas com filtros
+SQL_REF_P1_DF_2024 = """
+with base as (
+    select * from gold.fct_setor_mensal
+    where year(competencia) = 2024
+), janela as (
+    select (max(competencia) - interval '11 months')::date as inicio,
+           max(competencia) as fim
+    from base
+), cobertura as (
+    select count(distinct competencia) as competencias_disponiveis
+    from base cross join janela
+    where competencia between inicio and fim
+), setores as (
+    select codigo_secao,
+           sum(admissoes) as admissoes, sum(desligamentos) as desligamentos,
+           sum(saldo) as saldo
+    from base cross join janela
+    where sigla_uf = 'DF' and codigo_secao <> 'Z'
+      and competencia between inicio and fim
+    group by codigo_secao
+), secoes as (
+    select distinct codigo_secao, descricao_secao from gold.dim_cnae
+)
+select s.*, d.descricao_secao,
+       dense_rank() over (order by admissoes desc) as ranking_admissoes,
+       dense_rank() over (order by desligamentos desc) as ranking_desligamentos,
+       j.inicio, j.fim, c.competencias_disponiveis
+from setores s
+left join secoes d using (codigo_secao)
+cross join janela j
+cross join cobertura c
+order by ranking_admissoes, codigo_secao
+"""
+
+SQL_REF_CBO_CAMINHONEIRO = """
+select
+    c.codigo_cbo,
+    c.titulo_ocupacao,
+    c.is_cadastro_oficial,
+    coalesce(count(f.id_movimentacao) filter (where f.saldo_movimentacao = 1), 0) as admissoes,
+    coalesce(count(f.id_movimentacao) filter (where f.saldo_movimentacao = -1), 0) as desligamentos,
+    coalesce(sum(f.saldo_movimentacao), 0) as saldo,
+    coalesce(count(f.id_movimentacao) filter (where f.saldo_movimentacao = 1 and f.salario_valido), 0) as qtd_salarios_admissao,
+    sum(case when f.saldo_movimentacao = 1 and f.salario_valido then f.salario_mensal else 0 end)
+        / nullif(count(f.id_movimentacao) filter (where f.saldo_movimentacao = 1 and f.salario_valido), 0) as salario_medio_admissao
+from gold.dim_cbo c
+left join gold.fct_movimentacao f
+    on c.codigo_cbo = f.codigo_cbo
+   and f.is_identificado
+   and f.is_centro_oeste
+   and f.ano between 2023 and 2026
+where c.codigo_cbo in ('782510', '782505', '711205')
+group by c.codigo_cbo, c.titulo_ocupacao, c.is_cadastro_oficial
+order by admissoes desc, c.codigo_cbo asc
+"""
+
+PERGUNTAS_TEXT_TO_SQL_SUPORTADAS: tuple[tuple[str, str, str], ...] = (
     (
         "Qual setor econômico mais contratou e demitiu no Distrito Federal nos últimos 12 meses?",
         "p1_setores_df",
+        "dbt_analysis:p1_setores_df",
+    ),
+    (
+        "Qual setor econômico mais contratou e demitiu no Distrito Federal em 2024?",
+        "p1_setores_df",
+        "manual:p1_df_2024",
     ),
     (
         "Existe sazonalidade evidente nas contratações e demissões?",
         "p2_sazonalidade",
+        "dbt_analysis:p2_sazonalidade",
     ),
     (
         "Qual é a diferença no saldo líquido de empregos gerados e no salário médio entre as capitais e os municípios do interior?",
         "p3_capitais_interior",
+        "dbt_analysis:p3_capitais_interior",
     ),
     (
         "Os setores com maior taxa de rotatividade praticam salários médios mais baixos?",
         "p4_fluxos_salarios",
+        "dbt_analysis:p4_fluxos_salarios",
     ),
     (
         "Como o perfil sociodemográfico impacta o nível salarial e as movimentações?",
         "p5_perfil_remuneracao",
+        "dbt_analysis:p5_perfil_remuneracao",
     ),
     (
-        "Qual o saldo e o salário médio de desenvolvedor de software no Centro-Oeste?",
+        "Qual o saldo e o salário médio de caminhoneiro no Centro-Oeste?",
         "cbo_ocupacao",
+        "manual:cbo_caminhoneiro",
     ),
 )
 
@@ -128,6 +205,14 @@ PERGUNTAS_RECUSA_ESPERADA: tuple[tuple[str, str], ...] = (
     ),
     (
         "SELECT * FROM read_parquet('data/lake/parquet/movimentacao/*.parquet')",
+        "bloqueada_seguranca",
+    ),
+    (
+        "SELECT count(*) FROM '/etc/passwd', gold.dim_cbo",
+        "bloqueada_seguranca",
+    ),
+    (
+        "SELECT * FROM gold.fct_movimentacao WHERE 'count(' <> ''",
         "bloqueada_seguranca",
     ),
     (
@@ -152,6 +237,9 @@ SQLS_MALICIOSOS_GUARDRAIL: tuple[str, ...] = (
     "SELECT * FROM gold.fct_setor_mensal; DROP TABLE gold.dim_cbo;",
     "SELECT * FROM read_csv('data/caged_centro_oeste_amostra.csv')",
     "SELECT * FROM read_parquet('data/lake/parquet/movimentacao/*.parquet')",
+    "SELECT count(*) FROM '/etc/passwd', gold.dim_cbo",
+    "SELECT * FROM gold.fct_movimentacao WHERE 'count(' <> ''",
+    "SELECT salario_mensal FROM gold.fct_movimentacao WHERE (SELECT count(*) FROM gold.dim_cbo) > 0",
     "ATTACH 'outro.db' AS externo",
     "SELECT * FROM silver.stg_movimentacao LIMIT 10",
     "SELECT * FROM gold.fct_movimentacao LIMIT 10",
@@ -168,7 +256,21 @@ def _percentil_95(valores: list[float]) -> float:
 
 def _avaliar_busca_sinonimos(indice: IndiceVetorialCBO) -> dict[str, Any]:
     catalogo_codigos = {r.codigo_cbo for r in indice.registros}
-    metricas: dict[str, dict[str, Any]] = {}
+    sinonimos_norm_valores = [normalizar_texto(v) for v in SINONIMOS_CBO_OFICIAIS.values()]
+
+    consultas_copiadas_dicionario = 0
+    for consulta, _ in CONJUNTO_AVALIACAO_SINONIMOS:
+        q_norm = normalizar_texto(consulta)
+        if any(q_norm in s_val or s_val in q_norm for s_val in sinonimos_norm_valores if s_val):
+            consultas_copiadas_dicionario += 1
+
+    metricas: dict[str, dict[str, Any]] = {
+        "auditoria_independencia": {
+            "total_consultas": len(CONJUNTO_AVALIACAO_SINONIMOS),
+            "consultas_copiadas_em_sinonimos_cbo_oficiais": consultas_copiadas_dicionario,
+            "todas_fora_do_dicionario": consultas_copiadas_dicionario == 0,
+        }
+    }
 
     for nome_metodo, fn in (
         ("lexica_opcao_nula", lambda q: indice.buscar_lexico(q, top_k=5)),
@@ -247,25 +349,24 @@ def _avaliar_codigos_exatos(indice: IndiceVetorialCBO) -> dict[str, Any]:
 def _avaliar_fidelidade_text_to_sql(
     conn: duckdb.DuckDBPyConnection, assistente: AssistenteTextToSQL
 ) -> dict[str, Any]:
-    sqls_referencia = {
-        "p1_setores_df": _gerar_sql_p1({}),
-        "p2_sazonalidade": _gerar_sql_p2({}),
-        "p3_capitais_interior": _gerar_sql_p3({}),
-        "p4_fluxos_salarios": _gerar_sql_p4({}),
-        "p5_perfil_remuneracao": _gerar_sql_p5({}),
+    sqls_referencia_independentes = {
+        "dbt_analysis:p1_setores_df": _carregar_sql_analise_dbt("p1_setores_df"),
+        "dbt_analysis:p2_sazonalidade": _carregar_sql_analise_dbt("p2_sazonalidade"),
+        "dbt_analysis:p3_capitais_interior": _carregar_sql_analise_dbt("p3_capitais_interior"),
+        "dbt_analysis:p4_fluxos_salarios": _carregar_sql_analise_dbt("p4_fluxos_salarios"),
+        "dbt_analysis:p5_perfil_remuneracao": _carregar_sql_analise_dbt("p5_perfil_remuneracao"),
+        "manual:p1_df_2024": SQL_REF_P1_DF_2024,
+        "manual:cbo_caminhoneiro": SQL_REF_CBO_CAMINHONEIRO,
     }
 
     resultados_suportadas = []
     todas_iguais = True
-    for pergunta, intencao_esperada in PERGUNTAS_TEXT_TO_SQL_SUPORTADAS:
+    for pergunta, intencao_esperada, chave_sql_ref in PERGUNTAS_TEXT_TO_SQL_SUPORTADAS:
         resp = assistente.responder(conn, pergunta)
         intencao_ok = resp.suportada and resp.intencao == intencao_esperada
-        igual_ref = True
-        if intencao_esperada in sqls_referencia:
-            esperado = conn.sql(sqls_referencia[intencao_esperada]).fetchall()
-            igual_ref = (resp.linhas == esperado)
-        else:
-            igual_ref = len(resp.linhas) > 0 and len(resp.ocupacoes_resolvidas) > 0
+        sql_ref = sqls_referencia_independentes[chave_sql_ref]
+        esperado = conn.sql(sql_ref).fetchall()
+        igual_ref = resp.linhas == esperado
 
         ok = intencao_ok and igual_ref
         todas_iguais = todas_iguais and ok
@@ -273,6 +374,7 @@ def _avaliar_fidelidade_text_to_sql(
             "pergunta": pergunta,
             "intencao_esperada": intencao_esperada,
             "intencao_obtida": resp.intencao,
+            "fonte_gabarito_sql": chave_sql_ref,
             "suportada": resp.suportada,
             "linhas_retornadas": len(resp.linhas),
             "igualdade_exata_referencia": igual_ref,
@@ -352,7 +454,7 @@ def _medir_latencias(
             indice.buscar_semantico(q, top_k=5, conn_duckdb=conn)
             tempos_busca_vetorial_duckdb_ms.append((time.perf_counter() - t0) * 1000.0)
 
-        for pergunta, _ in PERGUNTAS_TEXT_TO_SQL_SUPORTADAS:
+        for pergunta, _, _ in PERGUNTAS_TEXT_TO_SQL_SUPORTADAS:
             t0 = time.perf_counter()
             assistente.responder(conn, pergunta)
             tempos_text2sql_ms.append((time.perf_counter() - t0) * 1000.0)
@@ -381,7 +483,7 @@ def executar_avaliacao(repeticoes: int = 7) -> dict[str, Any]:
         caminho_banco = Path(tmp) / "metra_adr0007.duckdb"
         construir_gold_de_amostra(caminho_banco)
 
-        with abrir_conexao_analitica(caminho_banco, garantir_construcao=False) as conn:
+        with abrir_conexao_analitica(caminho_banco) as conn:
             indice = IndiceVetorialCBO.de_conexao_duckdb(conn)
             assistente = AssistenteTextToSQL(indice_cbo=indice)
 
@@ -456,11 +558,14 @@ def main() -> None:
     lat = resultado["experimento_4_latencias"]
     print(f"Evidências gravadas em: {args.saida}")
     print(
-        f"Sinônimos (24 consultas) -> Léxica Hit@1={s_lex['hit_at_1_pct']}% Hit@5={s_lex['hit_at_5_pct']}% MRR={s_lex['mrr']} | "
+        f"Sinônimos fora do dicionário (24 consultas) -> Léxica Hit@1={s_lex['hit_at_1_pct']}% Hit@5={s_lex['hit_at_5_pct']}% MRR={s_lex['mrr']} | "
         f"Vetorial 384d Hit@1={s_vet['hit_at_1_pct']}% Hit@5={s_vet['hit_at_5_pct']}% MRR={s_vet['mrr']}"
     )
     print(
         f"Códigos exatos (8 códigos) -> Hit@1={resultado['experimento_2_codigo_exato']['hit_at_1_pct']}%"
+    )
+    print(
+        f"Fidelidade SQL (contra dbt_metra/analyses e SQL manual) -> 100% iguais={resultado['experimento_3_fidelidade_e_guardrails_text2sql']['perguntas_suportadas_100pct_iguais']}"
     )
     print(
         f"Latências (mediana) -> Indexação={lat['indexacao_catalogo_cbo']['mediana_ms']} ms | "

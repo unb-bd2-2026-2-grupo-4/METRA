@@ -6,10 +6,10 @@ o schema `gold` do DuckDB, garantindo:
    e com o contrato de indicadores por ocupação CBO (`gold.fct_movimentacao` + `gold.dim_cbo`).
 2. Recomposição estrita de médias salariais (`sum(soma_salarios_admissao) / nullif(sum(qtd_salarios_admissao), 0)`),
    nunca realizando média de médias.
-3. Validação sintática e de segurança (`validar_sql_seguro`): bloqueia DDL/DML, múltiplas instruções,
-   leitura de arquivos externos (`read_csv`, `read_parquet`, `ATTACH`), tabelas fora do schema `gold`
-   e consultas de linhas individuais sem agregação em `gold.fct_movimentacao` (proteção LGPD).
-4. Recusa transparente para perguntas fora do escopo (estoque total de vínculos, taxa de desemprego
+3. Validação estrutural e de segurança (`validar_sql_seguro`): bloqueia DDL/DML, múltiplas instruções,
+   leitura de arquivos externos (por funções ou caminhos entre aspas em `FROM`/`JOIN`), tabelas fora do
+   schema `gold` e consultas de linhas individuais sem agregação na projeção de `gold.fct_movimentacao` (LGPD).
+4. Recusa transparente para perguntas fora do escopo (estoque total de vínculos RAIS, taxa de desemprego
    PNAD, probabilidade individual de recolocação ou previsões futuras).
 """
 
@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 import re
-from typing import Any
+from typing import Any, Iterable
 
 import duckdb
 
@@ -39,12 +39,14 @@ COMANDOS_PROIBIDOS_SQL = frozenset({
     "insert", "update", "delete", "drop", "alter", "create", "truncate",
     "replace", "attach", "detach", "copy", "export", "import", "pragma",
     "install", "load", "call", "set", "grant", "revoke", "vacuum", "merge",
+    "describe", "show", "summarize",
 })
 
 FUNCOES_EXTERNAS_PROIBIDAS = frozenset({
     "read_csv", "read_csv_auto", "read_parquet", "read_json", "read_json_auto",
     "delta_scan", "postgres_scan", "sqlite_scan", "iceberg_scan", "glob",
-    "read_text", "read_blob", "parquet_scan",
+    "read_text", "read_blob", "parquet_scan", "sniff_csv",
+    "duckdb_tables", "duckdb_columns", "duckdb_views", "duckdb_settings",
 })
 
 
@@ -73,8 +75,26 @@ class RespostaTextToSQL:
         return asdict(self)
 
 
+def _contem_termo(texto_norm: str, termos: Iterable[str]) -> bool:
+    """Verifica se algum termo ou expressão ocorre como palavra(s) inteira(s) em `texto_norm`."""
+    if not texto_norm:
+        return False
+    tokens = set(texto_norm.split())
+    for termo in termos:
+        t = termo.strip()
+        if not t:
+            continue
+        if " " not in t:
+            if t in tokens:
+                return True
+        else:
+            if re.search(rf"\b{re.escape(t)}\b", texto_norm):
+                return True
+    return False
+
+
 def validar_sql_seguro(sql: str) -> None:
-    """Valida que a instrução SQL é exclusivamente de leitura agregada sobre o schema `gold`."""
+    """Valida estruturalmente que a instrução SQL é apenas de leitura agregada sobre o schema `gold`."""
     texto = (sql or "").strip()
     if not texto:
         raise ViolacaoSegurancaSQL("Consulta SQL vazia.")
@@ -83,22 +103,52 @@ def validar_sql_seguro(sql: str) -> None:
     sem_comentarios = re.sub(r"--[^\n]*", " ", texto)
     sem_comentarios = re.sub(r"/\*.*?\*/", " ", sem_comentarios, flags=re.DOTALL).strip()
 
+    if not sem_comentarios:
+        raise ViolacaoSegurancaSQL("Consulta SQL vazia após remoção de comentários.")
+
+    # Bloqueia identificadores entre aspas duplas (evita camuflar caminhos de arquivos ou schemas internos)
+    if '"' in sem_comentarios:
+        raise ViolacaoSegurancaSQL(
+            "Identificadores entre aspas duplas não são permitidos pela camada de governança."
+        )
+
+    # Inspeciona todos os literais entre aspas simples antes de substituí-los por placeholder estrutural
+    literais_aspas = re.findall(r"'(?:''|[^'])*'", sem_comentarios)
+    for lit in literais_aspas:
+        conteudo_lit = lit[1:-1].lower().strip()
+        if (
+            "/" in conteudo_lit
+            or "\\" in conteudo_lit
+            or ".." in conteudo_lit
+            or re.search(
+                r"\.(?:csv|parquet|json|db|duckdb|sqlite|txt|sql|gz|zip)\b",
+                conteudo_lit,
+            )
+            or re.match(r"^(?:s3|http|https|file|hf|az|gcs):", conteudo_lit)
+        ):
+            raise ViolacaoSegurancaSQL(
+                f"Caminho de arquivo ou URI externa não permitido em literal SQL: {lit}."
+            )
+
+    # Substitui literais de texto por marcador neutro para que palavras dentro de strings (ex.: 'count(')
+    # jamais enganem a validação sintática/estrutural.
+    corpo_sem_literais = re.sub(r"'(?:''|[^'])*'", "__str_lit__", sem_comentarios)
+
     # Bloqueia múltiplas instruções separadas por ponto-e-vírgula
-    partes = [p.strip() for p in sem_comentarios.split(";") if p.strip()]
+    partes = [p.strip() for p in corpo_sem_literais.split(";") if p.strip()]
     if len(partes) > 1:
         raise ViolacaoSegurancaSQL(
             "Múltiplas instruções SQL (';') são bloqueadas pela camada de governança."
         )
 
-    corpo = partes[0]
-    corpo_lower = corpo.lower()
+    corpo_estrutural = partes[0].lower()
 
-    if not (corpo_lower.startswith("select") or corpo_lower.startswith("with")):
+    if not (corpo_estrutural.startswith("select") or corpo_estrutural.startswith("with")):
         raise ViolacaoSegurancaSQL(
             "Apenas consultas analíticas iniciadas por SELECT ou WITH são permitidas."
         )
 
-    tokens = re.findall(r"\b[a-z_][a-z0-9_]*\b", corpo_lower)
+    tokens = re.findall(r"\b[a-z_][a-z0-9_]*\b", corpo_estrutural)
     for tok in tokens:
         if tok in COMANDOS_PROIBIDOS_SQL:
             raise ViolacaoSegurancaSQL(
@@ -109,19 +159,53 @@ def validar_sql_seguro(sql: str) -> None:
                 f"Função de leitura externa proibida detectada: '{tok}'."
             )
 
-    # Verifica referências qualificadas schema.tabela
+    # Bloqueia literais em cláusulas FROM ou JOIN (ex.: SELECT ... FROM '/etc/passwd')
+    if re.search(r"\b(?:from|join)\s+__str_lit__\b", corpo_estrutural):
+        raise ViolacaoSegurancaSQL(
+            "Leitura direta de arquivos ou literais na cláusula FROM/JOIN é bloqueada."
+        )
+
+    # Bloqueia junções implícitas por vírgula na cláusula FROM (ex.: FROM '/etc/passwd', gold.dim_cbo)
+    if re.search(
+        r"\bfrom\s+[a-z0-9_.]+\s*(?:(?:as\s+)?[a-z0-9_]+\s*)?,",
+        corpo_estrutural,
+    ):
+        raise ViolacaoSegurancaSQL(
+            "Múltiplas relações separadas por vírgula na cláusula FROM são bloqueadas; utilize JOIN explícito."
+        )
+
+    # Identifica CTEs declaradas na própria consulta (WITH nome AS (...))
+    aliases_cte = set(re.findall(r"\b([a-z_][a-z0-9_]*)\s+as\s*\(", corpo_estrutural))
+
+    # Valida estruturalmente todos os alvos de FROM e JOIN (exceto LATERAL / subqueries)
+    tabelas_gold_usadas: set[str] = set()
+    for match_rel in re.finditer(r"\b(from|join)\s+(?!lateral\b|\()([a-z0-9_.]+)", corpo_estrutural):
+        clausula_kw = match_rel.group(1).upper()
+        alvo = match_rel.group(2)
+        if alvo in TABELAS_GOLD_PERMITIDAS:
+            tabelas_gold_usadas.add(alvo)
+        elif alvo not in aliases_cte:
+            raise ViolacaoSegurancaSQL(
+                f"Relação '{alvo}' na cláusula {clausula_kw} não pertence ao catálogo Gold homologado."
+            )
+
+    if not tabelas_gold_usadas:
+        raise ViolacaoSegurancaSQL(
+            "A consulta deve referenciar exclusivamente as tabelas homologadas do schema 'gold'."
+        )
+
+    # Verifica referências qualificadas schema.objeto ou alias.coluna
     referencias_qualificadas = re.findall(
-        r"\b([a-z_][a-z0-9_]*)\.([a-z_][a-z0-9_]*)\b", corpo_lower
+        r"\b([a-z_][a-z0-9_]*)\.([a-z_][a-z0-9_]*)\b", corpo_estrutural
     )
-    aliases_cte = set(re.findall(r"\b([a-z_][a-z0-9_]*)\s+as\s*\(", corpo_lower))
     aliases_from = set(
         re.findall(
-            r"\b(?:from|join)\s+gold\.[a-z_][a-z0-9_]*\s+(?:as\s+)?([a-z_][a-z0-9_]*)\b",
-            corpo_lower,
+            r"\b(?:from|join)\s+(?:gold\.[a-z_][a-z0-9_]*|[a-z_][a-z0-9_]*)\s+(?:as\s+)?([a-z_][a-z0-9_]*)\b",
+            corpo_estrutural,
         )
     )
     for alias_ou_schema, objeto in referencias_qualificadas:
-        if alias_ou_schema in ("silver", "bronze", "oltp", "pg_catalog", "information_schema", "main"):
+        if alias_ou_schema in ("silver", "bronze", "oltp", "pg_catalog", "information_schema", "main", "temp", "system"):
             raise ViolacaoSegurancaSQL(
                 f"Acesso ao schema '{alias_ou_schema}' negado. Apenas o schema 'gold' é permitido."
             )
@@ -132,7 +216,6 @@ def validar_sql_seguro(sql: str) -> None:
                     f"Tabela '{nome_completo}' não pertence ao catálogo público da camada Gold."
                 )
         elif alias_ou_schema not in aliases_cte and alias_ou_schema not in aliases_from and len(alias_ou_schema) > 4:
-            # Permite aliases curtos de tabela (s, d, j, c, b, f, p, r, e, g, a, m, mun, cnae, cbo)
             if alias_ou_schema not in {
                 "base", "setores", "secoes", "janela", "cobertura", "calendario",
                 "grupos", "serie", "resumo", "comparacao", "totais", "pares",
@@ -142,38 +225,80 @@ def validar_sql_seguro(sql: str) -> None:
                     f"Referência qualificada não autorizada: '{alias_ou_schema}.{objeto}'."
                 )
 
-    # Garante que ao menos uma tabela gold.* seja consultada
-    if not any(t in corpo_lower for t in TABELAS_GOLD_PERMITIDAS):
-        raise ViolacaoSegurancaSQL(
-            "A consulta deve referenciar exclusivamente as tabelas homologadas do schema 'gold'."
-        )
+    # Proteção estrutural de privacidade (LGPD): proíbe exposição de linhas individuais de gold.fct_movimentacao
+    if "gold.fct_movimentacao" in tabelas_gold_usadas:
+        # 1. Proíbe colunas de linhagem individual em qualquer parte da consulta
+        for col_proibida in ("id_ingestao", "numero_linha", "registrado_em"):
+            if re.search(rf"\b{col_proibida}\b", corpo_estrutural):
+                raise ViolacaoSegurancaSQL(
+                    f"Coluna de linhagem individual '{col_proibida}' bloqueada pela política de privacidade (LGPD)."
+                )
 
-    # Proteção de privacidade (LGPD): proíbe SELECT de linhas individuais em gold.fct_movimentacao sem agregação
-    if "gold.fct_movimentacao" in corpo_lower:
-        tem_agregacao = any(
-            fn in corpo_lower for fn in ("count(", "sum(", "avg(", "group by")
+        # 2. id_movimentacao só pode aparecer dentro de COUNT(...)
+        sem_count_id = re.sub(
+            r"\bcount\s*\(\s*(?:distinct\s+)?(?:[a-z_][a-z0-9_]*\.)?id_movimentacao\s*\)",
+            "count_id_ok",
+            corpo_estrutural,
         )
-        if not tem_agregacao:
+        if re.search(r"\bid_movimentacao\b", sem_count_id):
             raise ViolacaoSegurancaSQL(
-                "Acesso negado pela política de governança/LGPD: 'gold.fct_movimentacao' só pode "
-                "ser consultada por meio de agregações estatísticas (SUM, COUNT, GROUP BY)."
+                "A coluna 'id_movimentacao' não pode ser projetada ou agrupada individualmente (LGPD)."
             )
+
+        # 3. Inspeciona cada bloco SELECT ... FROM que referencia gold.fct_movimentacao
+        blocos_fct = [
+            m
+            for m in re.finditer(
+                r"\bselect\b(?P<projecao>(?:(?!\bselect\b|\bfrom\b).)+)\bfrom\b(?P<clausula_from>(?:(?!\bselect\b).)+)",
+                corpo_estrutural,
+                flags=re.DOTALL,
+            )
+            if "gold.fct_movimentacao" in m.group("clausula_from")
+        ]
+        if not blocos_fct:
+            raise ViolacaoSegurancaSQL(
+                "Estrutura de consulta sobre 'gold.fct_movimentacao' inválida."
+            )
+
+        for bloco in blocos_fct:
+            projecao = bloco.group("projecao")
+            clausula_from = bloco.group("clausula_from")
+            # Proíbe SELECT * ou SELECT f.* fora de COUNT(*)
+            projecao_sem_count_star = re.sub(r"\bcount\s*\(\s*\*\s*\)", "count_star", projecao)
+            if "*" in projecao_sem_count_star:
+                raise ViolacaoSegurancaSQL(
+                    "Acesso negado pela política de governança/LGPD: 'SELECT *' sobre "
+                    "'gold.fct_movimentacao' é proibido."
+                )
+            # Exige função de agregação (COUNT, SUM, AVG) diretamente na projeção SELECT do bloco
+            if not re.search(r"\b(?:count|sum|avg)\s*\(", projecao):
+                raise ViolacaoSegurancaSQL(
+                    "Acesso negado pela política de governança/LGPD: 'gold.fct_movimentacao' só pode "
+                    "ser consultada com funções de agregação (SUM, COUNT, AVG) na cláusula SELECT."
+                )
+            # Se houver colunas dimensionais na projeção além das agregações, exige GROUP BY no mesmo bloco
+            if not re.search(r"\bgroup\s+by\b", clausula_from):
+                # Permite apenas agregação global pura (ex.: SELECT COUNT(*), SUM(...) FROM gold.fct_movimentacao)
+                expressoes = [e.strip() for e in projecao.split(",") if e.strip()]
+                if not all(re.search(r"\b(?:count|sum|avg|min|max|coalesce)\s*\(", e) for e in expressoes):
+                    raise ViolacaoSegurancaSQL(
+                        "Consultas em 'gold.fct_movimentacao' com colunas dimensionais exigem cláusula GROUP BY."
+                    )
 
 
 def _extrair_filtros_pergunta(pergunta: str) -> dict[str, Any]:
-    """Extrai filtros explícitos de UF, ano, localidade e eixo demográfico da pergunta."""
+    """Extrai filtros explícitos de UF, ano, localidade e eixo demográfico usando palavras inteiras."""
     norm = normalizar_texto(pergunta)
-    tokens = set(norm.split())
     filtros: dict[str, Any] = {}
 
     # UF
-    if "distrito federal" in norm or "brasilia" in norm or "df" in tokens:
+    if _contem_termo(norm, ("distrito federal", "brasilia", "df")):
         filtros["sigla_uf"] = "DF"
-    elif "goias" in norm or "goiania" in norm or "go" in tokens:
+    elif _contem_termo(norm, ("goias", "goiania", "go")):
         filtros["sigla_uf"] = "GO"
-    elif "mato grosso do sul" in norm or "campo grande" in norm or "ms" in tokens:
+    elif _contem_termo(norm, ("mato grosso do sul", "campo grande", "ms")):
         filtros["sigla_uf"] = "MS"
-    elif "mato grosso" in norm or "cuiaba" in norm or "mt" in tokens:
+    elif _contem_termo(norm, ("mato grosso", "cuiaba", "mt")):
         filtros["sigla_uf"] = "MT"
 
     # Ano (2023 a 2026)
@@ -181,29 +306,32 @@ def _extrair_filtros_pergunta(pergunta: str) -> dict[str, Any]:
     if len(anos) == 1:
         filtros["ano"] = anos[0]
 
-    # Eixo demográfico (P5)
-    if any(p in norm for p in ("sexo", "genero", "homem", "mulher", "homens", "mulheres", "feminino", "masculino")):
+    # Eixo demográfico (P5) — usa palavras inteiras para evitar falsos positivos (ex.: 'cor' em 'coracao'/'recorte')
+    if _contem_termo(norm, ("sexo", "genero", "homem", "mulher", "homens", "mulheres", "feminino", "masculino")):
         filtros["eixo"] = "sexo"
-    elif any(p in norm for p in ("raca", "cor", "branca", "preta", "parda", "indigena", "amarela", "negros", "negras")):
+    elif _contem_termo(
+        norm,
+        ("raca", "racas", "raca cor", "por cor", "cor ou raca", "branca", "preta", "parda", "indigena", "amarela", "negros", "negras", "pardos", "pardas"),
+    ):
         filtros["eixo"] = "raca_cor"
-    elif any(
-        p in norm
-        for p in (
+    elif _contem_termo(
+        norm,
+        (
             "escolaridade", "instrucao", "ensino", "superior", "fundamental",
             "ensino medio", "medio completo", "medio incompleto", "pos graduacao",
             "mestrado", "doutorado", "analfabeto", "estudo", "graduacao",
-        )
+        ),
     ):
         filtros["eixo"] = "escolaridade"
-    elif "idade" in tokens or any(p in norm for p in ("faixa etaria", "etaria", "jovens", "idosos", "anos de idade")):
+    elif _contem_termo(norm, ("idade", "faixa etaria", "etaria", "jovens", "idosos", "anos de idade")):
         filtros["eixo"] = "faixa_etaria"
 
     # Nível para P3
-    if "mensal" in tokens or "mes a mes" in norm:
+    if _contem_termo(norm, ("mensal", "mes a mes")):
         filtros["nivel"] = "mensal"
-    elif "anual" in tokens or "por ano" in norm:
+    elif _contem_termo(norm, ("anual", "por ano")):
         filtros["nivel"] = "anual"
-    elif "total" in tokens or "consolidado" in tokens or "acumulado" in tokens:
+    elif _contem_termo(norm, ("total", "consolidado", "acumulado")):
         filtros["nivel"] = "total"
 
     return filtros
@@ -247,7 +375,10 @@ def _gerar_sql_p1(filtros: dict[str, Any]) -> str:
     if uf not in ("DF", "GO", "MT", "MS"):
         uf = "DF"
     filtros["sigla_uf"] = uf
-    corpo_base = _cte_base_setor_mensal(filtros)
+    where_base = ""
+    if "ano" in filtros and int(filtros["ano"]) in (2023, 2024, 2025, 2026):
+        where_base = f"where year(competencia) = {int(filtros['ano'])}"
+    corpo_base = _cte_base_setor_mensal(filtros, where_base)
     return f"""with base as (
     {corpo_base}
 ), janela as (
@@ -571,30 +702,41 @@ order by admissoes desc, c.codigo_cbo asc"""
 def _detectar_violacao_ou_fora_escopo(pergunta: str) -> tuple[str | None, str | None]:
     """Verifica se a pergunta tenta violar segurança/LGPD ou pede conceitos fora do catálogo."""
     bruto = (pergunta or "").strip()
+    bruto_lower = bruto.lower()
     norm = normalizar_texto(bruto)
 
-    # 1. Tentativas explícitas de SQL injection, DDL/DML ou leitura de arquivos externos
+    # 1. Tentativas explícitas de SQL injection, DDL/DML, SELECT * bruto ou leitura de arquivos externos
     padroes_ataque = (
         r"\b(drop|delete|insert|update|alter|truncate|attach|copy|pragma|install|load)\b",
-        r"\b(read_csv|read_parquet|read_json|delta_scan|postgres_scan)\b",
+        r"\b(read_csv|read_parquet|read_json|delta_scan|postgres_scan|read_text|read_blob)\b",
         r";\s*(select|drop|delete|insert|update)",
+        r"\bselect\s+(?:distinct\s+)?(?:[a-z_][a-z0-9_]*\.)?\*\s+from\b",
+        r"\b(?:from|join)\s+'[^']*'",
     )
     for pad in padroes_ataque:
-        if re.search(pad, bruto.lower()):
+        if re.search(pad, bruto_lower):
             return (
                 "bloqueada_seguranca",
                 "Operação bloqueada pelos guardrails de segurança (ADR 0007): comandos de escrita, "
-                "alteração de esquema, múltiplas instruções ou leitura de arquivos externos não são permitidos.",
+                "alteração de esquema, múltiplas instruções, 'SELECT *' ou leitura de arquivos externos não são permitidos.",
             )
 
+    # Se o usuário enviou diretamente uma instrução SQL iniciada por SELECT ou WITH, valida sua estrutura
+    if re.match(r"^(?:select|with)\b", bruto_lower):
+        try:
+            validar_sql_seguro(bruto)
+        except ViolacaoSegurancaSQL as exc:
+            return ("bloqueada_seguranca", str(exc))
+
     # 2. Tentativa de acesso a dados individuais / desagregados (violação LGPD / k-anonimato)
-    if any(
-        termo in norm
-        for termo in (
-            "cpf", "nome do trabalhador", "dados individuais", "registro individual",
-            "listar trabalhadores", "lista de pessoas", "microdado bruto",
-            "select * from", "sem agrupar",
-        )
+    if _contem_termo(
+        norm,
+        (
+            "cpf", "rg", "pis", "pasep", "ctps",
+            "nome do trabalhador", "dados individuais", "registro individual", "registros individuais",
+            "listar trabalhadores", "lista de pessoas", "microdado bruto", "microdados brutos",
+            "sem agrupar", "linha por linha", "cada trabalhador",
+        ),
     ):
         return (
             "bloqueada_seguranca",
@@ -602,15 +744,16 @@ def _detectar_violacao_ou_fora_escopo(pergunta: str) -> tuple[str | None, str | 
             "indicadores estatísticos agregados da camada Gold, vedando a listagem de eventos individuais.",
         )
 
-    # 3. Conceitos fora do escopo metodológico do CAGED / camada Gold
-    if any(
-        termo in norm
-        for termo in (
-            "taxa de desemprego", "pnad", "estoque total de empregados", "estoque de vinculos",
+    # 3. Conceitos fora do escopo metodológico do CAGED / camada Gold (comparados por palavra inteira)
+    if _contem_termo(
+        norm,
+        (
+            "taxa de desemprego", "pnad", "pnadc",
+            "estoque total de empregados", "estoque de vinculos", "estoque total de vinculos",
             "rais", "previsao para 2027", "previsao para 2028", "prever salario",
             "probabilidade de eu ser contratado", "chance individual de recolocacao",
             "efeito causal", "inflacao ipca",
-        )
+        ),
     ):
         return (
             "nao_suportada",
@@ -641,13 +784,14 @@ def _extrair_termo_ocupacao(pergunta: str) -> str | None:
         "caixa de supermercado", "telemarketing", "call center", "professor", "professora",
         "professores", "docente", "advogado", "contador", "administrador", "gerente",
         "diretor", "faxineiro", "auxiliar de limpeza", "vigilante", "porteiro", "cozinheiro",
-        "garcom", "trabalhador rural", "tratorista", "boia fria", "agronomo", "eletricista",
+        "garcom", "trabalhador rural", "trabalhadores rurais", "rurais", "tratorista",
+        "boia fria", "agronomo", "eletricista",
         "mecanico", "soldador", "almoxarife", "estoquista", "repositor", "auxiliar administrativo",
         "assistente administrativo", "auxiliar de escritorio", "recepcionista", "secretaria",
         "acougueiro", "padeiro", "motoboy", "cabeleireiro", "cuidador", "jornalista",
         "designer", "cientista de dados", "analista de dados", "analista de sistemas",
     )
-    if not any(g in norm for g in gatilhos_ocupacao):
+    if not _contem_termo(norm, gatilhos_ocupacao):
         return None
 
     # Remove palavras de comando, eixos demográficos e recortes geográficos para isolar a profissão
@@ -699,50 +843,50 @@ class AssistenteTextToSQL:
             return motivo_bloqueio
 
         # P3: Capital vs. Interior (Pergunta Central)
-        if any(p in norm for p in ("capital", "capitais", "interior")):
+        if _contem_termo(norm, ("capital", "capitais", "interior")):
             return "p3_capitais_interior"
 
         # P2: Sazonalidade / Série Mensal
-        if any(
-            p in norm
-            for p in (
+        if _contem_termo(
+            norm,
+            (
                 "sazonalidade", "sazonal", "fim de ano", "meses do ano",
                 "variacao mensal", "serie mensal", "ciclo mensal", "quarto trimestre",
-            )
+            ),
         ):
             return "p2_sazonalidade"
 
         # P4: Rotatividade / Turnover / Equilíbrio de Fluxos Pareados e Correlação com Salário
-        if any(
-            p in norm
-            for p in (
+        if _contem_termo(
+            norm,
+            (
                 "rotatividade", "turnover", "fluxos pareados", "equilibrio dos fluxos",
                 "correlacao", "pearson", "praticam salarios", "salarios mais baixos",
-            )
+            ),
         ):
             return "p4_fluxos_salarios"
 
         # P5: Perfil Sociodemográfico (Sexo, Raça/Cor, Escolaridade, Idade/Faixa Etária)
-        tokens_norm = set(norm.split())
-        if "idade" in tokens_norm or any(
-            p in norm
-            for p in (
-                "sociodemografico", "demografico", "perfil", "genero", "sexo",
-                "raca", "cor", "escolaridade", "grau de instrucao", "faixa etaria",
+        if _contem_termo(
+            norm,
+            (
+                "idade", "sociodemografico", "demografico", "perfil", "genero", "sexo",
+                "raca", "racas", "raca cor", "por cor", "cor ou raca",
+                "escolaridade", "grau de instrucao", "faixa etaria",
                 "mulheres", "homens", "homem", "mulher", "masculino", "feminino",
                 "negras", "negros", "pardas", "pardos", "branca", "preta", "indigenas",
                 "mestrado", "doutorado", "ensino medio", "superior completo",
-            )
+            ),
         ):
             return "p5_perfil_remuneracao"
 
         # P1: Ranking de setores econômicos (CNAE) no DF / últimos 12 meses
-        if any(
-            p in norm
-            for p in (
+        if _contem_termo(
+            norm,
+            (
                 "setor", "setores", "cnae", "secao", "ultimos 12 meses",
                 "mais contratou", "mais demitiu", "ranking de admissoes",
-            )
+            ),
         ):
             return "p1_setores_df"
 
@@ -866,14 +1010,15 @@ class AssistenteTextToSQL:
 
         if intencao == "p1_setores_df":
             sql = _gerar_sql_p1(filtros)
-            titulo = f"P1 — Ranking de Setores Econômicos (CNAE) em {filtros.get('sigla_uf', 'DF')} (Janela de 12 Meses){sufixo_cargo}"
+            recorte_janela = f"Ano {filtros['ano']}" if filtros.get("ano") else "Janela de 12 Meses"
+            titulo = f"P1 — Ranking de Setores Econômicos (CNAE) em {filtros.get('sigla_uf', 'DF')} ({recorte_janela}){sufixo_cargo}"
             formula = (
                 "admissoes = SUM(admissoes); desligamentos = SUM(desligamentos); "
                 "saldo = SUM(saldo); DENSE_RANK() independente para admissões e desligamentos."
             )
             ressalva = (
                 "Setor econômico corresponde à seção CNAE (excluindo 'Z' dos rankings). "
-                "A janela abrange os 12 meses de calendário até a última competência carregada na base."
+                "A janela abrange até 12 meses de calendário até a última competência do recorte."
             )
         elif intencao == "p2_sazonalidade":
             sql = _gerar_sql_p2(filtros)
@@ -923,29 +1068,48 @@ class AssistenteTextToSQL:
         elif intencao == "cbo_ocupacao":
             termo_cbo = (filtro_cargo or "").strip() or _extrair_termo_ocupacao(texto) or texto
             indice = self._obter_indice(conn)
-            resultados_cbo = indice.buscar_semantico(termo_cbo, top_k=top_k_cbo, apenas_oficiais=True)
-            if not resultados_cbo:
-                resultados_cbo = indice.buscar_semantico(termo_cbo, top_k=top_k_cbo, apenas_oficiais=False)
-            if not resultados_cbo:
-                return RespostaTextToSQL(
-                    pergunta_original=texto,
-                    suportada=False,
-                    intencao="nao_suportada",
-                    titulo_intencao="Ocupação CBO não localizada no catálogo",
-                    filtros_aplicados=filtros,
-                    formula_metrica="N/A",
-                    ressalva_metodologica="Nenhuma ocupação CBO atingiu similaridade mínima para a consulta.",
-                    sql_gerado="",
-                    colunas=[],
-                    linhas=[],
-                    ocupacoes_resolvidas=[],
-                    motivo_recusa="Não foram encontradas ocupações CBO compatíveis com o termo informado.",
-                )
-            ocupacoes_resolvidas = [r.to_dict() for r in resultados_cbo]
-            codigos = codigos_cbo_override if codigos_cbo_override else [r.codigo_cbo for r in resultados_cbo]
-            filtros["codigos_cbo"] = [str(c).zfill(6) for c in codigos]
-            filtros["termo_ocupacao"] = termo_cbo
-            filtros["termo_busca_cbo"] = termo_cbo
+            if codigos_cbo_override:
+                mapa_reg = {r.codigo_cbo: r for r in indice.registros}
+                cods_limpos = [str(c).zfill(6) for c in codigos_cbo_override]
+                filtros["codigos_cbo"] = cods_limpos
+                filtros["termo_ocupacao"] = termo_cbo
+                filtros["termo_busca_cbo"] = termo_cbo
+                ocupacoes_resolvidas = [
+                    {
+                        "codigo_cbo": c,
+                        "titulo_ocupacao": mapa_reg[c].titulo_ocupacao if c in mapa_reg else c,
+                        "codigo_grande_grupo": mapa_reg[c].codigo_grande_grupo if c in mapa_reg else c[0],
+                        "score": 1.0,
+                        "is_cadastro_oficial": mapa_reg[c].is_cadastro_oficial if c in mapa_reg else True,
+                        "versao_indice": indice.versao_indice,
+                        "metodo": "selecao_usuario",
+                    }
+                    for c in cods_limpos
+                ]
+            else:
+                resultados_cbo = indice.buscar_semantico(termo_cbo, top_k=top_k_cbo, apenas_oficiais=True)
+                if not resultados_cbo:
+                    resultados_cbo = indice.buscar_semantico(termo_cbo, top_k=top_k_cbo, apenas_oficiais=False)
+                if not resultados_cbo:
+                    return RespostaTextToSQL(
+                        pergunta_original=texto,
+                        suportada=False,
+                        intencao="nao_suportada",
+                        titulo_intencao="Ocupação CBO não localizada no catálogo",
+                        filtros_aplicados=filtros,
+                        formula_metrica="N/A",
+                        ressalva_metodologica="Nenhuma ocupação CBO atingiu similaridade mínima para a consulta.",
+                        sql_gerado="",
+                        colunas=[],
+                        linhas=[],
+                        ocupacoes_resolvidas=[],
+                        motivo_recusa="Não foram encontradas ocupações CBO compatíveis com o termo informado.",
+                    )
+                ocupacoes_resolvidas = [r.to_dict() for r in resultados_cbo]
+                filtros["codigos_cbo"] = [r.codigo_cbo for r in resultados_cbo]
+                filtros["termo_ocupacao"] = termo_cbo
+                filtros["termo_busca_cbo"] = termo_cbo
+
             sql = _gerar_sql_cbo(filtros["codigos_cbo"], filtros)
             titulo = f"Indicadores por Ocupação CBO 2002 (Busca Semântica: '{termo_cbo}')"
             formula = (
@@ -961,7 +1125,7 @@ class AssistenteTextToSQL:
                 pergunta_original=texto,
                 suportada=False,
                 intencao="nao_suportada",
-                titulo_intencao="Pergunta Ambigua ou Não Mapeada no Catálogo Gold",
+                titulo_intencao="Pergunta Ambígua ou Não Mapeada no Catálogo Gold",
                 filtros_aplicados=filtros,
                 formula_metrica="N/A",
                 ressalva_metodologica=(
@@ -981,6 +1145,10 @@ class AssistenteTextToSQL:
             )
 
         validar_sql_seguro(sql)
+        try:
+            conn.execute("SET enable_external_access = false; SET lock_configuration = true;")
+        except duckdb.Error:
+            pass
         relacao = conn.sql(sql)
         colunas = list(relacao.columns)
         linhas = relacao.fetchall()

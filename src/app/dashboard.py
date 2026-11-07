@@ -7,6 +7,7 @@ Execução:
 
 from __future__ import annotations
 
+import html
 from pathlib import Path
 import sys
 from typing import Any
@@ -15,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+import duckdb
 import pandas as pd
 import streamlit as st
 
@@ -164,38 +166,118 @@ def fmt_pct(valor: Any, com_sinal: bool = False) -> str:
 
 
 # ==============================================================================
-# CARREGAMENTO DE DADOS
+# RECURSOS E CACHE DE CONSULTAS (STREAMLIT CACHE)
 # ==============================================================================
 
-@st.cache_resource(show_spinner="Carregando base analítica (DuckDB) e índice CBO...")
-def carregar_recursos_analiticos(caminho_str: str) -> tuple[IndiceVetorialCBO, AssistenteTextToSQL, dict[str, Any]]:
-    with abrir_conexao_analitica(caminho_str, garantir_construcao=True) as conn:
-        indice = IndiceVetorialCBO.de_conexao_duckdb(conn)
-        row = conn.execute("""
-            SELECT
-                COUNT(*) AS total_mov,
-                COUNT(*) FILTER (WHERE saldo_movimentacao = 1) AS admissoes,
-                COUNT(*) FILTER (WHERE saldo_movimentacao = -1) AS desligamentos,
-                COALESCE(SUM(saldo_movimentacao), 0) AS saldo,
-                SUM(CASE WHEN saldo_movimentacao = 1 AND salario_valido THEN salario_mensal ELSE 0 END)
-                    / NULLIF(COUNT(*) FILTER (WHERE saldo_movimentacao = 1 AND salario_valido), 0) AS sal_medio,
-                MIN(competencia)::VARCHAR AS comp_min,
-                MAX(competencia)::VARCHAR AS comp_max
-            FROM gold.fct_movimentacao
-            WHERE is_identificado AND is_centro_oeste AND ano BETWEEN 2023 AND 2026
-        """).fetchone()
+@st.cache_resource(show_spinner="Conectando ao banco analítico (DuckDB Gold)...")
+def obter_conexao_cached(caminho_str: str) -> duckdb.DuckDBPyConnection:
+    """Mantém conexão somente leitura (`read_only=True`) compartilhada na sessão."""
+    return abrir_conexao_analitica(caminho_str)
 
-        resumo = {
-            "total_movimentacoes": int(row[0] or 0),
-            "admissoes": int(row[1] or 0),
-            "desligamentos": int(row[2] or 0),
-            "saldo": int(row[3] or 0),
-            "salario_medio": float(row[4]) if row[4] is not None else None,
-            "comp_min": (row[5] or "2023-01")[:7],
-            "comp_max": (row[6] or "2026-01")[:7],
-        }
+
+@st.cache_resource(show_spinner="Carregando índice vetorial CBO e resumo da camada Gold...")
+def carregar_recursos_analiticos(caminho_str: str) -> tuple[IndiceVetorialCBO, AssistenteTextToSQL, dict[str, Any]]:
+    conn = obter_conexao_cached(caminho_str)
+    indice = IndiceVetorialCBO.de_conexao_duckdb(conn)
+    row = conn.execute("""
+        SELECT
+            COUNT(*) AS total_mov,
+            COUNT(*) FILTER (WHERE saldo_movimentacao = 1) AS admissoes,
+            COUNT(*) FILTER (WHERE saldo_movimentacao = -1) AS desligamentos,
+            COALESCE(SUM(saldo_movimentacao), 0) AS saldo,
+            SUM(CASE WHEN saldo_movimentacao = 1 AND salario_valido THEN salario_mensal ELSE 0 END)
+                / NULLIF(COUNT(*) FILTER (WHERE saldo_movimentacao = 1 AND salario_valido), 0) AS sal_medio,
+            MIN(competencia)::VARCHAR AS comp_min,
+            MAX(competencia)::VARCHAR AS comp_max
+        FROM gold.fct_movimentacao
+        WHERE is_identificado AND is_centro_oeste AND ano BETWEEN 2023 AND 2026
+    """).fetchone()
+
+    resumo = {
+        "total_movimentacoes": int(row[0] or 0),
+        "admissoes": int(row[1] or 0),
+        "desligamentos": int(row[2] or 0),
+        "saldo": int(row[3] or 0),
+        "salario_medio": float(row[4]) if row[4] is not None else None,
+        "comp_min": (row[5] or "2023-01")[:7],
+        "comp_max": (row[6] or "2026-01")[:7],
+    }
     assistente = AssistenteTextToSQL(indice_cbo=indice)
     return indice, assistente, resumo
+
+
+@st.cache_data(show_spinner=False)
+def _executar_consulta_dict_cached(
+    caminho_str: str,
+    pergunta: str,
+    filtro_cargo: str | None = None,
+    codigos_cbo_override: tuple[str, ...] | None = None,
+    sigla_uf_override: str | None = None,
+    ano_override: int | None = None,
+    eixo_override: str | None = None,
+) -> dict[str, Any]:
+    conn = obter_conexao_cached(caminho_str)
+    _, assistente, _ = carregar_recursos_analiticos(caminho_str)
+    resp = assistente.responder(
+        conn,
+        pergunta,
+        filtro_cargo=filtro_cargo,
+        codigos_cbo_override=list(codigos_cbo_override) if codigos_cbo_override else None,
+        sigla_uf_override=sigla_uf_override,
+        ano_override=ano_override,
+        eixo_override=eixo_override,
+    )
+    return resp.to_dict()
+
+
+def obter_resposta_cached(
+    caminho_str: str,
+    pergunta: str,
+    filtro_cargo: str | None = None,
+    codigos_cbo_override: list[str] | None = None,
+    sigla_uf_override: str | None = None,
+    ano_override: int | None = None,
+    eixo_override: str | None = None,
+) -> RespostaTextToSQL:
+    dados = _executar_consulta_dict_cached(
+        caminho_str=caminho_str,
+        pergunta=pergunta,
+        filtro_cargo=filtro_cargo,
+        codigos_cbo_override=tuple(codigos_cbo_override) if codigos_cbo_override else None,
+        sigla_uf_override=sigla_uf_override,
+        ano_override=ano_override,
+        eixo_override=eixo_override,
+    )
+    return RespostaTextToSQL(
+        pergunta_original=dados["pergunta_original"],
+        suportada=dados["suportada"],
+        intencao=dados["intencao"],
+        titulo_intencao=dados["titulo_intencao"],
+        filtros_aplicados=dict(dados["filtros_aplicados"]),
+        formula_metrica=dados["formula_metrica"],
+        ressalva_metodologica=dados["ressalva_metodologica"],
+        sql_gerado=dados["sql_gerado"],
+        colunas=list(dados["colunas"]),
+        linhas=[tuple(r) for r in dados["linhas"]],
+        ocupacoes_resolvidas=list(dados["ocupacoes_resolvidas"]),
+        motivo_recusa=dados["motivo_recusa"],
+    )
+
+
+@st.cache_data(show_spinner=False)
+def consultar_indicadores_cbo_cached(
+    caminho_str: str,
+    codigos_cbo: tuple[str, ...],
+    sigla_uf: str | None = None,
+    ano: int | None = None,
+) -> dict[str, Any]:
+    conn = obter_conexao_cached(caminho_str)
+    return consultar_indicadores_cbo(
+        conn,
+        codigos_cbo=list(codigos_cbo),
+        sigla_uf=sigla_uf,
+        ano=ano,
+    )
 
 
 # ==============================================================================
@@ -203,11 +285,14 @@ def carregar_recursos_analiticos(caminho_str: str) -> tuple[IndiceVetorialCBO, A
 # ==============================================================================
 
 def render_kpi(titulo: str, valor: str, detalhe: str = "") -> None:
+    t_esc = html.escape(str(titulo))
+    v_esc = html.escape(str(valor))
+    d_esc = html.escape(str(detalhe))
     st.markdown(f"""
         <div class="kpi-box">
-            <div class="kpi-label">{titulo}</div>
-            <div class="kpi-number">{valor}</div>
-            <div class="kpi-meta">{detalhe}</div>
+            <div class="kpi-label">{t_esc}</div>
+            <div class="kpi-number">{v_esc}</div>
+            <div class="kpi-meta">{d_esc}</div>
         </div>
     """, unsafe_allow_html=True)
 
@@ -276,10 +361,16 @@ def render_p3_capitais_interior(df_bruto: pd.DataFrame, cargo_label: str = "") -
         st.dataframe(df_exibir, hide_index=True)
 
 
-def render_p1_setores_df(df_bruto: pd.DataFrame, cargo_label: str = "") -> None:
+def render_p1_setores_df(
+    df_bruto: pd.DataFrame,
+    cargo_label: str = "",
+    filtros: dict[str, Any] | None = None,
+) -> None:
     df_ativos = df_bruto[df_bruto["admissoes"] > 0].copy()
     sufixo = f" — {cargo_label}" if cargo_label else ""
-    st.markdown(f"#### Setores econômicos no Distrito Federal (12 meses){sufixo}")
+    uf_label = (filtros or {}).get("sigla_uf", "DF")
+    ano_label = f"Ano {filtros['ano']}" if (filtros and filtros.get("ano")) else "12 meses"
+    st.markdown(f"#### Setores econômicos em {uf_label} ({ano_label}){sufixo}")
     st.caption("Volume de admissões, desligamentos e saldo líquido por seção da CNAE 2.0.")
 
     if not df_ativos.empty:
@@ -324,42 +415,77 @@ def render_p1_setores_df(df_bruto: pd.DataFrame, cargo_label: str = "") -> None:
 
 def render_p2_sazonalidade(df_bruto: pd.DataFrame, cargo_label: str = "") -> None:
     df_val = df_bruto.dropna(subset=["admissoes", "desligamentos", "saldo"]).copy()
-    por_mes = (
+    observado_mes = (
         df_val.groupby("mes", as_index=False)
         .agg(
-            admissoes=("admissoes", "sum"),
-            desligamentos=("desligamentos", "sum"),
-            saldo=("saldo", "sum"),
-            anos=("ano", "nunique"),
+            admissoes_obs=("admissoes", "sum"),
+            desligamentos_obs=("desligamentos", "sum"),
+            saldo_obs=("saldo", "sum"),
         )
-        .sort_values("mes")
     )
+
+    # Usa as colunas media_* calculadas pelo SQL sobre os anos completos (12 competências),
+    # evitando distorção por anos parciais (como 2026).
+    resumo_sql = (
+        df_bruto.drop_duplicates(subset=["sigla_uf", "codigo_secao", "mes"])
+        .groupby("mes", as_index=False)
+        .agg(
+            anos_completos=("anos_considerados", "max"),
+            media_admissoes=("media_admissoes_mes", lambda s: s.dropna().sum() if s.notna().any() else None),
+            media_desligamentos=("media_desligamentos_mes", lambda s: s.dropna().sum() if s.notna().any() else None),
+            media_saldo=("media_saldo_mes", lambda s: s.dropna().sum() if s.notna().any() else None),
+        )
+    )
+
+    por_mes = pd.merge(resumo_sql, observado_mes, on="mes", how="outer").sort_values("mes")
     por_mes["nome_mes"] = por_mes["mes"].map(lambda m: f"{int(m):02d} - {NOMES_MESES.get(int(m), str(m))}")
-    por_mes["media_saldo"] = por_mes["saldo"] / por_mes["anos"].replace(0, 1)
+
+    tem_anos_completos = bool(por_mes["media_saldo"].notna().any())
+    coluna_criterio = "media_saldo" if tem_anos_completos else "saldo_obs"
+    rotulo_criterio = "Média (anos completos)" if tem_anos_completos else "Saldo observado (ano parcial)"
 
     sufixo = f" — {cargo_label}" if cargo_label else ""
     st.markdown(f"#### Sazonalidade mensal das movimentações{sufixo}")
-    st.caption("Distribuição acumulada e média mensal de contratações e desligamentos entre janeiro e dezembro.")
+    st.caption(
+        "Média mensal calculada exclusivamente sobre anos completos (12 competências com dados), "
+        "sem distorção por anos parciais."
+    )
 
-    if not por_mes.empty:
-        melhor = por_mes.sort_values("saldo", ascending=False).iloc[0]
-        pior = por_mes.sort_values("saldo", ascending=True).iloc[0]
+    df_criterio = por_mes.dropna(subset=[coluna_criterio])
+    if not df_criterio.empty:
+        melhor = df_criterio.sort_values(coluna_criterio, ascending=False).iloc[0]
+        pior = df_criterio.sort_values(coluna_criterio, ascending=True).iloc[0]
+        qtd_anos_comp = int(por_mes["anos_completos"].max() or 0)
 
         c1, c2, c3 = st.columns(3)
         with c1:
-            render_kpi("Mês de maior expansão", str(melhor["nome_mes"]), f"Saldo acumulado: {fmt_int(melhor['saldo'], True)}")
+            render_kpi(
+                "Mês de maior expansão",
+                str(melhor["nome_mes"]),
+                f"{rotulo_criterio}: {fmt_int(melhor[coluna_criterio], True)}",
+            )
         with c2:
-            render_kpi("Mês de maior retração", str(pior["nome_mes"]), f"Saldo acumulado: {fmt_int(pior['saldo'], True)}")
+            render_kpi(
+                "Mês de maior retração",
+                str(pior["nome_mes"]),
+                f"{rotulo_criterio}: {fmt_int(pior[coluna_criterio], True)}",
+            )
         with c3:
-            render_kpi("Cobertura temporal", f"{df_val['competencia'].nunique()} meses", f"{str(df_val['competencia'].min())[:7]} a {str(df_val['competencia'].max())[:7]}")
+            render_kpi(
+                "Cobertura temporal",
+                f"{df_val['competencia'].nunique()} competências",
+                f"{qtd_anos_comp} ano(s) completo(s) na média sazonal",
+            )
 
     st.write("")
     c_chart, c_table = st.columns([1, 1])
 
     with c_chart:
-        st.markdown("**Saldo líquido acumulado por mês**")
+        st.markdown(f"**{rotulo_criterio} por mês**")
         st.bar_chart(
-            por_mes.set_index("nome_mes")[["saldo"]].rename(columns={"saldo": "Saldo líquido"}),
+            por_mes.set_index("nome_mes")[[coluna_criterio]].rename(
+                columns={coluna_criterio: rotulo_criterio}
+            ),
             height=290,
         )
 
@@ -367,10 +493,10 @@ def render_p2_sazonalidade(df_bruto: pd.DataFrame, cargo_label: str = "") -> Non
         st.markdown("**Série mensal consolidada**")
         df_tab = pd.DataFrame({
             "Mês": por_mes["nome_mes"],
-            "Admissões": por_mes["admissoes"].map(fmt_int),
-            "Desligamentos": por_mes["desligamentos"].map(fmt_int),
-            "Saldo acumulado": por_mes["saldo"].map(lambda v: fmt_int(v, True)),
-            "Média saldo/ano": por_mes["media_saldo"].map(lambda v: fmt_int(v, True)),
+            "Média admissões (anos compl.)": por_mes["media_admissoes"].map(fmt_int),
+            "Média deslig. (anos compl.)": por_mes["media_desligamentos"].map(fmt_int),
+            "Média saldo (anos compl.)": por_mes["media_saldo"].map(lambda v: fmt_int(v, True)),
+            "Saldo acumulado (série total)": por_mes["saldo_obs"].map(lambda v: fmt_int(v, True)),
         })
         st.dataframe(df_tab, hide_index=True, height=290)
 
@@ -429,12 +555,13 @@ def render_p5_sociodemografico(
     df_bruto: pd.DataFrame,
     filtros: dict[str, Any],
     caminho_str: str | None = None,
-    assistente: AssistenteTextToSQL | None = None,
     chave_prefixo: str = "p5",
-) -> None:
+    resposta_original: RespostaTextToSQL | None = None,
+) -> RespostaTextToSQL | None:
     eixos = list(df_bruto["eixo"].unique())
     eixo_atual = filtros.get("eixo") if filtros.get("eixo") in eixos else eixos[0]
     cargo_label = filtros.get("termo_ocupacao", "")
+    resposta_efetiva = resposta_original
 
     sufixo = f" — {cargo_label}" if cargo_label else ""
     st.markdown(f"#### Perfil sociodemográfico e remuneração{sufixo}")
@@ -449,24 +576,24 @@ def render_p5_sociodemografico(
         key=f"{chave_prefixo}_radio_eixo",
     )
 
-    if eixo_selecionado != eixo_atual and caminho_str and assistente:
-        with abrir_conexao_analitica(caminho_str, garantir_construcao=False) as conn:
-            resp_nova = assistente.responder(
-                conn,
-                "Como o perfil sociodemográfico impacta o salário médio de admissão?",
-                filtro_cargo=filtros.get("termo_ocupacao"),
-                codigos_cbo_override=filtros.get("codigos_cbo"),
-                sigla_uf_override=filtros.get("sigla_uf"),
-                ano_override=filtros.get("ano"),
-                eixo_override=eixo_selecionado,
-            )
-            df_bruto = pd.DataFrame(resp_nova.linhas, columns=resp_nova.colunas)
-            eixo_atual = eixo_selecionado
+    if eixo_selecionado != eixo_atual and caminho_str:
+        resp_nova = obter_resposta_cached(
+            caminho_str,
+            "Como o perfil sociodemográfico impacta o salário médio de admissão?",
+            filtro_cargo=filtros.get("termo_ocupacao"),
+            codigos_cbo_override=filtros.get("codigos_cbo"),
+            sigla_uf_override=filtros.get("sigla_uf"),
+            ano_override=filtros.get("ano"),
+            eixo_override=eixo_selecionado,
+        )
+        df_bruto = pd.DataFrame(resp_nova.linhas, columns=resp_nova.colunas)
+        eixo_atual = eixo_selecionado
+        resposta_efetiva = resp_nova
 
     df_eixo = df_bruto[df_bruto["eixo"] == eixo_atual].copy()
     if df_eixo.empty:
         st.info("Sem registros para a dimensão selecionada neste recorte.")
-        return
+        return resposta_efetiva
 
     consolidado = (
         df_eixo.groupby(["codigo_categoria", "categoria"], as_index=False)
@@ -554,6 +681,8 @@ def render_p5_sociodemografico(
         })
         st.dataframe(df_tab, hide_index=True, height=290)
 
+    return resposta_efetiva
+
 
 # ==============================================================================
 # ROTEADOR DE RESPOSTAS
@@ -562,7 +691,6 @@ def render_p5_sociodemografico(
 def renderizar_resposta_geral(
     resposta: RespostaTextToSQL,
     caminho_str: str,
-    assistente: AssistenteTextToSQL,
     chave_prefixo: str = "geral",
 ) -> None:
     df_bruto = pd.DataFrame(resposta.linhas, columns=resposta.colunas)
@@ -570,6 +698,7 @@ def renderizar_resposta_geral(
         st.warning("Nenhum registro encontrado para os filtros selecionados.")
         return
 
+    resposta_auditoria = resposta
     cargo_label = resposta.filtros_aplicados.get("termo_ocupacao", "")
     if resposta.ocupacoes_resolvidas and resposta.intencao != "cbo_ocupacao":
         cbo_tags = ", ".join([f"{o['codigo_cbo']} ({o['titulo_ocupacao']})" for o in resposta.ocupacoes_resolvidas[:3]])
@@ -578,19 +707,27 @@ def renderizar_resposta_geral(
     if resposta.intencao == "p3_capitais_interior":
         render_p3_capitais_interior(df_bruto, cargo_label)
     elif resposta.intencao == "p1_setores_df":
-        render_p1_setores_df(df_bruto, cargo_label)
+        render_p1_setores_df(df_bruto, cargo_label, resposta.filtros_aplicados)
     elif resposta.intencao == "p2_sazonalidade":
         render_p2_sazonalidade(df_bruto, cargo_label)
     elif resposta.intencao == "p4_fluxos_salarios":
         render_p4_rotatividade(df_bruto, cargo_label)
     elif resposta.intencao == "p5_perfil_remuneracao":
-        render_p5_sociodemografico(df_bruto, resposta.filtros_aplicados, caminho_str, assistente, chave_prefixo)
+        nova_resp = render_p5_sociodemografico(
+            df_bruto,
+            resposta.filtros_aplicados,
+            caminho_str,
+            chave_prefixo,
+            resposta,
+        )
+        if nova_resp is not None:
+            resposta_auditoria = nova_resp
     elif resposta.intencao == "cbo_ocupacao":
         render_visao_cbo_detalhada(df_bruto)
     else:
         st.dataframe(df_bruto, hide_index=True)
 
-    render_auditoria_expander(resposta)
+    render_auditoria_expander(resposta_auditoria)
 
 
 def render_visao_cbo_detalhada(df_bruto: pd.DataFrame) -> None:
@@ -629,7 +766,6 @@ def render_visao_cbo_detalhada(df_bruto: pd.DataFrame) -> None:
 
 def render_view_painel_executivo(
     caminho_str: str,
-    assistente: AssistenteTextToSQL,
     filtro_uf: str | None,
     filtro_ano: int | None,
     cargo_filtro: str | None,
@@ -643,60 +779,55 @@ def render_view_painel_executivo(
     ])
 
     with tab_p3:
-        with abrir_conexao_analitica(caminho_str, garantir_construcao=False) as conn:
-            resp = assistente.responder(
-                conn,
-                "Qual é a diferença no saldo líquido e no salário médio entre as capitais e o interior?",
-                filtro_cargo=cargo_filtro,
-                sigla_uf_override=filtro_uf,
-                ano_override=filtro_ano,
-            )
-        renderizar_resposta_geral(resp, caminho_str, assistente, "painel_p3")
+        resp_p3 = obter_resposta_cached(
+            caminho_str,
+            "Qual é a diferença no saldo líquido e no salário médio entre as capitais e o interior?",
+            filtro_cargo=cargo_filtro,
+            sigla_uf_override=filtro_uf,
+            ano_override=filtro_ano,
+        )
+        renderizar_resposta_geral(resp_p3, caminho_str, "painel_p3")
 
     with tab_p1:
-        with abrir_conexao_analitica(caminho_str, garantir_construcao=False) as conn:
-            resp = assistente.responder(
-                conn,
-                "Qual setor econômico mais contratou e demitiu no Distrito Federal nos últimos 12 meses?",
-                filtro_cargo=cargo_filtro,
-                sigla_uf_override="DF",
-                ano_override=filtro_ano,
-            )
-        renderizar_resposta_geral(resp, caminho_str, assistente, "painel_p1")
+        resp_p1 = obter_resposta_cached(
+            caminho_str,
+            "Qual setor econômico mais contratou e demitiu no Distrito Federal nos últimos 12 meses?",
+            filtro_cargo=cargo_filtro,
+            sigla_uf_override="DF",
+            ano_override=filtro_ano,
+        )
+        renderizar_resposta_geral(resp_p1, caminho_str, "painel_p1")
 
     with tab_p2:
-        with abrir_conexao_analitica(caminho_str, garantir_construcao=False) as conn:
-            resp = assistente.responder(
-                conn,
-                "Existe sazonalidade nas contratações e demissões?",
-                filtro_cargo=cargo_filtro,
-                sigla_uf_override=filtro_uf,
-                ano_override=filtro_ano,
-            )
-        renderizar_resposta_geral(resp, caminho_str, assistente, "painel_p2")
+        resp_p2 = obter_resposta_cached(
+            caminho_str,
+            "Existe sazonalidade nas contratações e demissões?",
+            filtro_cargo=cargo_filtro,
+            sigla_uf_override=filtro_uf,
+            ano_override=filtro_ano,
+        )
+        renderizar_resposta_geral(resp_p2, caminho_str, "painel_p2")
 
     with tab_p4:
-        with abrir_conexao_analitica(caminho_str, garantir_construcao=False) as conn:
-            resp = assistente.responder(
-                conn,
-                "Os setores com maior rotatividade praticam salários médios mais baixos?",
-                filtro_cargo=cargo_filtro,
-                sigla_uf_override=filtro_uf,
-                ano_override=filtro_ano,
-            )
-        renderizar_resposta_geral(resp, caminho_str, assistente, "painel_p4")
+        resp_p4 = obter_resposta_cached(
+            caminho_str,
+            "Os setores com maior rotatividade praticam salários médios mais baixos?",
+            filtro_cargo=cargo_filtro,
+            sigla_uf_override=filtro_uf,
+            ano_override=filtro_ano,
+        )
+        renderizar_resposta_geral(resp_p4, caminho_str, "painel_p4")
 
     with tab_p5:
-        with abrir_conexao_analitica(caminho_str, garantir_construcao=False) as conn:
-            resp = assistente.responder(
-                conn,
-                "Como o perfil sociodemográfico impacta o salário médio de admissão?",
-                filtro_cargo=cargo_filtro,
-                sigla_uf_override=filtro_uf,
-                ano_override=filtro_ano,
-                eixo_override="sexo",
-            )
-        renderizar_resposta_geral(resp, caminho_str, assistente, "painel_p5")
+        resp_p5 = obter_resposta_cached(
+            caminho_str,
+            "Como o perfil sociodemográfico impacta o salário médio de admissão?",
+            filtro_cargo=cargo_filtro,
+            sigla_uf_override=filtro_uf,
+            ano_override=filtro_ano,
+            eixo_override="sexo",
+        )
+        renderizar_resposta_geral(resp_p5, caminho_str, "painel_p5")
 
 
 # ==============================================================================
@@ -706,7 +837,6 @@ def render_view_painel_executivo(
 def render_view_busca_cbo(
     caminho_str: str,
     indice: IndiceVetorialCBO,
-    assistente: AssistenteTextToSQL,
     filtro_uf: str | None,
     filtro_ano: int | None,
 ) -> None:
@@ -748,11 +878,20 @@ def render_view_busca_cbo(
         return
 
     top1 = resultados[0]
-    codigos_encontrados = [r.codigo_cbo for r in resultados]
+    codigos_encontrados = tuple(r.codigo_cbo for r in resultados)
 
-    with abrir_conexao_analitica(caminho_str, garantir_construcao=False) as conn:
-        ind_sel = consultar_indicadores_cbo(conn, codigos_cbo=[top1.codigo_cbo], sigla_uf=filtro_uf, ano=filtro_ano)
-        ind_grupo = consultar_indicadores_cbo(conn, codigos_cbo=codigos_encontrados, sigla_uf=filtro_uf, ano=filtro_ano)
+    ind_sel = consultar_indicadores_cbo_cached(
+        caminho_str,
+        codigos_cbo=(top1.codigo_cbo,),
+        sigla_uf=filtro_uf,
+        ano=filtro_ano,
+    )
+    ind_grupo = consultar_indicadores_cbo_cached(
+        caminho_str,
+        codigos_cbo=codigos_encontrados,
+        sigla_uf=filtro_uf,
+        ano=filtro_ano,
+    )
 
     st.write("")
     st.markdown(f"**Ocupação principal:** `{top1.codigo_cbo}` — {top1.titulo_ocupacao}")
@@ -791,32 +930,30 @@ def render_view_busca_cbo(
         st.dataframe(pd.DataFrame(linhas_tab), hide_index=True)
 
     with tab_perfil:
-        with abrir_conexao_analitica(caminho_str, garantir_construcao=False) as conn:
-            resp_perfil = assistente.responder(
-                conn,
-                "Como o perfil sociodemográfico impacta o salário médio de admissão?",
-                filtro_cargo=termo_ativo,
-                codigos_cbo_override=[top1.codigo_cbo],
-                sigla_uf_override=filtro_uf,
-                ano_override=filtro_ano,
-                eixo_override="sexo",
-            )
+        resp_perfil = obter_resposta_cached(
+            caminho_str,
+            "Como o perfil sociodemográfico impacta o salário médio de admissão?",
+            filtro_cargo=termo_ativo,
+            codigos_cbo_override=[top1.codigo_cbo],
+            sigla_uf_override=filtro_uf,
+            ano_override=filtro_ano,
+            eixo_override="sexo",
+        )
         df_p = pd.DataFrame(resp_perfil.linhas, columns=resp_perfil.colunas)
         if not df_p.empty:
-            render_p5_sociodemografico(df_p, resp_perfil.filtros_aplicados, caminho_str, assistente, "cbo_view")
+            render_p5_sociodemografico(df_p, resp_perfil.filtros_aplicados, caminho_str, "cbo_view", resp_perfil)
         else:
             st.info("Sem registros demográficos para esta ocupação no filtro atual.")
 
     with tab_geo:
-        with abrir_conexao_analitica(caminho_str, garantir_construcao=False) as conn:
-            resp_geo = assistente.responder(
-                conn,
-                "Qual é a diferença no saldo líquido e no salário médio entre as capitais e o interior?",
-                filtro_cargo=termo_ativo,
-                codigos_cbo_override=[top1.codigo_cbo],
-                sigla_uf_override=filtro_uf,
-                ano_override=filtro_ano,
-            )
+        resp_geo = obter_resposta_cached(
+            caminho_str,
+            "Qual é a diferença no saldo líquido e no salário médio entre as capitais e o interior?",
+            filtro_cargo=termo_ativo,
+            codigos_cbo_override=[top1.codigo_cbo],
+            sigla_uf_override=filtro_uf,
+            ano_override=filtro_ano,
+        )
         df_g = pd.DataFrame(resp_geo.linhas, columns=resp_geo.colunas)
         if not df_g.empty:
             render_p3_capitais_interior(df_g, top1.titulo_ocupacao)
@@ -830,7 +967,6 @@ def render_view_busca_cbo(
 
 def render_view_assistente_sql(
     caminho_str: str,
-    assistente: AssistenteTextToSQL,
     filtro_uf: str | None,
     filtro_ano: int | None,
     cargo_filtro: str | None,
@@ -864,14 +1000,13 @@ def render_view_assistente_sql(
     if not pergunta_ativa:
         return
 
-    with abrir_conexao_analitica(caminho_str, garantir_construcao=False) as conn:
-        resposta = assistente.responder(
-            conn,
-            pergunta_ativa,
-            filtro_cargo=cargo_filtro,
-            sigla_uf_override=filtro_uf,
-            ano_override=filtro_ano,
-        )
+    resposta = obter_resposta_cached(
+        caminho_str,
+        pergunta_ativa,
+        filtro_cargo=cargo_filtro,
+        sigla_uf_override=filtro_uf,
+        ano_override=filtro_ano,
+    )
 
     if not resposta.suportada:
         if resposta.intencao == "bloqueada_seguranca":
@@ -882,7 +1017,7 @@ def render_view_assistente_sql(
         return
 
     st.write("")
-    renderizar_resposta_geral(resposta, caminho_str, assistente, "assistente_sql")
+    renderizar_resposta_geral(resposta, caminho_str, "assistente_sql")
 
 
 # ==============================================================================
@@ -899,7 +1034,22 @@ def main() -> None:
     st.markdown(ESTILO_CSS, unsafe_allow_html=True)
 
     caminho_duckdb = obter_caminho_duckdb()
-    indice, assistente, resumo = carregar_recursos_analiticos(str(caminho_duckdb))
+    try:
+        indice, _, resumo = carregar_recursos_analiticos(str(caminho_duckdb))
+    except (FileNotFoundError, RuntimeError, duckdb.Error) as exc:
+        st.markdown("## METRA — Mercado de Trabalho Formal no Centro-Oeste")
+        st.error(
+            "**Camada analítica Gold indisponível para leitura**\n\n"
+            f"{exc}\n\n"
+            "O painel opera exclusivamente em modo leitura (`READ_ONLY`) e não reconstrói o banco analítico "
+            "automaticamente. Materialize a camada Gold pelo pipeline oficial:\n"
+            "```bash\n"
+            "cd dbt_metra\n"
+            "dbt build --profiles-dir .\n"
+            "```\n"
+            "Ou execute o job de materialização no Dagster (`dagster dev -w workspace.yaml`)."
+        )
+        st.stop()
 
     with st.sidebar:
         st.markdown("### METRA")
@@ -945,7 +1095,7 @@ def main() -> None:
             f"Saldo: {fmt_int(resumo['saldo'], True)}"
         )
 
-    # Cabeçalho principal
+    # Cabeçalho principal (com html.escape em todas as variáveis interpoladas)
     st.markdown("## METRA — Mercado de Trabalho Formal no Centro-Oeste")
     filtros_ativos = [
         f"UF: {filtro_uf_efetivo}" if filtro_uf_efetivo else "Região: Centro-Oeste (DF, GO, MT, MS)",
@@ -955,12 +1105,12 @@ def main() -> None:
         filtros_ativos.append(f"Ocupação: {cargo_efetivo}")
     filtros_ativos.append(f"Salário médio na base: {fmt_moeda(resumo['salario_medio'])}")
 
-    st.markdown(f'<div class="header-meta">{" · ".join(filtros_ativos)}</div>', unsafe_allow_html=True)
+    texto_cabecalho = html.escape(" · ".join(filtros_ativos))
+    st.markdown(f'<div class="header-meta">{texto_cabecalho}</div>', unsafe_allow_html=True)
 
     if opcao_menu == "Perguntas de Gestão (P1–P5)":
         render_view_painel_executivo(
             str(caminho_duckdb),
-            assistente,
             filtro_uf_efetivo,
             filtro_ano_efetivo,
             cargo_efetivo,
@@ -969,14 +1119,12 @@ def main() -> None:
         render_view_busca_cbo(
             str(caminho_duckdb),
             indice,
-            assistente,
             filtro_uf_efetivo,
             filtro_ano_efetivo,
         )
     elif opcao_menu == "Consulta Text-to-SQL":
         render_view_assistente_sql(
             str(caminho_duckdb),
-            assistente,
             filtro_uf_efetivo,
             filtro_ano_efetivo,
             cargo_efetivo,
