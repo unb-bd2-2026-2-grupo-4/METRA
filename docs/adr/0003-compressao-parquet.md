@@ -16,17 +16,17 @@ A amostra versionada contém 49.178 movimentações do Centro-Oeste: 14.834 em 2
 
 ## 2. Alternativas consideradas
 
-### A. Snappy
+### A. Uncompressed — opção nula
+
+Dispensa codec de compressão, mas mantém a codificação colunar do Parquet. É a referência de tamanho e de custo sem compressão; não equivale a CSV bruto. Foi descartado por ocupar mais espaço sem vantagem suficiente de tempo.
+
+### B. Snappy
 
 Manter o padrão existente, com compressão e descompressão rápidas. Não exige dependências novas nem mudança no leitor. Foi escolhido pelo critério medido abaixo.
 
-### B. Zstd
+### C. Zstd
 
 Busca maior redução de armazenamento, podendo consumir mais processamento. É suportado pelo mesmo escritor e leitor. Gerou o menor arquivo, mas excedeu a tolerância de tempo neste experimento.
-
-### C. Uncompressed — opção nula
-
-Dispensa codec de compressão, mas mantém a codificação colunar do Parquet. É a referência de tamanho e de custo sem compressão; não equivale a CSV bruto. Foi descartado por ocupar mais espaço sem vantagem suficiente de tempo.
 
 ---
 
