@@ -1,0 +1,1984 @@
+
+<!doctype html>
+<html lang="pt" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="METRA (Monitoramento e Engenharia de dados do TRAbalho) | Projeto Integrado de Banco de Dados 2 (FCTE/UnB) - Squad G4">
+      
+      
+        <meta name="author" content="Squad G4">
+      
+      
+        <link rel="canonical" href="https://unb-bd2-2026-2-grupo-4.github.io/METRA/camada-analitica-dbt/">
+      
+      
+        <link rel="prev" href="../camada-parquet/">
+      
+      
+        <link rel="next" href="../orquestracao/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.1">
+    
+    
+      
+        <title>Camada Analítica e Qualidade dbt - METRA (Monitoramento e Engenharia de dados do TRAbalho)</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.57a0d79d.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.fb2fffe2.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Poppins:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Poppins";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="teal" data-md-color-accent="deep-purple">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#camada-analitica-com-dbt" class="md-skip">
+          Pular para conteúdo
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Cabeçalho">
+    <a href=".." title="METRA (Monitoramento e Engenharia de dados do TRAbalho)" class="md-header__button md-logo" aria-label="METRA (Monitoramento e Engenharia de dados do TRAbalho)" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            METRA (Monitoramento e Engenharia de dados do TRAbalho)
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Camada Analítica e Qualidade dbt
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="teal" data-md-color-accent="deep-purple"  aria-label="Alternar para modo escuro"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Alternar para modo escuro" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="teal" data-md-color-accent="deep-purple"  aria-label="Alternar para modo claro"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Alternar para modo claro" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Buscar" placeholder="Buscar" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Pesquisar">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Limpar" aria-label="Limpar" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Inicializando busca
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/unb-bd2-2026-2-grupo-4/METRA" title="Ir para repositório" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    unb-bd2-2026-2-grupo-4/METRA
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Abas" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href=".." class="md-tabs__link">
+          
+  
+  
+  Visão Geral
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../arquitetura/" class="md-tabs__link">
+          
+  
+  
+  Engenharia de Dados
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../adr/0001-modelagem-sistema-origem/" class="md-tabs__link">
+          
+  
+  
+  Governança & Decisões
+
+        </a>
+      </li>
+    
+  
+
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navegação" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="METRA (Monitoramento e Engenharia de dados do TRAbalho)" class="md-nav__button md-logo" aria-label="METRA (Monitoramento e Engenharia de dados do TRAbalho)" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    METRA (Monitoramento e Engenharia de dados do TRAbalho)
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/unb-bd2-2026-2-grupo-4/METRA" title="Ir para repositório" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    unb-bd2-2026-2-grupo-4/METRA
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_1" id="__nav_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Visão Geral
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Visão Geral
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Início
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dominio/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Domínio e Gestão
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engenharia de Dados
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Engenharia de Dados
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../arquitetura/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Arquitetura da Plataforma
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../camada-bronze/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Camada Bronze
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../relacionamentos/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Relacionamento entre as Bases
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cdc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Captura de Mudanças (CDC)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../camada-parquet/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extração para Parquet e Delta
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Camada Analítica e Qualidade dbt
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Camada Analítica e Qualidade dbt
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Índice">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Índice
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#fluxo-e-arquivos" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fluxo e arquivos
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#executar-e-inspecionar-os-testes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Executar e inspecionar os testes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Executar e inspecionar os testes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#matriz-de-qualidade-implementada" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Matriz de qualidade implementada
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#como-tratar-uma-falha" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Como tratar uma falha
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reproducao-sem-banco-de-origem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reprodução sem banco de origem
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#star-schema-implementado-na-gold" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Star Schema implementado na Gold
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Star Schema implementado na Gold">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#variacao-lenta-e-testes-gold-a-integrar" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Variação lenta e testes Gold a integrar
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#freshness-e-proximos-criterios-de-aceite" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Freshness e próximos critérios de aceite
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../orquestracao/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Orquestração com Dagster
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../consumo-e-governanca/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consumo e Governança
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Governança & Decisões
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Governança & Decisões
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_1" id="__nav_3_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decisões de Arquitetura (ADR)
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Decisões de Arquitetura (ADR)
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0001-modelagem-sistema-origem/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0001: Origem Transacional OLTP
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0002-simplificacao-arquitetural-duckdb/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0002: Simplificação com DuckDB
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0003-compressao-parquet/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0003: Compressão Parquet
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0004-cdc-decodificacao-logica/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0004: Estratégia de CDC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0005-modelagem-analitica-dbt/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0005: Modelagem Analítica e Qualidade
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0006-orquestracao-com-dagster/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0006: Adoção do Dagster para o Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0007-busca-semantica-e-consumo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0007: Busca Semântica CBO e Text-to-SQL
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../uso-de-ia/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Governança e IA
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Diário de Bordo
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Diário de Bordo
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diario/semana-01/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Semana 01
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diario/semana-02/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Semana 02
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diario/semana-03/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Semana 03
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diario/semana-04/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Semana 04
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diario/semana-05/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Semana 05
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diario/semana-06/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Semana 06
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diario/semana-07/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Semana 07
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diario/semana-08/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Semana 08
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diario/semana-09/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Semana 09
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Índice">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Índice
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#fluxo-e-arquivos" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fluxo e arquivos
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#executar-e-inspecionar-os-testes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Executar e inspecionar os testes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Executar e inspecionar os testes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#matriz-de-qualidade-implementada" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Matriz de qualidade implementada
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#como-tratar-uma-falha" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Como tratar uma falha
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reproducao-sem-banco-de-origem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reprodução sem banco de origem
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#star-schema-implementado-na-gold" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Star Schema implementado na Gold
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Star Schema implementado na Gold">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#variacao-lenta-e-testes-gold-a-integrar" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Variação lenta e testes Gold a integrar
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#freshness-e-proximos-criterios-de-aceite" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Freshness e próximos critérios de aceite
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="camada-analitica-com-dbt">Camada analítica com dbt</h1>
+<p>O projeto contém as cinco fontes Parquet, os quatro modelos Silver, as cinco dimensões e quatro fatos Gold. Esta entrega acrescenta os <strong>122 testes genéricos das fontes/Silver</strong>, o benchmark e a documentação de modelagem. Os testes genéricos específicos da Gold e a implementação de SCD continuam pendentes, enquanto os testes Python de negócio da Gold já existem na base. O diagrama abaixo representa os modelos atuais.</p>
+<h2 id="fluxo-e-arquivos">Fluxo e arquivos</h2>
+<pre class="mermaid"><code>flowchart LR
+    O[PostgreSQL: oltp] --&gt;|exportar_parquet.py| P[Parquet por tabela]
+    P --&gt;|dbt sources| S[Silver: quatro modelos stg]
+    S --&gt; T[Testes de qualidade]
+    S --&gt; G[Gold: dimensões e fatos]
+    G -. integração pendente .-&gt; D[Streamlit]</code></pre>
+<p>As fontes são <code>movimentacao</code>, <code>municipio</code>, <code>cbo_2002</code>, <code>cnae_subclasse</code> e <code>cnae_secao</code>. O caminho é <code>data/lake/parquet/&lt;tabela&gt;/**/*.parquet</code>, com <code>hive_partitioning=false</code>; não é um único conjunto plano de arquivos. A transformação Silver normaliza nomes, acrescenta flags e mantém os códigos como texto. O join entre subclasse e seção CNAE produz <code>stg_cnae</code>.</p>
+<p>O destino padrão é <strong><code>data/metra_analitico.duckdb</code></strong>, schema <code>silver</code>. <code>data/metra.duckdb</code> é usado pela análise anterior: o painel e o Dagster devem respeitar <code>METRA_DUCKDB</code> ou alinhar essa configuração antes da integração. Execuções concorrentes de escrita devem ser coordenadas pelo orquestrador.</p>
+<hr />
+<h2 id="executar-e-inspecionar-os-testes">Executar e inspecionar os testes</h2>
+<p>Após a carga OLTP e a exportação descritas no <a href="https://github.com/unb-bd2-2026-2-grupo-4/METRA#readme">README</a>, na raiz do repositório:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>python3<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-r<span class="w"> </span>requirements-pipeline.txt
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nb">cd</span><span class="w"> </span>dbt_metra
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>dbt<span class="w"> </span>build<span class="w"> </span>--profiles-dir<span class="w"> </span>.
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>dbt<span class="w"> </span><span class="nb">test</span><span class="w"> </span>--profiles-dir<span class="w"> </span>.
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>dbt<span class="w"> </span>docs<span class="w"> </span>generate<span class="w"> </span>--profiles-dir<span class="w"> </span>.
+</code></pre></div>
+<p><code>dbt build</code> executa modelos e testes em ordem de dependência. <code>dbt test</code> verifica o estado materializado sem reconstruí-lo. Preserve <code>target/manifest.json</code> e <code>target/run_results.json</code> como artefatos da execução no Dagster/CI, associados ao lote e ao commit; não os versione como dados de negócio. Esses arquivos são locais e ignorados pelo Git.</p>
+<p>Para apontar para outro lake ou destino, use caminhos absolutos nas variáveis <code>METRA_LAKE_PARQUET</code> e <code>METRA_DUCKDB</code>. O diretório pai do banco deve existir.</p>
+<h3 id="matriz-de-qualidade-implementada">Matriz de qualidade implementada</h3>
+<table>
+<thead>
+<tr>
+<th>Categoria</th>
+<th>O que é verificado</th>
+<th>Local</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Schema</td>
+<td>Colunas e tipos materializados, incluindo códigos textuais, competência <code>DATE</code> e salário <code>DECIMAL(16,2)</code></td>
+<td><code>models/staging/schema.yml</code></td>
+</tr>
+<tr>
+<td>Obrigatoriedade e unicidade</td>
+<td>PKs, atributos obrigatórios e par <code>(id_ingestao, numero_linha)</code></td>
+<td>Fontes e Silver</td>
+</tr>
+<tr>
+<td>Integridade referencial</td>
+<td>Município, CBO e CNAE da movimentação; seção da subclasse na origem</td>
+<td>Fontes e Silver</td>
+</tr>
+<tr>
+<td>Domínios</td>
+<td>Ano 2023–2026, mês 1–12, saldo ±1, sexo, raça/cor, UF e seção CNAE</td>
+<td>Fontes/Silver conforme coluna</td>
+</tr>
+<tr>
+<td>Limites</td>
+<td>Idade nula ou 10–120; salário/horas nulos ou não negativos; IDs de linhagem positivos</td>
+<td>Silver</td>
+</tr>
+<tr>
+<td>Formatos</td>
+<td>Município e CNAE com 7 dígitos; CBO com 6, inclusive zeros à esquerda</td>
+<td>Silver</td>
+</tr>
+<tr>
+<td>Coerência</td>
+<td>Competência, tipo de evento, salário válido, sentinelas, capitais do recorte e flags de cadastros</td>
+<td>Silver</td>
+</tr>
+<tr>
+<td>Volume</td>
+<td>Tabelas não vazias; referências com mesma contagem da origem; movimentos com total de IDs distintos da origem</td>
+<td>Fontes e Silver</td>
+</tr>
+<tr>
+<td>Distribuição</td>
+<td>Conservação das contagens por competência, por competência/município e por perfil/saldo</td>
+<td>Silver versus Parquet</td>
+</tr>
+<tr>
+<td>Série temporal</td>
+<td>Meses ausentes e razão de volume mensal fora de 0,25–4 vezes o mês anterior</td>
+<td>Aviso em <code>silver_volume_mensal</code></td>
+</tr>
+</tbody>
+</table>
+<p>As definições dos modelos antes mantidas em <code>_staging__models.yml</code> foram concentradas em <code>schema.yml</code>, evitando dois patches dbt para o mesmo modelo. Os testes genéricos SQL estão em <code>tests/generic/qualidade.sql</code>, dentro de <code>dbt_metra/</code>, e não exigem <code>dbt-utils</code>.</p>
+<p>Os testes seguem os domínios da migração OLTP existente. Escolaridade e tipo detalhado de movimentação têm obrigatoriedade, mas ainda não uma lista oficial de valores aceitos: isso depende do dicionário validado pela equipe. Idade nula, salário/horas nulos ou zero e os sentinelas documentados são aceitos. Essas exceções não devem ser convertidas em “dados válidos para toda análise”: a média salarial usa apenas salários positivos.</p>
+<h3 id="como-tratar-uma-falha">Como tratar uma falha</h3>
+<ul>
+<li><strong>Erro:</strong> não promover o resultado para consumo; investigar fonte, chave ou transformação, corrigir e reexecutar. <code>dbt build</code> não garante rollback global de todos os modelos: uma publicação atômica do banco é responsabilidade da integração com o Dagster.</li>
+<li><strong>Aviso de distribuição temporal:</strong> investigar mês parcial, sazonalidade, atraso e falha de ingestão. Os limites são critérios operacionais iniciais, não limites estatísticos calibrados. Não usar <code>--warn-error</code> indiscriminadamente sem decidir essa política.</li>
+<li><strong>Duplicata na fonte:</strong> o snapshot Parquet 1:1 deveria ter PK única. A deduplicação de <code>stg_movimentacao</code> permanece, mas não deve ocultar defeito na extração; o teste de unicidade da fonte sinaliza o problema.</li>
+<li><strong>CNAE sem seção:</strong> o teste na fonte captura a referência ausente antes que o <code>inner join</code> a descarte. A reconciliação de contagem também protege contra perda silenciosa.</li>
+</ul>
+<h3 id="reproducao-sem-banco-de-origem">Reprodução sem banco de origem</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># Na raiz, no ambiente Python com as dependências instaladas:</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>python<span class="w"> </span>-m<span class="w"> </span>unittest<span class="w"> </span>discover<span class="w"> </span>-s<span class="w"> </span>tests<span class="w"> </span>-p<span class="w"> </span><span class="s1">'test_dbt_quality.py'</span><span class="w"> </span>-v
+</code></pre></div>
+<p>A suíte cria cinco conjuntos Parquet sintéticos em diretório temporário, executa o dbt real e remove os arquivos ao terminar. Não usa <code>data/lake/</code> nem exige PostgreSQL ou rede depois da instalação. O cenário válido tem 12 movimentos em três competências, incluindo nulos permitidos, sentinelas e códigos com zero inicial. Os cenários negativos verificam alteração de tipo, dados inválidos, duplicação, referências ausentes, mudança de distribuição sem mudança do total, tabela vazia e mês ausente. Isso valida os testes, não substitui a execução sobre a carga real completa.</p>
+<hr />
+<h2 id="star-schema-implementado-na-gold">Star Schema implementado na Gold</h2>
+<p><strong>Grão da fato:</strong> uma linha por movimentação de admissão ou desligamento do Novo CAGED, identificada por <code>id_movimentacao</code> da origem. Não é uma linha por trabalhador, por vínculo ativo ou por município/mês. Os microdados utilizados não permitem estimar individualmente a probabilidade de recolocação.</p>
+<p>As marcações PK/FK abaixo expressam as chaves e relações lógicas dos modelos dbt; não significam que o DuckDB tenha constraints físicas declaradas. Os nomes correspondem aos arquivos de <code>models/marts/</code>.</p>
+<pre class="mermaid"><code>erDiagram
+    DIM_COMPETENCIA ||--o{ FCT_MOVIMENTACAO : competencia
+    DIM_MUNICIPIO ||--o{ FCT_MOVIMENTACAO : id_municipio
+    DIM_CBO ||--o{ FCT_MOVIMENTACAO : codigo_cbo
+    DIM_CNAE ||--o{ FCT_MOVIMENTACAO : codigo_cnae_subclasse
+    DIM_PERFIL_DEMOGRAFICO ||--o{ FCT_MOVIMENTACAO : id_perfil_demografico
+
+    FCT_MOVIMENTACAO {
+        bigint id_movimentacao PK
+        date competencia FK
+        varchar id_municipio FK
+        varchar codigo_cbo FK
+        varchar codigo_cnae_subclasse FK
+        varchar id_perfil_demografico FK
+        integer idade
+        integer saldo_movimentacao
+        decimal salario_mensal
+        boolean salario_valido
+        bigint id_ingestao
+        bigint numero_linha
+    }
+    DIM_COMPETENCIA {
+        date competencia PK
+        integer ano
+        integer mes
+        integer trimestre
+        boolean tem_dados
+    }
+    DIM_MUNICIPIO {
+        varchar id_municipio PK
+        varchar nome_municipio
+        varchar sigla_uf
+        boolean is_capital
+        boolean is_identificado
+    }
+    DIM_CBO {
+        varchar codigo_cbo PK
+        varchar titulo_ocupacao
+        varchar codigo_grande_grupo
+        boolean is_cadastro_oficial
+    }
+    DIM_CNAE {
+        varchar codigo_cnae_subclasse PK
+        varchar descricao_subclasse
+        varchar codigo_secao
+        varchar descricao_secao
+    }
+    DIM_PERFIL_DEMOGRAFICO {
+        varchar id_perfil_demografico PK
+        integer codigo_sexo
+        integer codigo_raca_cor
+        integer codigo_grau_instrucao
+        integer codigo_faixa_etaria
+    }</code></pre>
+<p><code>fct_movimentacao</code> preserva o detalhe da Silver e acrescenta os atributos das dimensões por <code>left join</code>. A chave do perfil é a combinação dos códigos de sexo, raça/cor, escolaridade e faixa etária. A dimensão de competência preenche o intervalo mensal observado e marca os meses que possuem registros com <code>tem_dados</code>.</p>
+<p>As três fatos agregadas derivam de <code>fct_movimentacao</code>, filtrando municípios identificados do Centro-Oeste e anos de 2023 a 2026:</p>
+<table>
+<thead>
+<tr>
+<th>Modelo</th>
+<th>Grão: uma linha por combinação de</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>fct_setor_mensal</code></td>
+<td><code>competencia</code>, <code>sigla_uf</code>, <code>codigo_secao</code></td>
+</tr>
+<tr>
+<td><code>fct_geografia_mensal</code></td>
+<td><code>competencia</code>, <code>sigla_uf</code>, <code>is_capital</code></td>
+</tr>
+<tr>
+<td><code>fct_perfil_mensal</code></td>
+<td><code>competencia</code>, <code>sigla_uf</code>, <code>is_capital</code>, <code>codigo_secao</code>, <code>id_perfil_demografico</code></td>
+</tr>
+</tbody>
+</table>
+<p>As métricas são compartilhadas pela macro <code>metricas_movimentacao</code>; incluem contagens, saldo, soma salarial e quantidade de salários de admissão elegíveis, para recompor médias ponderadas. A implementação das perguntas P1–P5 é descrita em <code>dbt_metra/analyses/README.md</code> no repositório.</p>
+<h3 id="variacao-lenta-e-testes-gold-a-integrar">Variação lenta e testes Gold a integrar</h3>
+<p>A dimensão <code>dim_cbo</code> atual copia <code>stg_cbo</code> e não mantém histórico de versões. Como evolução ainda não implementada, a proposta é preservar mudanças do título CBO por <strong>SCD tipo 2</strong>, em vez de sobrescrever versões. Os intervalos <code>[observado_desde, observado_ate)</code> registram quando o projeto observou cada cadastro; a fonte atual não fornece vigência histórica da ocupação. Não atribuir retroativamente a 2023 uma validade que só começou a ser observada em 2026.</p>
+<p>Um campo futuro <code>referencia_cadastro_em</code> seria o instante de associação do fato ao cadastro observado, distinto da competência de negócio e de <code>registrado_em</code> da origem. Essa associação deve ser persistida; um rebuild que troca todas as chaves pela versão atual destruiria a história. Snapshot, política de associação da carga inicial e preservação de chaves ainda precisam de implementação na Gold.</p>
+<table>
+<thead>
+<tr>
+<th>Contrato Gold pendente</th>
+<th>Testes a conectar ao modelo real</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Grão da fato</td>
+<td><code>not_null</code>/<code>unique</code> de <code>id_movimentacao</code>; contagem e saldo iguais à Silver</td>
+</tr>
+<tr>
+<td>Dimensões</td>
+<td>PK única/não nula e FKs da fato sem órfãos, inclusive sentinelas</td>
+</tr>
+<tr>
+<td>CBO SCD2</td>
+<td>Chave de versão única; no máximo uma versão aberta por código; intervalo positivo; ausência de sobreposição; associação da fato dentro do intervalo de observação</td>
+</tr>
+<tr>
+<td>Perfil e competência</td>
+<td>Unicidade do conjunto de códigos do perfil; mês/ano coerentes; zero duplicação em joins</td>
+</tr>
+<tr>
+<td>Agregados de consumo</td>
+<td>Admissões/desligamentos/saldo reconciliados; salário calculado por soma/contagem válida, nunca média de médias</td>
+</tr>
+<tr>
+<td>Distribuição</td>
+<td>Mesmos totais por UF, competência, setor e perfil antes e depois da modelagem</td>
+</tr>
+</tbody>
+</table>
+<p>Os testes genéricos deste PR se limitam às fontes e à Silver. Para completar a cobertura Gold, acrescentar os testes ao YAML de contratos já existente (<code>models/marts/_gold__models.yml</code>), sem duplicar patches de modelos em outro arquivo. Os testes de negócio em <code>tests/test_gold.py</code> complementam, mas não substituem, esses contratos. Os testes SCD dependem da implementação do histórico.</p>
+<hr />
+<h2 id="freshness-e-proximos-criterios-de-aceite">Freshness e próximos critérios de aceite</h2>
+<p><strong>SLA proposto para validação da equipe:</strong> publicar consumo validado em até 24 horas após o sucesso da extração do snapshot completo. Medir <code>publicacao_validada_em - extracao_concluida_em</code> para o mesmo lote; alerta quando exceder o SLA. Esses metadados ainda precisam ser persistidos pelo fluxo de orquestração.</p>
+<p><code>max(competencia)</code> indica cobertura temporal do dado, não freshness de processamento. O conjunto disponível pode terminar em janeiro/2026 e ainda ter sido processado hoje. <code>registrado_em</code> também não substitui o instante da extração.</p>
+<p>A <a href="https://unb-bd2.github.io/PlanoEnsino/projeto/e3/">E3</a> exige ainda retry/backfill demonstrados, consulta otimizada com evidências e painel. O benchmark da <a href="../adr/0005-modelagem-analitica-dbt/">ADR-0005</a> compara granularidades sobre a amostra, mas não comprova otimização da Gold, SCD nem orquestração. Os comandos <code>EXPLAIN ANALYZE</code> anexos são do DuckDB; não equivalem ao <code>EXPLAIN (ANALYZE, BUFFERS)</code> PostgreSQL solicitado no checklist. Alinhar com a docente a evidência apropriada ao motor usado.</p>
+<p>Referências de implementação: <a href="https://docs.getdbt.com/reference/resource-properties/data-tests">testes declarativos dbt</a> e <a href="https://docs.getdbt.com/best-practices/writing-custom-generic-tests">testes genéricos SQL</a>.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Voltar para o topo
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "navigation.expand", "content.code.copy", "search.suggest", "search.highlight"], "search": "../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copiado para \u00e1rea de transfer\u00eancia", "clipboard.copy": "Copiar para \u00e1rea de transfer\u00eancia", "search.result.more.one": "mais 1 nesta p\u00e1gina", "search.result.more.other": "# mais nesta p\u00e1gina", "search.result.none": "Nenhum documento encontrado", "search.result.one": "1 documento encontrado", "search.result.other": "# documentos encontrados", "search.result.placeholder": "Digite para iniciar a busca", "search.result.term.missing": "Ausente", "select.version": "Selecione a vers\u00e3o"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.a5f9d56c.min.js"></script>
+      
+    
+  </body>
+</html>

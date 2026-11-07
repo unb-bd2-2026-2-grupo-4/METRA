@@ -1,0 +1,347 @@
+{
+  "data_utc": "2026-10-15T03:38:05.286800+00:00",
+  "ambiente": {
+    "python": "3.12.14",
+    "duckdb": "1.5.6",
+    "plataforma": "Linux-6.18.44-x86_64-with-glibc2.39",
+    "threads": 1
+  },
+  "fonte": {
+    "tipo": "CSV amostral tipado; linhagem reconstruida, sem PostgreSQL",
+    "arquivo": "caged_centro_oeste_amostra.csv",
+    "sha256": "507f52f8599a91e6750f56f89dcad9a8674a3a02c6e1f180d39da3e0dc63066c",
+    "linhagem": "IDs sequenciais; id_ingestao=1; registrado_em=2026-10-15T00:00:00Z"
+  },
+  "linhas": 49178,
+  "schema": [
+    [
+      "id_movimentacao",
+      "BIGINT",
+      "YES",
+      null,
+      null,
+      null
+    ],
+    [
+      "ano",
+      "INTEGER",
+      "YES",
+      null,
+      null,
+      null
+    ],
+    [
+      "mes",
+      "INTEGER",
+      "YES",
+      null,
+      null,
+      null
+    ],
+    [
+      "id_municipio",
+      "VARCHAR",
+      "YES",
+      null,
+      null,
+      null
+    ],
+    [
+      "cnae_2_subclasse",
+      "VARCHAR",
+      "YES",
+      null,
+      null,
+      null
+    ],
+    [
+      "cbo_2002",
+      "VARCHAR",
+      "YES",
+      null,
+      null,
+      null
+    ],
+    [
+      "sexo",
+      "INTEGER",
+      "YES",
+      null,
+      null,
+      null
+    ],
+    [
+      "raca_cor",
+      "INTEGER",
+      "YES",
+      null,
+      null,
+      null
+    ],
+    [
+      "idade",
+      "INTEGER",
+      "YES",
+      null,
+      null,
+      null
+    ],
+    [
+      "grau_instrucao",
+      "INTEGER",
+      "YES",
+      null,
+      null,
+      null
+    ],
+    [
+      "tipo_movimentacao",
+      "INTEGER",
+      "YES",
+      null,
+      null,
+      null
+    ],
+    [
+      "saldo_movimentacao",
+      "INTEGER",
+      "YES",
+      null,
+      null,
+      null
+    ],
+    [
+      "salario_mensal",
+      "DECIMAL(16,2)",
+      "YES",
+      null,
+      null,
+      null
+    ],
+    [
+      "horas_contratuais",
+      "DECIMAL(5,2)",
+      "YES",
+      null,
+      null,
+      null
+    ],
+    [
+      "id_ingestao",
+      "BIGINT",
+      "YES",
+      null,
+      null,
+      null
+    ],
+    [
+      "numero_linha",
+      "BIGINT",
+      "YES",
+      null,
+      null,
+      null
+    ],
+    [
+      "registrado_em",
+      "TIMESTAMP WITH TIME ZONE",
+      "YES",
+      null,
+      null,
+      null
+    ]
+  ],
+  "particoes": [
+    [
+      2023,
+      14834
+    ],
+    [
+      2024,
+      16160
+    ],
+    [
+      2025,
+      16735
+    ],
+    [
+      2026,
+      1449
+    ]
+  ],
+  "metodo": "1 aquecimento + repeticoes; ordem rotativa; hash de todas as colunas; cache SO nao limpo; sem fsync",
+  "criterio": "menor tamanho com mediana escrita + mediana leitura <= 1.25 vezes Snappy",
+  "medicoes": {
+    "uncompressed": [
+      {
+        "rodada": 1,
+        "bytes": 1685300,
+        "arquivos": 4,
+        "escrita_s": 0.07034362999991117,
+        "leitura_s": 0.02045795900005487
+      },
+      {
+        "rodada": 2,
+        "bytes": 1685300,
+        "arquivos": 4,
+        "escrita_s": 0.04661270200006129,
+        "leitura_s": 0.015863760000002003
+      },
+      {
+        "rodada": 3,
+        "bytes": 1685300,
+        "arquivos": 4,
+        "escrita_s": 0.061888482999961525,
+        "leitura_s": 0.02834256399989954
+      },
+      {
+        "rodada": 4,
+        "bytes": 1685300,
+        "arquivos": 4,
+        "escrita_s": 0.06074989700005062,
+        "leitura_s": 0.029294633000063186
+      },
+      {
+        "rodada": 5,
+        "bytes": 1685300,
+        "arquivos": 4,
+        "escrita_s": 0.04792550299998766,
+        "leitura_s": 0.017295725999929346
+      },
+      {
+        "rodada": 6,
+        "bytes": 1685300,
+        "arquivos": 4,
+        "escrita_s": 0.055715052999971704,
+        "leitura_s": 0.020742181000059645
+      },
+      {
+        "rodada": 7,
+        "bytes": 1685300,
+        "arquivos": 4,
+        "escrita_s": 0.04513021699995079,
+        "leitura_s": 0.03106248200003847
+      }
+    ],
+    "snappy": [
+      {
+        "rodada": 1,
+        "bytes": 960593,
+        "arquivos": 4,
+        "escrita_s": 0.05694362400004138,
+        "leitura_s": 0.018182573999979468
+      },
+      {
+        "rodada": 2,
+        "bytes": 960593,
+        "arquivos": 4,
+        "escrita_s": 0.05091280400006326,
+        "leitura_s": 0.01816734799990627
+      },
+      {
+        "rodada": 3,
+        "bytes": 960593,
+        "arquivos": 4,
+        "escrita_s": 0.054907264999997096,
+        "leitura_s": 0.020006195999940246
+      },
+      {
+        "rodada": 4,
+        "bytes": 960593,
+        "arquivos": 4,
+        "escrita_s": 0.04000692300007813,
+        "leitura_s": 0.017710512999997263
+      },
+      {
+        "rodada": 5,
+        "bytes": 960593,
+        "arquivos": 4,
+        "escrita_s": 0.056731018000050426,
+        "leitura_s": 0.020227976000001036
+      },
+      {
+        "rodada": 6,
+        "bytes": 960593,
+        "arquivos": 4,
+        "escrita_s": 0.0734864490000291,
+        "leitura_s": 0.018912546000024122
+      },
+      {
+        "rodada": 7,
+        "bytes": 960593,
+        "arquivos": 4,
+        "escrita_s": 0.0786883770000486,
+        "leitura_s": 0.019363353000017014
+      }
+    ],
+    "zstd": [
+      {
+        "rodada": 1,
+        "bytes": 556147,
+        "arquivos": 4,
+        "escrita_s": 0.06163257900004737,
+        "leitura_s": 0.023582359999977598
+      },
+      {
+        "rodada": 2,
+        "bytes": 556147,
+        "arquivos": 4,
+        "escrita_s": 0.05916302499997528,
+        "leitura_s": 0.02242143599994506
+      },
+      {
+        "rodada": 3,
+        "bytes": 556147,
+        "arquivos": 4,
+        "escrita_s": 0.056474877000027845,
+        "leitura_s": 0.02896160399996006
+      },
+      {
+        "rodada": 4,
+        "bytes": 556147,
+        "arquivos": 4,
+        "escrita_s": 0.09349295200001961,
+        "leitura_s": 0.0417431169998963
+      },
+      {
+        "rodada": 5,
+        "bytes": 556147,
+        "arquivos": 4,
+        "escrita_s": 0.08236720799993691,
+        "leitura_s": 0.03513209699997333
+      },
+      {
+        "rodada": 6,
+        "bytes": 556147,
+        "arquivos": 4,
+        "escrita_s": 0.10264934799999992,
+        "leitura_s": 0.05478117099994506
+      },
+      {
+        "rodada": 7,
+        "bytes": 556147,
+        "arquivos": 4,
+        "escrita_s": 0.12562949599998774,
+        "leitura_s": 0.05643710300000748
+      }
+    ]
+  },
+  "medianas": {
+    "uncompressed": {
+      "bytes": 1685300,
+      "escrita_s": 0.055715052999971704,
+      "leitura_s": 0.020742181000059645
+    },
+    "snappy": {
+      "bytes": 960593,
+      "escrita_s": 0.056731018000050426,
+      "leitura_s": 0.018912546000024122
+    },
+    "zstd": {
+      "bytes": 556147,
+      "escrita_s": 0.08236720799993691,
+      "leitura_s": 0.03513209699997333
+    }
+  },
+  "vencedor": "snappy"
+}
