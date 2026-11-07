@@ -67,14 +67,16 @@ nav:
       - Extração para Parquet e Delta: camada-parquet.md
       - Camada Analítica e Qualidade dbt: camada-analitica-dbt.md
       - Orquestração com Dagster: orquestracao.md
+      - Consumo e Governança: consumo-e-governanca.md
   - Governança & Decisões:
       - Decisões de Arquitetura (ADR):
           - "ADR 0001: Origem Transacional OLTP": adr/0001-modelagem-sistema-origem.md
           - "ADR 0002: Simplificação com DuckDB": adr/0002-simplificacao-arquitetural-duckdb.md
           - "ADR 0003: Compressão Parquet": adr/0003-compressao-parquet.md
           - "ADR 0004: Estratégia de CDC": adr/0004-cdc-decodificacao-logica.md
-          - "ADR 0005: Modelagem Analítica": adr/0005-modelagem-analitica-dbt.md
+          - "ADR 0005: Modelagem Analítica e Qualidade": adr/0005-modelagem-analitica-dbt.md
           - "ADR 0006: Adoção do Dagster para o Pipeline": adr/0006-orquestracao-com-dagster.md
+          - "ADR 0007: Busca Semântica CBO e Text-to-SQL": adr/0007-busca-semantica-e-consumo.md
       - Governança e IA: uso-de-ia.md
       - Diário de Bordo:
           - Semana 01: diario/semana-01.md

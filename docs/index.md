@@ -70,6 +70,24 @@ O recorte do projeto concentra-se no **Mercado de Trabalho Formal da Região Cen
     
     Extração dos dados transacionais para formatos analíticos abertos, com particionamento, compressão, validação de integridade e materialização em Delta Lake.
 
+-   **[Camada Analítica com dbt](camada-analitica-dbt.md)**
+    
+    ---
+    
+    Transformações das fontes Parquet nas camadas Silver e Gold, com modelos dimensionais e testes de qualidade dos dados.
+
+-   **[Orquestração com Dagster](orquestracao.md)**
+    
+    ---
+    
+    Coordenação do pipeline de ingestão, extração para Parquet e transformação dbt-duckdb por meio de um grafo de assets.
+
+-   **[Consumo e Governança](consumo-e-governanca.md)**
+    
+    ---
+    
+    Catálogo de métricas, perguntas de gestão, linhagem da fonte ao consumo e diretrizes para uso governado dos dados.
+
 -   **[Decisões de Arquitetura (ADRs)](adr/0001-modelagem-sistema-origem.md)**
     
     ---

@@ -173,12 +173,21 @@ Abaixo constam os registros de todas as atividades:
 - **Como foi verificado:** A partir de banco vazio, pipeline E1 com a amostra de 49.178 registros, extração para Parquet e `dbt build` executados dentro da imagem de ingestão (Python 3.12.15, dbt-core 1.12.6, dbt-duckdb 1.11.1, DuckDB 1.5.6), com os 4 modelos criados e `target/manifest.json` gerado por `dbt parse`; o mesmo `dbt build` na venv local (Python 3.14), reexecutado sem erro e com `METRA_LAKE_PARQUET` absoluto; diretório inexistente falhando com erro claro; contagens de cada modelo iguais às do Parquet de origem; tipos conferidos (`ano` INTEGER, códigos texto, salários DECIMAL); pergunta central recalculada sobre `silver.stg_movimentacao` e `silver.stg_municipio` idêntica à consulta de `src/analise.py` sobre o Parquet. Não foram escritos testes dbt (tarefa de outro integrante) nem testado com a base completa de 14,7 milhões de registros.
 - **Quem revisou:** Lucas Alves.
 
+### 29/10/2026 - Antecipação das tarefas de qualidade, modelagem e governança de Euller
+
+- **Ferramenta:** Codex (OpenAI).
+- **Onde:** `dbt_metra/models/staging/`, `dbt_metra/tests/generic/qualidade.sql`, `tests/test_dbt_quality.py`, `src/qualidade/avaliar_granularidade.py`, ADRs 0005/0007 e evidências, `docs/camada-analitica-dbt.md`, `docs/consumo-e-governanca.md`, `README.md`, `mkdocs.yml` e este registro.
+- **O que foi pedido:** Revisar a linguagem e formatação das ADRs 0003 e 0004.
+- **O que foi aproveitado:** 122 testes dbt de schema, integridade, volume, distribuição e regras da Silver/fontes; sete cenários de integração com falhas intencionais; benchmark reproduzível de granularidades; Star Schema e SCD propostos; ADR-0005 com medições; ADR-0007 com contrato e protocolo ainda não implementados; catálogo e governança preliminares.
+- **Como foi verificado:** Dez testes Python passaram (sete novos de integração dbt e três existentes de CDC), em 19,386 s. No cenário válido, os quatro modelos e 122 testes dbt passaram sobre Parquet sintético isolado; nos negativos, falhas/avisos esperados foram confirmados. O benchmark usou 49.178 registros reais da amostra com normalização e linhagem sintética, reconciliando métricas entre dois grãos; evidências em `docs/adr/evidencias/0005-granularidade.json`. Build estrito MkDocs e `git diff --check` passaram.
+- **Quem revisou:** Euller Júlio
+
 ### 30/10/2026 - Camada Gold e regras SQL das cinco perguntas (E3, Marco 1)
 
 - **Ferramenta:** Codex (OpenAI), com a skill ponytail para manter a implementação restrita ao escopo aprovado.
 - **Onde:** `dbt_metra/models/marts/`, `dbt_metra/macros/`, `dbt_metra/analyses/`, `dbt_metra/dbt_project.yml`, `tests/test_gold.py`, `README.md` e `docs/uso-de-ia.md`.
 - **O que foi pedido:** Planejar dimensões e fatos Gold sobre a Silver existente, contratos de consumo e SQL reproduzível das cinco perguntas de gestão, sem implementar as tarefas dos outros integrantes.
-- **O que foi aproveitado:** Cinco dimensões, fato detalhada e três fatos mensais reconstruídas integralmente; chaves naturais e perfil demográfico por combinação observada; somas e denominadores para médias salariais de admissão; consultas P1–P5 com janela de calendário, distinção entre mês ausente e zero observado, comparação capital/interior e diferenças salariais descritivas. 
+- **O que foi aproveitado:** Cinco dimensões, fato detalhada e três fatos mensais reconstruídas integralmente; chaves naturais e perfil demográfico por combinação observada; somas e denominadores para médias salariais de admissão; consultas P1–P5 com janela de calendário, distinção entre mês ausente e zero observado, comparação capital/interior e diferenças salariais descritivas.
 - **Como foi verificado:** Dez testes de negócio aprovados com Parquet temporário e execução real de `dbt build` e `dbt compile` em DuckDB isolado (Python 3.12.3, dbt-core 1.12.6, dbt-duckdb 1.11.1 e DuckDB 1.5.6). A amostra versionada, com referências sintéticas de teste, conciliou 49.178 eventos, 25.325 admissões, 23.853 desligamentos e saldo 1.472; as cinco análises compiladas foram executadas sobre ela. Os três testes existentes de CDC também passaram.
 - **Quem revisou:** Tiago Antunes
 
@@ -229,6 +238,15 @@ Abaixo constam os registros de todas as atividades:
 - **O que foi aproveitado:** Separação dos 122 testes genéricos de fontes/Silver, sete cenários de integração, benchmark de granularidade e documentação analítica em branch baseada na main atual. O Star Schema foi alinhado aos nomes e relacionamentos da Gold existente. A cobertura genérica da Gold e o SCD continuam explicitamente pendentes. ADR-0007 e consumo/governança não fazem parte desta entrega.
 - **Como foi verificado:** Execução dos sete cenários de integração com dbt real e Parquet sintético; build estrito MkDocs; repetição do benchmark sobre as 49.178 linhas da amostra, com reconciliação de métricas e reprodução das contagens/tamanhos. As evidências versionadas da ADR preservam a medição original de 29/10. Comparação do commit e estado local da branch original para garantir sua preservação. A revisão visual do diagrama e a aprovação formal da ADR permanecem pendentes.
 - **Quem revisou:** Euller Júlio.
+
+### 03/11/2026 - Busca Semântica de Ocupações CBO, Assistente Text-to-SQL Governado e ADR 0007 (E4)
+
+- **Ferramenta:** Antigravity (Google DeepMind).
+- **Onde:** `src/app/` (`__init__.py`, `busca_cbo.py`, `text_to_sql.py`, `banco_analitico.py`, `dashboard.py`, `avaliar_busca_e_text2sql.py`), `tests/test_busca_e_text2sql.py`, `docs/adr/0007-busca-semantica-e-consumo.md`, `docs/adr/evidencias/0007-busca-semantica-e-text2sql.json`, `docs/consumo-e-governanca.md`, `mkdocs.yml`, `requirements-pipeline.txt`, `README.md` e `docs/uso-de-ia.md`.
+- **O que foi pedido:** Integrar a busca semântica vetorial de ocupações da CBO 2002 e o assistente Text-to-SQL governado pelo catálogo de métricas da camada `gold` em uma aba do painel Streamlit, concluir os experimentos do protocolo da ADR 0007 na branch `feat/qualidade-analitica` (unificada com a `main`) e documentar as evidências reproduzíveis.
+- **O que foi aproveitado:** Índice vetorial híbrido de 384 dimensões normalizado em norma $L_2$ (`IndiceVetorialCBO`) com busca por produto interno em NumPy e `array_cosine_similarity(vetor::FLOAT[384], ?::FLOAT[384])` sobre relação PyArrow registrada no DuckDB; priorização de códigos exatos de 6 dígitos (incluindo zero inicial); assistente `AssistenteTextToSQL` cobrindo as cinco perguntas de gestão (P1–P5) e consultas ocupacionais com recomposição de médias salariais ponderadas; validador sintático `validar_sql_seguro` bloqueando DDL/DML, leitura externa, schemas fora de `gold` e listagem de registros individuais de `gold.fct_movimentacao`; painel Streamlit em duas abas; script de benchmark reproduzível e suíte de 8 testes automatizados.
+- **Como foi verificado:** Execução do benchmark `python -m src.app.avaliar_busca_e_text2sql` (7 repetições após aquecimento sobre 49.178 movimentações e 1.272 códigos CBO: `Hit@5 = 100,0%` e `Hit@1 = 95,83%` vs. `58,33%` na busca léxica; 6/6 respostas Text-to-SQL idênticas aos SQLs compilados de referência; 10/10 ataques SQL bloqueados), aprovação das 4 suítes de testes do repositório (`test_cdc_replay.py`, `test_dbt_quality.py`, `test_gold.py` e `test_busca_e_text2sql.py`), validação do build estrito da documentação (`python -m mkdocs build --strict`) e `git diff --check`.
+- **Quem revisou:** Arthur Evangelista e Euller Júlio.
 
 ### 05/11/2026 - ADR-0006 e documentação da orquestração com Dagster (E3)
 

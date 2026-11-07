@@ -352,7 +352,7 @@ Para validar as regras de negócio com Parquet e DuckDB temporários, a partir d
 python -m unittest discover -s tests -p 'test_gold.py' -v
 ```
 
-Essa verificação executa os modelos reais com fixtures e com a amostra versionada (referências sintéticas), incluindo reexecução e evento atrasado. Os testes unitários e de regras de negócio existentes não substituem os testes genéricos de qualidade do dbt (eles serão acrescentados na entrega de qualidade). Os contratos descritivos já estão em `models/marts/_gold__models.yml`, mas ainda não há `data_tests` nesse manifesto.
+Essa verificação executa os modelos reais com fixtures e com a amostra versionada (referências sintéticas), incluindo reexecução e evento atrasado. Os contratos descritivos da Gold estão em `models/marts/_gold__models.yml`, complementando os 122 testes genéricos de qualidade das fontes e da Silver em `models/staging/schema.yml`.
 
 ### Orquestração com Dagster (E3)
 
@@ -377,6 +377,23 @@ O comando sobe o `dagster-webserver` e o `dagster-daemon` com o mesmo `DAGSTER_H
 Na interface, materialize `executar_pipeline` para executar as migrações e cargas E1, e em seguida, materialize `exportar_parquet` para gerar os arquivos Parquet. Depois, os assets dbt podem então ser materializados para executar `dbt build` sobre o lake. Os sources `lake/*` são virtuais: representam os Parquets produzidos pela extração e aparecem como parte da linhagem, sem uma materialização adicional. O arquivo DuckDB e os Parquets são montados a partir de `data/`.
 
 O procedimento operacional detalhado está em [`docs/orquestracao.md`](./docs/orquestracao.md), enquanto a decisão arquitetural foi registrada na [ADR 0006](./docs/adr/0006-orquestracao-com-dagster.md).
+
+### Busca Semântica CBO, Assistente Text-to-SQL e Painel Streamlit (E4)
+
+A camada de consumo interativa (`src/app/dashboard.py`) integra duas abas conectadas em modo somente leitura (`read_only=True`) ao banco analítico `data/metra_analitico.duckdb` (construindo-o automaticamente a partir da amostra versionada quando ausente):
+
+1. **Busca Semântica CBO 2002 & Assistente Text-to-SQL (`ADR 0007`):**
+   - **Busca Semântica de Ocupações (`src/app/busca_cbo.py`):** índice vetorial híbrido de 384 dimensões normalizado em norma $L_2$ (`metra-cbo-hybrid-384d-v1`) sobre `gold.dim_cbo`, suportando busca por código exato de 6 dígitos (inclusive com zero inicial) e por sinônimos ou termos coloquiais (ex.: *"dev backend"*, *"caminhoneiro"*, *"bóia-fria"*), tanto via produto interno em NumPy quanto via `array_cosine_similarity(vetor::FLOAT[384], ?::FLOAT[384])` diretamente no DuckDB, cruzando os códigos com os indicadores agregados de `gold.fct_movimentacao`.
+   - **Assistente Text-to-SQL Governado pelo Catálogo (`src/app/text_to_sql.py`):** traduz perguntas em linguagem natural para consultas SQL auditáveis sobre os contratos da camada `gold` (P1–P5 e ocupações CBO), exibindo a fórmula oficial, ressalvas metodológicas e bloqueando deterministicamente comandos DDL/DML, leituras externas, acessos fora do schema `gold` ou consultas desagregadas de registros individuais (LGPD).
+2. **Painel das 5 Perguntas de Gestão (Contratos Gold):** visualização tabular e gráfica das cinco perguntas estratégicas do projeto sobre as tabelas agregadas da camada `gold`.
+
+Para executar o painel, os testes e o benchmark reproduzível da [`ADR 0007`](./docs/adr/0007-busca-semantica-e-consumo.md):
+
+```bash
+streamlit run src/app/dashboard.py
+python -m unittest discover -s tests -p 'test_busca_e_text2sql.py' -v
+python -m src.app.avaliar_busca_e_text2sql --saida docs/adr/evidencias/0007-busca-semantica-e-text2sql.json
+```
 
 ---
 
