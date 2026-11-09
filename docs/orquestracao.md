@@ -15,9 +15,11 @@ exportar_parquet
     ↓
 lake/* (cinco sources Parquet virtuais)
     ↓
-Silver (stg_*)
+Silver (stg_*)  →  snapshots/snp_cbo (SCD tipo 2)
     ↓
 Gold (dim_* e fct_*)
+    ↓
+conciliacao_mensal (particionado por competência)
 ```
 
 Na interface, o grafo completo aparece com as dependências entre as etapas Python, os sources do lake e os modelos Silver e Gold:
@@ -38,7 +40,9 @@ A decisão arquitetural da equipe está registrada na [ADR 0006](adr/0006-orques
 | `exportar_parquet` | Extrair o OLTP para o lake Parquet particionado | Atualiza `data/lake/parquet/` |
 | `lake/*` | Representar no grafo os cinco sources Parquet do dbt | Virtual (não escreve arquivos) |
 | `stg_*` | Limpar, padronizar e cruzar os Parquets | `dbt build` no DuckDB, schema `silver` |
-| `dim_*` e `fct_*` | Disponibilizar dimensões, fato detalhada e agregados Gold | `dbt build` no DuckDB, schema `gold` |
+| `snp_cbo` | Capturar novas versões das ocupações CBO (SCD tipo 2) | `dbt build` no DuckDB, schema `snapshots` |
+| `dim_*` e `fct_*` | Disponibilizar dimensões, histórico da CBO, fato detalhada e agregados Gold | `dbt build` no DuckDB, schema `gold` |
+| `conciliacao_mensal` | Conferir, por competência, contagem e saldo do OLTP contra a fato Gold | Partição mensal; falha se houver divergência |
 
 Os cinco sources são `movimentacao`, `municipio`, `cbo_2002`, `cnae_subclasse` e `cnae_secao`. Cada spec virtual recebe `exportar_parquet` como dependência adicional; as demais dependências entre sources, Silver e Gold vêm do manifesto dbt.
 
@@ -101,6 +105,46 @@ Os caminhos padrão são:
 | `METRA_DUCKDB` | `data/metra_analitico.duckdb` | `/app/data/metra_analitico.duckdb` |
 
 Use caminhos absolutos ao apontar para outro lake ou banco. O diretório pai do DuckDB deve existir. O banco e os Parquets devem estar montados no mesmo ambiente em que o asset é executado.
+
+---
+
+## Retry, Agendamento e Backfill
+
+Definidos em `dagster_metra/assets.py` e `dagster_metra/definitions.py`:
+
+| Recurso | Configuração |
+|---|---|
+| Retry | `POLITICA_RETRY` em todos os assets: até 3 novas tentativas, espera exponencial a partir de 10 s, com variação aleatória. As etapas são idempotentes (a carga ignora arquivos já ingeridos, a extração troca o lake atomicamente e o dbt reconstrói os modelos), então repetir não duplica dados. A conciliação não repete quando encontra divergência real, só em falhas transitórias. |
+| Job `pipeline_metra` | `executar_pipeline` → `exportar_parquet` → `dbt build` (Silver, snapshot e Gold). |
+| Schedule `pipeline_metra_mensal` | Dia 5 de cada mês, às 6h (America/Sao_Paulo), acompanhando a publicação mensal do Novo CAGED. |
+| Job `conciliacao_mensal_job` e schedule `conciliacao_mensal` | Asset particionado por mês desde jan/2023; o schedule concilia o mês anterior no dia 5, às 8h. |
+| Backfill | `BackfillPolicy.single_run()`: um intervalo de competências é reprocessado em uma única execução. |
+
+Os schedules são criados desligados (padrão do Dagster) e são ligados na aba **Automation** da UI; é preciso o `dagster-daemon` em execução, já previsto no Compose.
+
+### Demonstração
+
+Executada em 09/11/2026 na imagem `docker/dagster/Dockerfile`, com o PostgreSQL do Compose carregado com a amostra versionada (49.178 movimentações):
+
+```bash
+# 1. Pipeline completo pelo job
+dagster job execute -m dagster_metra.definitions -j pipeline_metra
+# -> executar_pipeline, exportar_parquet e metra_dbt_assets com STEP_SUCCESS;
+#    dbt: PASS=191 (14 modelos, 1 snapshot, 176 testes); RUN_SUCCESS
+
+# 2. Backfill de todas as competências em uma execução
+dagster asset materialize -m dagster_metra.definitions \
+  --select conciliacao_mensal --partition-range "2023-01-01...2026-10-01"
+# -> "Conciliando 46 competência(s): 2023-01-01 a 2026-10-01";
+#    46 partições materializadas, nenhuma divergência; RUN_SUCCESS
+
+# 3. Retry: PostgreSQL parado antes da execução e religado 25 s depois
+dagster asset materialize -m dagster_metra.definitions --select exportar_parquet
+# -> tentativa 1: STEP_UP_FOR_RETRY; tentativa 2: STEP_UP_FOR_RETRY;
+#    tentativa 3: STEP_SUCCESS; RUN_SUCCESS, sem intervenção manual
+```
+
+No Compose, os mesmos comandos rodam com `docker compose --profile dagster run --rm dagster-webserver dagster ...`, e o backfill também pode ser disparado pela UI, em **Assets → conciliacao_mensal → Materialize → partições**. `tests/test_orquestracao.py` verifica que todo asset tem a política de retry, os schedules e a política de backfill.
 
 ---
 
