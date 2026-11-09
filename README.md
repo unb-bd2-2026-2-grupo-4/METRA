@@ -301,9 +301,9 @@ Os modelos `stg_movimentacao`, `stg_municipio`, `stg_cbo` e `stg_cnae` leem o Pa
 
 O `profiles.yml` versionado em `dbt_metra/` dispensa configuração em `~/.dbt/`. As variáveis `METRA_LAKE_PARQUET` (diretório do Parquet, relativo a `dbt_metra/`) e `METRA_DUCKDB` (arquivo de destino) permitem apontar para outros caminhos, como em contêineres ou no orquestrador.
 
-### Qualidade das fontes e da Silver
+### Qualidade das fontes, da Silver e da Gold
 
-Os 122 testes genéricos de qualidade são definidos em `dbt_metra/models/staging/schema.yml` e `_lake__sources.yml`. Verificam schema, chaves, referências, domínios, volume, distribuição e linhagem. Execute `dbt test --profiles-dir .` dentro de `dbt_metra/`, depois de materializar os modelos, ou `dbt build --profiles-dir .` para construir e validar.
+O projeto dbt tem 176 testes. Os 122 das fontes e da Silver estão em `dbt_metra/models/staging/schema.yml` e `_lake__sources.yml` e verificam schema, chaves, referências, domínios, volume, distribuição e linhagem. Os 54 da Gold estão em `dbt_metra/models/marts/_gold__models.yml` e em `dbt_metra/tests/`: chaves únicas e não nulas das dimensões, integridade referencial da fato, grão dos agregados, contagem da fato igual à Silver e os contratos do SCD tipo 2 da CBO. Execute `dbt test --profiles-dir .` dentro de `dbt_metra/`, depois de materializar os modelos, ou `dbt build --profiles-dir .` para construir e validar.
 
 Para validar a detecção de falhas com Parquet sintético isolado, na raiz:
 

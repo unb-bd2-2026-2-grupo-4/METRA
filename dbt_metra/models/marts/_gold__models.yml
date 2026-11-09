@@ -1,16 +1,23 @@
 version: 2
 
-# Contratos Gold; os data_tests de qualidade serão acrescentados por Euller.
+# Contratos Gold: chaves únicas e não nulas, integridade referencial da fato e grão dos agregados.
 models:
   - name: dim_competencia
     description: "Uma linha por mês entre o mínimo e o máximo da Silver; presença de registros não certifica completude da fonte."
     columns:
       - name: competencia
         description: "Primeiro dia do mês de ocorrência do evento (DATE)."
+        data_tests:
+          - unique
+          - not_null
       - name: ano
         description: "Ano da competência."
+        data_tests:
+          - not_null
       - name: mes
         description: "Número do mês, de 1 a 12."
+        data_tests:
+          - not_null
       - name: trimestre
         description: "Número do trimestre, de 1 a 4."
       - name: tem_dados
@@ -20,10 +27,15 @@ models:
     columns:
       - name: id_municipio
         description: "Chave natural textual IBGE, 7 dígitos; 9999999 é o sentinela."
+        data_tests:
+          - unique
+          - not_null
       - name: nome_municipio
         description: "Nome do município."
       - name: sigla_uf
         description: "Sigla da UF; NI no sentinela. Os agregados restringem DF, GO, MT e MS."
+        data_tests:
+          - not_null
       - name: nome_uf
         description: "Nome da UF."
       - name: regiao
@@ -39,10 +51,15 @@ models:
     columns:
       - name: codigo_cnae_subclasse
         description: "Chave natural textual com 7 dígitos."
+        data_tests:
+          - unique
+          - not_null
       - name: descricao_subclasse
         description: "Descrição da subclasse, inclusive cadastros administrativos."
       - name: codigo_secao
         description: "Seção CNAE; Z permanece nos agregados e é excluída dos rankings e da correlação."
+        data_tests:
+          - not_null
       - name: descricao_secao
         description: "Descrição da seção econômica."
       - name: is_cadastro_oficial
@@ -52,6 +69,9 @@ models:
     columns:
       - name: codigo_cbo
         description: "Chave natural textual com 6 dígitos."
+        data_tests:
+          - unique
+          - not_null
       - name: titulo_ocupacao
         description: "Título da ocupação."
       - name: codigo_grande_grupo
@@ -91,6 +111,9 @@ models:
     columns:
       - name: id_perfil_demografico
         description: "Chave natural composta: sexo|raca_cor|grau_instrucao|faixa_etaria."
+        data_tests:
+          - unique
+          - not_null
       - name: codigo_sexo
         description: "Código do sexo registrado na origem; não mede identidade de gênero."
       - name: sexo
@@ -109,21 +132,52 @@ models:
         description: "Rótulo da faixa etária, com limites inclusivos."
   - name: fct_movimentacao
     description: "Uma linha por id_movimentacao da Silver, sem filtro regional e sem perda de eventos; dimensões ligadas por LEFT JOIN."
+    data_tests:
+      - metra_same_count:
+          arguments:
+            compare_model: ref('stg_movimentacao')
     columns:
       - name: id_movimentacao
         description: "Chave da movimentação na origem."
+        data_tests:
+          - unique
+          - not_null
       - name: ano
         description: "Ano do evento."
       - name: mes
         description: "Mês do evento."
       - name: competencia
         description: "Primeiro dia do mês de ocorrência do evento (DATE)."
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_competencia')
+                field: competencia
       - name: id_municipio
         description: "FK natural para dim_municipio; preserva o sentinela."
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_municipio')
+                field: id_municipio
       - name: codigo_cnae_subclasse
         description: "FK natural textual para dim_cnae."
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_cnae')
+                field: codigo_cnae_subclasse
       - name: codigo_cbo
         description: "FK natural textual para dim_cbo."
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_cbo')
+                field: codigo_cbo
       - name: codigo_sexo
         description: "Código do sexo registrado na origem."
       - name: codigo_raca_cor
@@ -136,6 +190,12 @@ models:
         description: "Tipo de movimentação cadastrado no CAGED."
       - name: saldo_movimentacao
         description: "1 admissão, -1 desligamento; sinal usado nas métricas."
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [1, -1]
+                quote: false
       - name: tipo_evento
         description: "admissao ou desligamento, conforme o sinal."
       - name: salario_mensal
@@ -154,6 +214,12 @@ models:
         description: "Faixa calculada a partir da idade; mesma regra da dimensão de perfil."
       - name: id_perfil_demografico
         description: "FK para a combinação observada em dim_perfil_demografico."
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_perfil_demografico')
+                field: id_perfil_demografico
       - name: sigla_uf
         description: "Sigla da UF; NI no sentinela. Os agregados restringem DF, GO, MT e MS."
       - name: is_capital
@@ -170,13 +236,31 @@ models:
         description: "Indicador da dimensão de competência."
   - name: fct_setor_mensal
     description: "Uma linha por competência × UF × seção CNAE no recorte identificado do Centro-Oeste de 2023–2026. Atende P1, P2 e P4."
+    data_tests:
+      - metra_unique_combination:
+          arguments:
+            columns: [competencia, sigla_uf, codigo_secao]
     columns:
       - name: competencia
         description: "Primeiro dia do mês de ocorrência do evento (DATE)."
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_competencia')
+                field: competencia
       - name: sigla_uf
         description: "Sigla da UF; NI no sentinela. Os agregados restringem DF, GO, MT e MS."
+        data_tests:
+          - not_null
       - name: codigo_secao
         description: "Seção CNAE; Z permanece nos agregados e é excluída dos rankings e da correlação."
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_cnae')
+                field: codigo_secao
       - name: admissoes
         description: "Quantidade de eventos com saldo_movimentacao = 1."
       - name: desligamentos
@@ -191,13 +275,27 @@ models:
         description: "Soma salarial dividida pelo denominador; NULL sem salários elegíveis. Recalcular após reagrupar."
   - name: fct_geografia_mensal
     description: "Uma linha por competência × UF × capital/interior no recorte identificado do Centro-Oeste de 2023–2026. Atende P3; ausência de grupo não gera linha artificial."
+    data_tests:
+      - metra_unique_combination:
+          arguments:
+            columns: [competencia, sigla_uf, is_capital]
     columns:
       - name: competencia
         description: "Primeiro dia do mês de ocorrência do evento (DATE)."
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_competencia')
+                field: competencia
       - name: sigla_uf
         description: "Sigla da UF; NI no sentinela. Os agregados restringem DF, GO, MT e MS."
+        data_tests:
+          - not_null
       - name: is_capital
         description: "Verdadeiro para Brasília, Goiânia, Cuiabá ou Campo Grande; DF não possui interior."
+        data_tests:
+          - not_null
       - name: admissoes
         description: "Quantidade de eventos com saldo_movimentacao = 1."
       - name: desligamentos
@@ -212,17 +310,39 @@ models:
         description: "Soma salarial dividida pelo denominador; NULL sem salários elegíveis. Recalcular após reagrupar."
   - name: fct_perfil_mensal
     description: "Uma linha por competência × UF × capital/interior × seção CNAE × perfil no recorte identificado do Centro-Oeste de 2023–2026. Atende P5."
+    data_tests:
+      - metra_unique_combination:
+          arguments:
+            columns: [competencia, sigla_uf, is_capital, codigo_secao, id_perfil_demografico]
     columns:
       - name: competencia
         description: "Primeiro dia do mês de ocorrência do evento (DATE)."
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_competencia')
+                field: competencia
       - name: sigla_uf
         description: "Sigla da UF; NI no sentinela. Os agregados restringem DF, GO, MT e MS."
       - name: is_capital
         description: "Verdadeiro para Brasília, Goiânia, Cuiabá ou Campo Grande; DF não possui interior."
       - name: codigo_secao
         description: "Seção CNAE; Z permanece nos agregados e é excluída dos rankings e da correlação."
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_cnae')
+                field: codigo_secao
       - name: id_perfil_demografico
         description: "FK para dim_perfil_demografico; permite recortes demográficos cruzados."
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_perfil_demografico')
+                field: id_perfil_demografico
       - name: admissoes
         description: "Quantidade de eventos com saldo_movimentacao = 1."
       - name: desligamentos

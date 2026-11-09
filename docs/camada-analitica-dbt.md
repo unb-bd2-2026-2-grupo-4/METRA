@@ -168,7 +168,7 @@ Os contratos do histórico são verificados pelo teste singular `tests/assert_cb
 | Agregados de consumo | Admissões/desligamentos/saldo reconciliados; salário calculado por soma/contagem válida, nunca média de médias |
 | Distribuição | Mesmos totais por UF, competência, setor e perfil antes e depois da modelagem |
 
-Os testes genéricos deste PR se limitam às fontes e à Silver. Para completar a cobertura Gold, acrescentar os testes ao YAML de contratos já existente (`models/marts/_gold__models.yml`), sem duplicar patches de modelos em outro arquivo. Os testes de negócio em `tests/test_gold.py` complementam, mas não substituem, esses contratos. Os testes SCD dependem da implementação do histórico.
+Os 54 testes da Gold estão no YAML de contratos (`models/marts/_gold__models.yml`) e em `tests/assert_cbo_uma_versao_vigente.sql`: `unique` e `not_null` nas chaves das dimensões e da fato, `relationships` da fato e dos agregados para as dimensões, `accepted_values` do saldo, contagem da fato igual à Silver (`metra_same_count`), unicidade do grão dos agregados mensais (`metra_unique_combination`) e os contratos do SCD tipo 2. A reconciliação de totais e de médias salariais entre agregados fica nos testes de negócio de `tests/test_gold.py`, que complementam esses contratos. Na amostra versionada, `dbt build` executa os 14 modelos, o snapshot e os 176 testes sem falhas.
 
 ---
 
