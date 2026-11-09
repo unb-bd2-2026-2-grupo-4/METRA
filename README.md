@@ -318,6 +318,7 @@ Veja a [camada analítica e o Star Schema](docs/camada-analitica-dbt.md) e a [AD
 O mesmo `dbt build` também reconstrói o schema `gold`, usando `ref()` sobre a Silver:
 
 - Dimensões `dim_competencia`, `dim_municipio`, `dim_cnae`, `dim_cbo` e `dim_perfil_demografico`.
+- Histórico da CBO como dimensão de variação lenta (SCD tipo 2): o snapshot `snp_cbo` preserva cada versão observada e `dim_cbo_historico` a expõe com `observado_desde`, `observado_ate` e `is_versao_vigente`; `dim_cbo` segue com a versão vigente.
 - `fct_movimentacao`: uma linha por evento da Silver, com chaves dimensionais e linhagem.
 - `fct_setor_mensal`: competência × UF × seção CNAE (P1, P2 e P4).
 - `fct_geografia_mensal`: competência × UF × capital/interior (P3).
@@ -375,6 +376,13 @@ docker compose --profile dagster up --build -d postgres dagster-webserver dagste
 O comando sobe o `dagster-webserver` e o `dagster-daemon` com o mesmo `DAGSTER_HOME`, portanto os jobs enviados pela UI são executados pelo daemon.
 
 Na interface, materialize `executar_pipeline` para executar as migrações e cargas E1, e em seguida, materialize `exportar_parquet` para gerar os arquivos Parquet. Depois, os assets dbt podem então ser materializados para executar `dbt build` sobre o lake. Os sources `lake/*` são virtuais: representam os Parquets produzidos pela extração e aparecem como parte da linhagem, sem uma materialização adicional. O arquivo DuckDB e os Parquets são montados a partir de `data/`.
+
+Todos os assets têm política de retry (até 3 novas tentativas, com espera exponencial). O job `pipeline_metra` tem o schedule mensal `pipeline_metra_mensal`, e o asset `conciliacao_mensal`, particionado por competência, confere o OLTP contra a fato Gold e permite backfill de um intervalo de meses em uma execução:
+
+```bash
+dagster job execute -m dagster_metra.definitions -j pipeline_metra
+dagster asset materialize -m dagster_metra.definitions --select conciliacao_mensal --partition-range "2023-01-01...2026-10-01"
+```
 
 O procedimento operacional detalhado está em [`docs/orquestracao.md`](./docs/orquestracao.md), enquanto a decisão arquitetural foi registrada na [ADR 0006](./docs/adr/0006-orquestracao-com-dagster.md).
 
