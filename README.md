@@ -127,7 +127,7 @@ E4            | Análises e Visualizações  |
 │   └── workflows/
 │       └── deploy-docs.yml # Pipeline de deploy automatizado no GitHub Pages
 ├── .gitignore              # Regras de exclusão para dados pesados (permite a amostra de 2.8 MB)
-├── AI-USAGE.md             # Registro contemporâneo de uso de assistentes de IA (conforme política)
+├── AI-USAGE.md             # Ponteiro para o registro de uso de IA em docs/uso-de-ia.md (conforme política)
 ├── README.md               # Visão geral do METRA, domínio, setup e governança
 ├── docker-compose.yml      # Manifesto que sobe todos os serviços locais da plataforma (E1 a E4)
 ├── mkdocs.yml              # Configuração do portal de documentação (Material for MkDocs)
