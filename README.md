@@ -230,7 +230,8 @@ docker compose up -d postgres
 docker compose run --rm ingestao-bronze
 
 # 5. Gerar o lake Parquet e as camadas Silver e Gold pelo job do Dagster
-docker compose --profile dagster run --rm dagster-webserver \
+#    (--build reconstrói a imagem quando o código do pipeline mudou)
+docker compose --profile dagster run --build --rm dagster-webserver \
   dagster job execute -m dagster_metra.definitions -j pipeline_metra
 
 # 6. Subir o painel Streamlit sobre a Gold gerada
