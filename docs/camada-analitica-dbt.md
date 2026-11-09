@@ -178,6 +178,34 @@ Os 54 testes da Gold estão no YAML de contratos (`models/marts/_gold__models.ym
 
 `max(competencia)` indica cobertura temporal do dado, não freshness de processamento. O conjunto disponível pode terminar em janeiro/2026 e ainda ter sido processado hoje. `registrado_em` também não substitui o instante da extração.
 
-A [E3](https://unb-bd2.github.io/PlanoEnsino/projeto/e3/) exige ainda retry/backfill demonstrados, consulta otimizada com evidências e painel. O benchmark da [ADR-0005](adr/0005-modelagem-analitica-dbt.md) compara granularidades sobre a amostra, mas não comprova otimização da Gold, SCD nem orquestração. Os comandos `EXPLAIN ANALYZE` anexos são do DuckDB; não equivalem ao `EXPLAIN (ANALYZE, BUFFERS)` PostgreSQL solicitado no checklist. Alinhar com a docente a evidência apropriada ao motor usado.
+O benchmark da [ADR-0005](adr/0005-modelagem-analitica-dbt.md) compara granularidades sobre a amostra. A otimização da Gold é medida separadamente, na seção seguinte; retry e backfill estão demonstrados em [Orquestração](orquestracao.md#retry-agendamento-e-backfill).
+
+---
+
+## Consulta otimizada: EXPLAIN antes e depois
+
+`src/qualidade/comparar_explain.py` responde à P1 (admissões, desligamentos, saldo e salários por seção CNAE no DF, nos últimos 12 meses da base) de três formas e exige que as respostas sejam idênticas:
+
+- **origem:** PostgreSQL sobre o OLTP 3FN, com `EXPLAIN (ANALYZE, BUFFERS)`;
+- **antes:** DuckDB agregando a fato detalhada `gold.fct_movimentacao`;
+- **depois:** DuckDB somando o agregado mensal `gold.fct_setor_mensal`, que o dbt materializa a partir da mesma fato.
+
+O DuckDB não oferece a opção `BUFFERS`; para ele, a evidência é o plano do `EXPLAIN ANALYZE`, com as linhas lidas por operador, e a mediana de 30 execuções com uma thread.
+
+| Base | Antes: `fct_movimentacao` | Depois: `fct_setor_mensal` | Ganho |
+|---|---|---|---|
+| Completa (14.753.112 movimentações) | 33,27 ms; o scan devolve 918.397 linhas após os filtros | 0,84 ms; o scan devolve 251 linhas | ≈ 40× |
+| Amostra versionada (49.178) | 0,50 ms | 0,90 ms | sem ganho |
+
+Na base completa, o agregado elimina a leitura de quase um milhão de linhas por consulta. Na amostra, as duas formas ficam abaixo de 1 ms e o custo fixo de executar a consulta domina: o agregado não compensa nesse volume, e a amostra não serve como evidência de desempenho. Na origem, a mesma pergunta sobre a amostra leva 3,8 ms no PostgreSQL, com 9.910 páginas lidas do cache compartilhado (`shared hit`), a maior parte em 3.062 buscas por índice na tabela de subclasses CNAE para resolver a seção de cada movimentação.
+
+A base completa não está no PostgreSQL do projeto; a Gold completa foi construída num diretório temporário a partir dos CSVs integrais pelo construtor de `src/app/banco_analitico.py`, com os 176 testes dbt aprovados. Evidências: [`0005-explain-completo.json`](https://github.com/unb-bd2-2026-2-grupo-4/METRA/blob/main/docs/adr/evidencias/0005-explain-completo.json) e [`0005-explain-amostra.json`](https://github.com/unb-bd2-2026-2-grupo-4/METRA/blob/main/docs/adr/evidencias/0005-explain-amostra.json), com os planos completos.
+
+```bash
+# Amostra, com o PostgreSQL do Compose e as variáveis PG* exportadas
+python -m src.qualidade.comparar_explain --saida docs/adr/evidencias/0005-explain-amostra.json
+# Outro banco DuckDB sem a origem correspondente (ex.: base completa)
+python -m src.qualidade.comparar_explain --banco <arquivo.duckdb> --sem-origem --saida <arquivo.json>
+```
 
 Referências de implementação: [testes declarativos dbt](https://docs.getdbt.com/reference/resource-properties/data-tests) e [testes genéricos SQL](https://docs.getdbt.com/best-practices/writing-custom-generic-tests).
