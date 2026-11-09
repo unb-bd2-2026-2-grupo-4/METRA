@@ -135,7 +135,9 @@ E4            | Análises e Visualizações  |
 ├── requirements-pipeline.txt # Dependências Python da ingestão, das migrações, da extração e do dbt
 ├── .env.example            # Variáveis de ambiente do PostgreSQL (opcional)
 ├── docker/                 # Arquivos de configuração e Dockerfiles dos serviços
-│   └── ingestao/Dockerfile # Imagem da tarefa de ingestão e carga do pipeline E1
+│   ├── ingestao/Dockerfile # Imagem da tarefa de ingestão e carga do pipeline E1
+│   ├── dagster/Dockerfile  # Imagem do webserver e do daemon do Dagster
+│   └── painel/Dockerfile   # Imagem do painel Streamlit (somente leitura do banco analítico)
 ├── src/                    # Scripts de ingestão, pipeline e transformações
 │   ├── analise.py          # Carga PostgreSQL -> DuckDB e indicadores no terminal
 │   ├── cdc/
@@ -226,9 +228,16 @@ docker compose up -d postgres
 #    Se os CSVs pesados estiverem em data/, carrega os 14,7 milhões de registros.
 #    Em uma máquina limpa de terceiro, utiliza automaticamente a amostra de 49 mil linhas versionada.
 docker compose run --rm ingestao-bronze
+
+# 5. Gerar o lake Parquet e as camadas Silver e Gold pelo job do Dagster
+docker compose --profile dagster run --rm dagster-webserver \
+  dagster job execute -m dagster_metra.definitions -j pipeline_metra
+
+# 6. Subir o painel Streamlit sobre a Gold gerada
+docker compose --profile painel up --build -d painel
 ```
 
-Acesse o portal de documentação em: [http://localhost:8000](http://localhost:8000).
+Acesse o portal de documentação em: [http://localhost:8000](http://localhost:8000) e o painel em: [http://localhost:8501](http://localhost:8501).
 
 ### Análise local com DuckDB
 
@@ -395,7 +404,13 @@ A camada de consumo interativa (`src/app/dashboard.py`) integra duas abas conect
    - **Assistente Text-to-SQL Governado pelo Catálogo (`src/app/text_to_sql.py`):** traduz perguntas em linguagem natural para consultas SQL auditáveis sobre os contratos da camada `gold` (P1–P5 e ocupações CBO), exibindo a fórmula oficial, ressalvas metodológicas e bloqueando deterministicamente comandos DDL/DML, leituras externas, acessos fora do schema `gold` ou consultas desagregadas de registros individuais (LGPD).
 2. **Painel das 5 Perguntas de Gestão (Contratos Gold):** visualização tabular e gráfica das cinco perguntas estratégicas do projeto sobre as tabelas agregadas da camada `gold`.
 
-Para executar o painel, os testes e o benchmark reproduzível da [`ADR 0007`](./docs/adr/0007-busca-semantica-e-consumo.md):
+No Docker, o serviço `painel` (perfil `painel`) serve o app em `http://localhost:8501` (porta configurável por `PAINEL_PORT`). Ele monta `data/` como somente leitura e só abre o banco durante cada consulta, então o dbt e o Dagster continuam escrevendo na Gold com o painel no ar; depois de uma nova materialização, basta recarregar a página. Sem a Gold gerada, o painel mostra o comando a executar.
+
+```bash
+docker compose --profile painel up --build -d painel
+```
+
+Para executar o painel localmente, os testes e o benchmark reproduzível da [`ADR 0007`](./docs/adr/0007-busca-semantica-e-consumo.md):
 
 ```bash
 streamlit run src/app/dashboard.py
