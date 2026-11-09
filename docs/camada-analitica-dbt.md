@@ -1,6 +1,6 @@
 # Camada analítica com dbt
 
-O projeto contém as cinco fontes Parquet, os quatro modelos Silver, as cinco dimensões e quatro fatos Gold. Esta entrega acrescenta os **122 testes genéricos das fontes/Silver**, o benchmark e a documentação de modelagem. Os testes genéricos específicos da Gold e a implementação de SCD continuam pendentes, enquanto os testes Python de negócio da Gold já existem na base. O diagrama abaixo representa os modelos atuais.
+O projeto contém as cinco fontes Parquet, os quatro modelos Silver, as cinco dimensões e quatro fatos Gold, mais o histórico SCD tipo 2 da CBO (`snp_cbo` e `dim_cbo_historico`). Os testes genéricos cobrem as fontes, a Silver e a Gold, e os testes Python de negócio complementam esses contratos. O diagrama abaixo representa os modelos atuais.
 
 ## Fluxo e arquivos
 
@@ -147,13 +147,19 @@ As três fatos agregadas derivam de `fct_movimentacao`, filtrando municípios id
 
 As métricas são compartilhadas pela macro `metricas_movimentacao`; incluem contagens, saldo, soma salarial e quantidade de salários de admissão elegíveis, para recompor médias ponderadas. A implementação das perguntas P1–P5 é descrita em `dbt_metra/analyses/README.md` no repositório.
 
-### Variação lenta e testes Gold a integrar
+### Variação lenta: SCD tipo 2 da CBO
 
-A dimensão `dim_cbo` atual copia `stg_cbo` e não mantém histórico de versões. Como evolução ainda não implementada, a proposta é preservar mudanças do título CBO por **SCD tipo 2**, em vez de sobrescrever versões. Os intervalos `[observado_desde, observado_ate)` registram quando o projeto observou cada cadastro; a fonte atual não fornece vigência histórica da ocupação. Não atribuir retroativamente a 2023 uma validade que só começou a ser observada em 2026.
+O snapshot dbt `snp_cbo` (`dbt_metra/snapshots/snp_cbo.yml`) compara, a cada `dbt build`, o título, o grande grupo e a origem do cadastro de cada ocupação de `stg_cbo` (estratégia `check`). Uma mudança encerra a versão anterior e abre uma nova, em vez de sobrescrevê-la; uma ocupação que sai da fonte tem a versão vigente encerrada (`hard_deletes: invalidate`), sem perder o histórico. O snapshot fica no schema `snapshots` do mesmo arquivo DuckDB e persiste entre execuções.
 
-Um campo futuro `referencia_cadastro_em` seria o instante de associação do fato ao cadastro observado, distinto da competência de negócio e de `registrado_em` da origem. Essa associação deve ser persistida; um rebuild que troca todas as chaves pela versão atual destruiria a história. Snapshot, política de associação da carga inicial e preservação de chaves ainda precisam de implementação na Gold.
+`gold.dim_cbo_historico` expõe uma linha por versão, com `id_versao_cbo`, `observado_desde`, `observado_ate` e `is_versao_vigente`. Os intervalos `[observado_desde, observado_ate)` registram quando o projeto **observou** cada cadastro; a fonte atual não fornece vigência histórica da ocupação. Não atribuir retroativamente a 2023 uma validade que só começou a ser observada em 2026.
 
-| Contrato Gold pendente | Testes a conectar ao modelo real |
+`gold.dim_cbo` continua sendo a versão vigente (tipo 1), usada pelos fatos e pelo painel. A associação persistida de cada fato à versão observada no momento da carga (`referencia_cadastro_em`) não foi implementada: um rebuild completo da fato usa sempre o cadastro vigente.
+
+Os contratos do histórico são verificados pelo teste singular `tests/assert_cbo_uma_versao_vigente.sql` (no máximo uma versão vigente por ocupação e períodos encadeados, sem sobreposição), pelos `data_tests` de `dim_cbo_historico` e por `tests/test_scd_cbo.py`, que executa o dbt duas vezes, muda um título na fonte entre as execuções e confere que a versão anterior foi preservada e encerrada.
+
+### Contratos de teste da Gold
+
+| Contrato Gold | Testes |
 |---|---|
 | Grão da fato | `not_null`/`unique` de `id_movimentacao`; contagem e saldo iguais à Silver |
 | Dimensões | PK única/não nula e FKs da fato sem órfãos, inclusive sentinelas |

@@ -58,6 +58,34 @@ models:
         description: "Primeiro dígito do código CBO."
       - name: is_cadastro_oficial
         description: "Falso para códigos sem título encontrado na fonte oficial."
+  - name: dim_cbo_historico
+    description: "SCD tipo 2 da CBO a partir do snapshot snp_cbo: uma linha por versão de cada ocupação, com período de validade."
+    columns:
+      - name: id_versao_cbo
+        description: "Chave substituta da versão (dbt_scd_id)."
+        data_tests: [unique, not_null]
+      - name: codigo_cbo
+        description: "Chave natural textual com 6 dígitos; repete-se entre versões."
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_cbo')
+                field: codigo_cbo
+      - name: titulo_ocupacao
+        description: "Título da ocupação observado no período."
+      - name: codigo_grande_grupo
+        description: "Primeiro dígito do código CBO."
+      - name: is_cadastro_oficial
+        description: "Falso para códigos sem título encontrado na fonte oficial."
+      - name: observado_desde
+        description: "Momento da execução do dbt que observou a versão pela primeira vez; não é vigência oficial da CBO."
+        data_tests: [not_null]
+      - name: observado_ate
+        description: "Momento em que uma versão diferente foi observada (intervalo semiaberto); nulo na versão vigente."
+      - name: is_versao_vigente
+        description: "Verdadeiro para a versão atual de cada ocupação."
+        data_tests: [not_null]
   - name: dim_perfil_demografico
     description: "Uma linha por combinação observada dos códigos de sexo, raça/cor, escolaridade e faixa etária; não representa uma pessoa."
     columns:
