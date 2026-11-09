@@ -99,6 +99,24 @@ services:
       - ./data:/app/data
       - dagster_home:/opt/dagster/dagster_home
 
+  # Painel Streamlit (E4): lê a Gold gerada pelo dbt/Dagster, sem escrever no banco.
+  #   docker compose --profile painel up --build -d painel
+  painel:
+    build:
+      context: .
+      dockerfile: docker/painel/Dockerfile
+    profiles: ["painel"]
+    container_name: g4_painel
+    restart: unless-stopped
+    ports:
+      - "${PAINEL_PORT:-8501}:8501"
+    environment:
+      METRA_DUCKDB: /app/data/metra_analitico.duckdb
+    volumes:
+      # Somente leitura: o painel nunca cria, altera ou apaga o banco analítico.
+      - ./data:/app/data:ro
+      - ./src:/app/src:ro
+
 volumes:
   postgres_data:
   dagster_home:
