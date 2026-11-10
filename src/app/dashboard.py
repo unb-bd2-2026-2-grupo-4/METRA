@@ -324,6 +324,7 @@ def render_p3_capitais_interior(
     filtros: dict[str, Any] | None = None,
 ) -> None:
     uf_filtro = (filtros or {}).get("sigla_uf")
+    ano_filtro = (filtros or {}).get("ano")
     recorte_alvo = (
         uf_filtro
         if uf_filtro and uf_filtro in df_bruto["recorte"].values
@@ -331,6 +332,9 @@ def render_p3_capitais_interior(
     )
 
     df_tot = df_bruto[df_bruto["nivel"] == "total"].copy()
+    if uf_filtro in df_tot["recorte"].values:
+        # Com a UF filtrada no SQL, a linha "Centro-Oeste" do grouping set contém só essa UF.
+        df_tot = df_tot[df_tot["recorte"] == uf_filtro]
     df_anual_recorte = (
         df_bruto[(df_bruto["nivel"] == "anual") & (df_bruto["recorte"] == recorte_alvo)]
         .sort_values("ano")
@@ -380,7 +384,8 @@ def render_p3_capitais_interior(
         df_a = df_anual_recorte.copy()
         df_a["periodo"] = df_a["ano"].map(lambda a: str(int(a)) if pd.notna(a) else "—")
         partes_serie.append(df_a)
-    if not df_tot_recorte.empty:
+    # Com um ano filtrado, o consolidado repetiria a única linha anual.
+    if not df_tot_recorte.empty and not ano_filtro:
         df_t = df_tot_recorte.copy()
         df_t["periodo"] = "Total"
         partes_serie.append(df_t)
@@ -388,7 +393,8 @@ def render_p3_capitais_interior(
     if partes_serie:
         df_serie = pd.concat(partes_serie, ignore_index=True)
         st.write("")
-        st.markdown(f"**Série anual 2023–2026 e consolidado ({recorte_alvo}) — Pergunta Central E1**")
+        titulo_serie = f"Ano {ano_filtro}" if ano_filtro else "Série anual 2023–2026 e consolidado"
+        st.markdown(f"**{titulo_serie} ({recorte_alvo}) — Pergunta Central E1**")
         df_tabela_anual = pd.DataFrame({
             "Período": df_serie["periodo"],
             "Saldo Capital": df_serie["saldo_capital"].map(lambda v: fmt_int(v, True)),
