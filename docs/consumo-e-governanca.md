@@ -1,10 +1,10 @@
 # Consumo e governança
 
-**Documento de integração atualizado em 03/11/2026.** O repositório já contém ingestão, OLTP, exportação Parquet/Delta, camadas Silver e Gold com 122 testes dbt de qualidade, orquestração Dagster e a integração da Busca Semântica CBO + Assistente Text-to-SQL Governado no painel Streamlit (`src/app/dashboard.py`), validada na [ADR-0007](adr/0007-busca-semantica-e-consumo.md). Os pontos de controle de acesso formal, LGPD institucional e ETL reverso seguem em consolidação para o fechamento da E4.
+**Documento de integração atualizado em 10/11/2026.** O repositório já contém ingestão, OLTP, exportação Parquet/Delta, camadas Silver e Gold com 176 testes dbt de qualidade, SCD tipo 2 da CBO (`gold.dim_cbo_historico`), orquestração Dagster (com retry, schedule e backfill) e a integração da Busca Semântica CBO + Assistente Text-to-SQL Governado no painel Streamlit (`src/app/dashboard.py`), validada na [ADR-0007](adr/0007-busca-semantica-e-consumo.md). Os pontos de controle de acesso formal, LGPD institucional e ETL reverso seguem em consolidação para o fechamento da E4.
 
-## Catálogo preliminar de métricas
+## Catálogo de métricas da camada Gold
 
-As definições partem de `silver.stg_movimentacao`. Os nomes físicos e a implementação centralizada na Gold serão alinhados com Tiago. O painel e o assistente devem consumir essa implementação única, sem duplicar fórmulas em Python.
+As definições partem de `silver.stg_movimentacao` e estão materializadas de forma centralizada no schema `gold` (`gold.fct_movimentacao`, `gold.fct_setor_mensal`, `gold.fct_geografia_mensal`, `gold.fct_perfil_mensal` e dimensões `gold.dim_*`). O painel Streamlit e o assistente Text-to-SQL consomem diretamente essa implementação única, sem duplicar fórmulas em Python.
 
 | Métrica | Definição no conjunto filtrado | Unidade e ressalva |
 |---|---|---|
@@ -16,31 +16,31 @@ As definições partem de `silver.stg_movimentacao`. Os nomes físicos e a imple
 | Série mensal | Mesmas métricas agrupadas por `competencia` | Mês da movimentação; distinguir mês ausente de zero observado |
 | Capital/interior | Métricas por `is_capital`, somente municípios identificados do recorte | Sentinela não deve ser classificada como interior |
 | Disparidade salarial | Comparar salário médio e quantidade válida por sexo, raça/cor, escolaridade e faixa etária | Associação descritiva, sem inferir causalidade ou probabilidade individual de recolocação |
-| Turnover setorial | **Pendente:** escolher fórmula e obter estoque compatível de vínculos | Não calculável como taxa de estoque apenas com admissões/desligamentos e saldo |
+| Turnover setorial (proxy de fluxos) | `200.0 * least(admissoes, desligamentos) / nullif(admissoes + desligamentos, 0)` ([ADR-0007](adr/0007-busca-semantica-e-consumo.md)) | Índice de equilíbrio de fluxos pareados (0 a 100%) usado como aproximação; não é taxa sobre estoque de vínculos (indisponível no CAGED) |
 
-Agregados devem guardar soma salarial e quantidade válida para recompor médias. Não calcular média simples de médias municipais. Categorias não informadas permanecem identificadas; não atribuir valores demográficos ausentes. Os rótulos dos códigos precisam ser validados com o dicionário CAGED adotado.
+Agregados guardam soma salarial (`soma_salarios_admissao`) e quantidade válida (`qtd_salarios_admissao`) para recompor médias ponderadas exatas. Não calcular média simples de médias municipais. Categorias não informadas permanecem identificadas; não atribuir valores demográficos ausentes.
 
 ### Correspondência com as perguntas publicadas
 
-| Pergunta | Recorte necessário | Pendência para consumo |
+| Pergunta | Recorte necessário | Tratamento implementado no consumo |
 |---|---|---|
-| P1: setores no DF nos últimos 12 meses | UF DF, seção CNAE e janela de 12 competências | Definir âncora na última competência disponível e informar isso no painel |
-| P2: sazonalidade | Série mensal por ano | Distinguir padrões de calendário de meses parciais/ausentes |
-| P3: capitais versus interior | Município identificado, flag de capital e competência | Agregação mensal complementa a comparação geográfica |
-| P4: turnover e salário | Setor, competência, salário válido e estoque | Fonte, denominador e fórmula de turnover ainda não definidos |
-| P5: perfil e remuneração | Sexo, raça/cor, idade e escolaridade | Não confundir movimentos observados com chance de recolocação |
+| P1: setores no DF nos últimos 12 meses | UF DF, seção CNAE e janela de 12 competências | Âncora na última competência disponível (ou no ano filtrado), exibindo o intervalo e o número de competências no painel |
+| P2: sazonalidade | Série mensal por ano | Distingue meses sem dados (`NULL`) de zero observado (`0`) e calcula médias sazonais apenas sobre anos completos (12 meses) |
+| P3: capitais versus interior | Município identificado, flag de capital, ano (2023–2026) e competência | Série anual (2023–2026), consolidado (`Total`) e recorte por UF conciliados com `python3 -m src.analise` |
+| P4: turnover e salário | Setor, competência, salário válido e fluxos mensais | Usa o índice de fluxos pareados (`indice_fluxos_pareados_pct`) e a correlação de Pearson com `salario_medio_admissao` como aproximação explícita ([ADR-0007](adr/0007-busca-semantica-e-consumo.md)) |
+| P5: perfil e remuneração | Sexo, raça/cor, idade e escolaridade | Associação descritiva com nota metodológica explícita de que fluxos observados não estimam chance individual de recolocação |
 
 ## Linhagem da fonte ao consumo
 
-| Informação | Origem → persistência → Silver | Destino previsto |
+| Informação | Origem → persistência → Silver | Destino na Gold e no consumo |
 |---|---|---|
 | Competência e saldo | CAGED → `bronze.caged_movimentacao` → `oltp.movimentacao` → Parquet `movimentacao` → `stg_movimentacao` | Fato e agregados Gold → painel/assistente |
-| Município/UF | IBGE → `bronze.ibge_municipio` → `oltp.municipio` → Parquet `municipio` → `stg_municipio` | Dimensão geográfica |
-| Ocupação | CBO → `bronze.cbo_ocupacao` → `oltp.cbo_2002` → Parquet `cbo_2002` → `stg_cbo` | Dimensão versionada e índice de busca |
-| Atividade econômica | IBGE CNAE → `bronze.ibge_cnae_subclasse` → `oltp.cnae_subclasse`/`cnae_secao` → respectivos Parquets → `stg_cnae` | Dimensão econômica |
-| Perfil e salário | Campos do CAGED → movimentação Bronze/OLTP/Parquet → `stg_movimentacao` | Perfil, fato e métricas agregadas |
+| Município/UF | IBGE → `bronze.ibge_municipio` → `oltp.municipio` → Parquet `municipio` → `stg_municipio` | Dimensão geográfica (`gold.dim_municipio`) |
+| Ocupação | CBO → `bronze.cbo_ocupacao` → `oltp.cbo_2002` → Parquet `cbo_2002` → `stg_cbo` | Dimensão vigente (`gold.dim_cbo`), histórico SCD2 (`gold.dim_cbo_historico`) e índice de busca |
+| Atividade econômica | IBGE CNAE → `bronze.ibge_cnae_subclasse` → `oltp.cnae_subclasse`/`cnae_secao` → respectivos Parquets → `stg_cnae` | Dimensão econômica (`gold.dim_cnae`) |
+| Perfil e salário | Campos do CAGED → movimentação Bronze/OLTP/Parquet → `stg_movimentacao` | Dimensão demográfica (`gold.dim_perfil_demografico`), fato e métricas agregadas |
 
-`id_ingestao` e `numero_linha` permitem voltar à origem da movimentação; `manifest.json` descreve as dependências dbt e `run_results.json` registra o resultado da execução. A vinculação desses artefatos ao lote e ao grafo Dagster é a próxima etapa de Davi. O replay CDC SQLite existente não está automaticamente conectado à Silver; não representar essa integração como pronta.
+`id_ingestao` e `numero_linha` permitem voltar à origem da movimentação; `manifest.json` descreve as dependências dbt e `run_results.json` registra o resultado da execução. Esses artefatos estão integrados ao grafo de linhagem do Dagster em `dagster_metra/definitions.py` (ver [Orquestração com Dagster](orquestracao.md)). O replay CDC SQLite existente não está automaticamente conectado à Silver; não representar essa integração como pronta.
 
 ## Privacidade e acesso: análise inicial
 
@@ -50,7 +50,7 @@ O modelo atual não contém CPF ou nome do trabalhador, mas combina município, 
 |---|---|---|
 | Finalidade | Análise acadêmica agregada do mercado formal | Registrar responsável institucional e escopo aprovado |
 | Base legal | **Pendente de validação institucional** | Documentar a hipótese aplicável; não presumir que dado público ou trabalho acadêmico resolve todo enquadramento |
-| Minimização | Painel proposto só com métricas agregadas; sem linhagem individual nas telas públicas | Criar relações de consumo com colunas permitidas e testá-las |
+| Minimização | Painel implementado (`src/app/dashboard.py`) expõe apenas métricas agregadas da Gold; sem linhagem individual nas telas públicas e com bloqueio de linhas individuais no validador Text-to-SQL | Criar visões/relações dedicadas caso outros processos de consumo acessem o banco sem passar pelo validador da aplicação |
 | Pequenos grupos | Proposta de suprimir resultados com menos de 5 observações salariais válidas | Validar limiar e ataques por diferença entre filtros; limiar isolado não prova anonimização |
 | Retenção | Proposta: manter artefatos locais até 30 dias após encerramento da avaliação e recursos, sujeito à política institucional | Aprovar prazo, inventariar cópias e automatizar descarte; nenhum descarte executado nesta tarefa |
 | Descarte | Remover cópias locais, índices, backups e logs conforme política aprovada | Documentar execução e verificar ausência de cópias não autorizadas |
@@ -69,9 +69,9 @@ Um caminho possível é exportar um resumo mensal validado de saldo e remuneraç
 
 ## Checklist para fechar com a equipe
 
-- Publicar Gold, dicionário e métricas com nomes definitivos e testes de reconciliação.
-- Integrar Streamlit, busca CBO e consulta em linguagem natural conforme [ADR-0007](adr/0007-busca-semantica-e-consumo.md), depois de medir e revisar a proposta.
-- Demonstrar SCD, freshness, retry/backfill e atualização de consumo somente após validação.
-- Validar base legal, retenção, pequenos grupos e controle de acesso; guardar evidências reais.
-- Implementar e demonstrar o caminho de ETL reverso com seu consumidor.
-- Atualizar diários e registro de IA conforme as atividades ocorrerem; não antecipar evidências de execução futura.
+- [x] Publicar Gold, dicionário e métricas com nomes definitivos e testes de reconciliação (176 testes dbt).
+- [x] Integrar painel Streamlit (`src/app/dashboard.py`), busca semântica CBO e consulta em linguagem natural conforme [ADR-0007](adr/0007-busca-semantica-e-consumo.md).
+- [x] Demonstrar SCD tipo 2 (`snp_cbo` / `gold.dim_cbo_historico`), retry, schedule mensal e backfill no Dagster, com consumo em modo somente leitura após materialização da Gold.
+- [ ] Validar base legal da LGPD, retenção, pequenos grupos e controle de acesso (além de `read_only`); guardar evidências reais (E4).
+- [ ] Implementar e demonstrar o caminho de ETL reverso com seu consumidor (E4).
+- [ ] Atualizar diários e registro de IA conforme as atividades da E4 ocorrerem; não antecipar evidências de execução futura.

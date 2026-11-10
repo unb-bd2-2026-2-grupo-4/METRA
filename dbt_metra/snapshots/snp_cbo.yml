@@ -1,0 +1,15 @@
+version: 2
+
+# SCD tipo 2 da CBO: cada mudança de título ou de origem do cadastro abre uma nova versão
+# e fecha a anterior (dbt_valid_to), preservando o histórico entre execuções do pipeline.
+snapshots:
+  - name: snp_cbo
+    relation: ref('stg_cbo')
+    description: "Histórico de versões das ocupações CBO 2002 capturado a cada execução do dbt."
+    config:
+      schema: snapshots
+      unique_key: codigo_cbo
+      strategy: check
+      check_cols: [titulo_ocupacao, codigo_grande_grupo, is_cadastro_oficial]
+      # Ocupação que some da fonte tem a versão vigente encerrada, sem apagar o histórico.
+      hard_deletes: invalidate

@@ -9,10 +9,22 @@ import json
 from pathlib import Path
 import sys
 
-from dagster import AssetKey, Definitions
+from dagster import (
+    AssetKey,
+    AssetSelection,
+    Definitions,
+    ScheduleDefinition,
+    build_schedule_from_partitioned_job,
+    define_asset_job,
+)
 from dagster_dbt import DagsterDbtTranslator, DbtCliResource, DbtProject, dbt_assets
 
-from dagster_metra.assets import executar_pipeline_asset, exportar_parquet_asset
+from dagster_metra.assets import (
+    POLITICA_RETRY,
+    conciliacao_mensal_asset,
+    executar_pipeline_asset,
+    exportar_parquet_asset,
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DBT_PROJECT_DIR = PROJECT_ROOT / "dbt_metra"
@@ -47,6 +59,7 @@ for unique_id in dbt_manifest.get("sources", {}):
     manifest=dbt_project.manifest_path,
     project=dbt_project,
     dagster_dbt_translator=dbt_translator,
+    retry_policy=POLITICA_RETRY,
 )
 def metra_dbt_assets(context, dbt: DbtCliResource):
     """Executa o build completo da camada Silver e Gold."""
@@ -54,13 +67,44 @@ def metra_dbt_assets(context, dbt: DbtCliResource):
     yield from dbt.cli(["build"], context=context).stream()
 
 
+# Pipeline completo: OLTP -> Parquet -> Silver/Gold (inclui o snapshot SCD da CBO).
+pipeline_metra_job = define_asset_job(
+    "pipeline_metra",
+    selection=AssetSelection.assets(executar_pipeline_asset, exportar_parquet_asset, metra_dbt_assets),
+    description="Executa a ingestão, a extração para Parquet e o dbt build da Silver e da Gold.",
+)
+
+# O Novo CAGED publica uma competência por mês; o pipeline roda no dia 5, às 6h.
+pipeline_mensal_schedule = ScheduleDefinition(
+    name="pipeline_metra_mensal",
+    job=pipeline_metra_job,
+    cron_schedule="0 6 5 * *",
+    execution_timezone="America/Sao_Paulo",
+)
+
+# Conciliação do mês anterior, duas horas depois do pipeline; backfills usam o mesmo job.
+conciliacao_mensal_job = define_asset_job(
+    "conciliacao_mensal_job",
+    selection=AssetSelection.assets(conciliacao_mensal_asset),
+    partitions_def=conciliacao_mensal_asset.partitions_def,
+)
+conciliacao_mensal_schedule = build_schedule_from_partitioned_job(
+    conciliacao_mensal_job,
+    name="conciliacao_mensal",
+    day_of_month=5,
+    hour_of_day=8,
+)
+
 defs = Definitions(
     assets=[
         executar_pipeline_asset,
         exportar_parquet_asset,
         *metra_lake_source_assets,
         metra_dbt_assets,
+        conciliacao_mensal_asset,
     ],
+    jobs=[pipeline_metra_job, conciliacao_mensal_job],
+    schedules=[pipeline_mensal_schedule, conciliacao_mensal_schedule],
     resources={
         "dbt": DbtCliResource(
             project_dir=DBT_PROJECT_DIR,

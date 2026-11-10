@@ -1,6 +1,6 @@
 # Camada analítica com dbt
 
-O projeto contém as cinco fontes Parquet, os quatro modelos Silver, as cinco dimensões e quatro fatos Gold. Esta entrega acrescenta os **122 testes genéricos das fontes/Silver**, o benchmark e a documentação de modelagem. Os testes genéricos específicos da Gold e a implementação de SCD continuam pendentes, enquanto os testes Python de negócio da Gold já existem na base. O diagrama abaixo representa os modelos atuais.
+O projeto contém as cinco fontes Parquet, os quatro modelos Silver, as cinco dimensões e quatro fatos Gold, mais o histórico SCD tipo 2 da CBO (`snp_cbo` e `dim_cbo_historico`). Os testes genéricos cobrem as fontes, a Silver e a Gold, e os testes Python de negócio complementam esses contratos. O diagrama abaixo representa os modelos atuais.
 
 ## Fluxo e arquivos
 
@@ -10,12 +10,12 @@ flowchart LR
     P -->|dbt sources| S[Silver: quatro modelos stg]
     S --> T[Testes de qualidade]
     S --> G[Gold: dimensões e fatos]
-    G -. integração pendente .-> D[Streamlit]
+    G -->|somente leitura| D["Streamlit (src/app/dashboard.py)"]
 ```
 
 As fontes são `movimentacao`, `municipio`, `cbo_2002`, `cnae_subclasse` e `cnae_secao`. O caminho é `data/lake/parquet/<tabela>/**/*.parquet`, com `hive_partitioning=false`; não é um único conjunto plano de arquivos. A transformação Silver normaliza nomes, acrescenta flags e mantém os códigos como texto. O join entre subclasse e seção CNAE produz `stg_cnae`.
 
-O destino padrão é **`data/metra_analitico.duckdb`**, schema `silver`. `data/metra.duckdb` é usado pela análise anterior: o painel e o Dagster devem respeitar `METRA_DUCKDB` ou alinhar essa configuração antes da integração. Execuções concorrentes de escrita devem ser coordenadas pelo orquestrador.
+O destino padrão é **`data/metra_analitico.duckdb`** (schemas `silver`, `gold` e `snapshots`), compartilhado entre o dbt, o Dagster e o painel Streamlit via `METRA_DUCKDB`. `data/metra.duckdb` permanece restrito ao script standalone `src/analise.py` da E2. Execuções de escrita são coordenadas pelo orquestrador, enquanto o painel abre o banco exclusivamente em modo `READ_ONLY`.
 
 ---
 
@@ -147,13 +147,19 @@ As três fatos agregadas derivam de `fct_movimentacao`, filtrando municípios id
 
 As métricas são compartilhadas pela macro `metricas_movimentacao`; incluem contagens, saldo, soma salarial e quantidade de salários de admissão elegíveis, para recompor médias ponderadas. A implementação das perguntas P1–P5 é descrita em `dbt_metra/analyses/README.md` no repositório.
 
-### Variação lenta e testes Gold a integrar
+### Variação lenta: SCD tipo 2 da CBO
 
-A dimensão `dim_cbo` atual copia `stg_cbo` e não mantém histórico de versões. Como evolução ainda não implementada, a proposta é preservar mudanças do título CBO por **SCD tipo 2**, em vez de sobrescrever versões. Os intervalos `[observado_desde, observado_ate)` registram quando o projeto observou cada cadastro; a fonte atual não fornece vigência histórica da ocupação. Não atribuir retroativamente a 2023 uma validade que só começou a ser observada em 2026.
+O snapshot dbt `snp_cbo` (`dbt_metra/snapshots/snp_cbo.yml`) compara, a cada `dbt build`, o título, o grande grupo e a origem do cadastro de cada ocupação de `stg_cbo` (estratégia `check`). Uma mudança encerra a versão anterior e abre uma nova, em vez de sobrescrevê-la; uma ocupação que sai da fonte tem a versão vigente encerrada (`hard_deletes: invalidate`), sem perder o histórico. O snapshot fica no schema `snapshots` do mesmo arquivo DuckDB e persiste entre execuções.
 
-Um campo futuro `referencia_cadastro_em` seria o instante de associação do fato ao cadastro observado, distinto da competência de negócio e de `registrado_em` da origem. Essa associação deve ser persistida; um rebuild que troca todas as chaves pela versão atual destruiria a história. Snapshot, política de associação da carga inicial e preservação de chaves ainda precisam de implementação na Gold.
+`gold.dim_cbo_historico` expõe uma linha por versão, com `id_versao_cbo`, `observado_desde`, `observado_ate` e `is_versao_vigente`. Os intervalos `[observado_desde, observado_ate)` registram quando o projeto **observou** cada cadastro; a fonte atual não fornece vigência histórica da ocupação. Não atribuir retroativamente a 2023 uma validade que só começou a ser observada em 2026.
 
-| Contrato Gold pendente | Testes a conectar ao modelo real |
+`gold.dim_cbo` continua sendo a versão vigente (tipo 1), usada pelos fatos e pelo painel. A associação persistida de cada fato à versão observada no momento da carga (`referencia_cadastro_em`) não foi implementada: um rebuild completo da fato usa sempre o cadastro vigente.
+
+Os contratos do histórico são verificados pelo teste singular `tests/assert_cbo_uma_versao_vigente.sql` (no máximo uma versão vigente por ocupação e períodos encadeados, sem sobreposição), pelos `data_tests` de `dim_cbo_historico` e por `tests/test_scd_cbo.py`, que executa o dbt duas vezes, muda um título na fonte entre as execuções e confere que a versão anterior foi preservada e encerrada.
+
+### Contratos de teste da Gold
+
+| Contrato Gold | Testes |
 |---|---|
 | Grão da fato | `not_null`/`unique` de `id_movimentacao`; contagem e saldo iguais à Silver |
 | Dimensões | PK única/não nula e FKs da fato sem órfãos, inclusive sentinelas |
@@ -162,7 +168,7 @@ Um campo futuro `referencia_cadastro_em` seria o instante de associação do fat
 | Agregados de consumo | Admissões/desligamentos/saldo reconciliados; salário calculado por soma/contagem válida, nunca média de médias |
 | Distribuição | Mesmos totais por UF, competência, setor e perfil antes e depois da modelagem |
 
-Os testes genéricos deste PR se limitam às fontes e à Silver. Para completar a cobertura Gold, acrescentar os testes ao YAML de contratos já existente (`models/marts/_gold__models.yml`), sem duplicar patches de modelos em outro arquivo. Os testes de negócio em `tests/test_gold.py` complementam, mas não substituem, esses contratos. Os testes SCD dependem da implementação do histórico.
+Os 54 testes da Gold estão no YAML de contratos (`models/marts/_gold__models.yml`) e em `tests/assert_cbo_uma_versao_vigente.sql`: `unique` e `not_null` nas chaves das dimensões e da fato, `relationships` da fato e dos agregados para as dimensões, `accepted_values` do saldo, contagem da fato igual à Silver (`metra_same_count`), unicidade do grão dos agregados mensais (`metra_unique_combination`) e os contratos do SCD tipo 2. A reconciliação de totais e de médias salariais entre agregados fica nos testes de negócio de `tests/test_gold.py`, que complementam esses contratos. Na amostra versionada, `dbt build` executa os 14 modelos, o snapshot e os 176 testes sem falhas.
 
 ---
 
@@ -172,6 +178,34 @@ Os testes genéricos deste PR se limitam às fontes e à Silver. Para completar 
 
 `max(competencia)` indica cobertura temporal do dado, não freshness de processamento. O conjunto disponível pode terminar em janeiro/2026 e ainda ter sido processado hoje. `registrado_em` também não substitui o instante da extração.
 
-A [E3](https://unb-bd2.github.io/PlanoEnsino/projeto/e3/) exige ainda retry/backfill demonstrados, consulta otimizada com evidências e painel. O benchmark da [ADR-0005](adr/0005-modelagem-analitica-dbt.md) compara granularidades sobre a amostra, mas não comprova otimização da Gold, SCD nem orquestração. Os comandos `EXPLAIN ANALYZE` anexos são do DuckDB; não equivalem ao `EXPLAIN (ANALYZE, BUFFERS)` PostgreSQL solicitado no checklist. Alinhar com a docente a evidência apropriada ao motor usado.
+O benchmark da [ADR-0005](adr/0005-modelagem-analitica-dbt.md) compara granularidades sobre a amostra. A otimização da Gold é medida separadamente, na seção seguinte; retry e backfill estão demonstrados em [Orquestração](orquestracao.md#retry-agendamento-e-backfill).
+
+---
+
+## Consulta otimizada: EXPLAIN antes e depois
+
+`src/qualidade/comparar_explain.py` responde à P1 (admissões, desligamentos, saldo e salários por seção CNAE no DF, nos últimos 12 meses da base) de três formas e exige que as respostas sejam idênticas:
+
+- **origem:** PostgreSQL sobre o OLTP 3FN, com `EXPLAIN (ANALYZE, BUFFERS)`;
+- **antes:** DuckDB agregando a fato detalhada `gold.fct_movimentacao`;
+- **depois:** DuckDB somando o agregado mensal `gold.fct_setor_mensal`, que o dbt materializa a partir da mesma fato.
+
+O DuckDB não oferece a opção `BUFFERS`; para ele, a evidência é o plano do `EXPLAIN ANALYZE`, com as linhas lidas por operador, e a mediana de 30 execuções com uma thread.
+
+| Base | Antes: `fct_movimentacao` | Depois: `fct_setor_mensal` | Ganho |
+|---|---|---|---|
+| Completa (14.753.112 movimentações) | 33,27 ms; o scan devolve 918.397 linhas após os filtros | 0,84 ms; o scan devolve 251 linhas | ≈ 40× |
+| Amostra versionada (49.178) | 0,50 ms | 0,90 ms | sem ganho |
+
+Na base completa, o agregado elimina a leitura de quase um milhão de linhas por consulta. Na amostra, as duas formas ficam abaixo de 1 ms e o custo fixo de executar a consulta domina: o agregado não compensa nesse volume, e a amostra não serve como evidência de desempenho. Na origem, a mesma pergunta sobre a amostra leva 3,8 ms no PostgreSQL, com 9.910 páginas lidas do cache compartilhado (`shared hit`), a maior parte em 3.062 buscas por índice na tabela de subclasses CNAE para resolver a seção de cada movimentação.
+
+A base completa não está no PostgreSQL do projeto; a Gold completa foi construída num diretório temporário a partir dos CSVs integrais pelo construtor de `src/app/banco_analitico.py`, com os 176 testes dbt aprovados. Evidências: [`0005-explain-completo.json`](https://github.com/unb-bd2-2026-2-grupo-4/METRA/blob/main/docs/adr/evidencias/0005-explain-completo.json) e [`0005-explain-amostra.json`](https://github.com/unb-bd2-2026-2-grupo-4/METRA/blob/main/docs/adr/evidencias/0005-explain-amostra.json), com os planos completos.
+
+```bash
+# Amostra, com o PostgreSQL do Compose e as variáveis PG* exportadas
+python -m src.qualidade.comparar_explain --saida docs/adr/evidencias/0005-explain-amostra.json
+# Outro banco DuckDB sem a origem correspondente (ex.: base completa)
+python -m src.qualidade.comparar_explain --banco <arquivo.duckdb> --sem-origem --saida <arquivo.json>
+```
 
 Referências de implementação: [testes declarativos dbt](https://docs.getdbt.com/reference/resource-properties/data-tests) e [testes genéricos SQL](https://docs.getdbt.com/best-practices/writing-custom-generic-tests).

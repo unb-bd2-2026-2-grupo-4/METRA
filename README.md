@@ -127,7 +127,7 @@ E4            | Análises e Visualizações  |
 │   └── workflows/
 │       └── deploy-docs.yml # Pipeline de deploy automatizado no GitHub Pages
 ├── .gitignore              # Regras de exclusão para dados pesados (permite a amostra de 2.8 MB)
-├── AI-USAGE.md             # Registro contemporâneo de uso de assistentes de IA (conforme política)
+├── AI-USAGE.md             # Ponteiro para o registro de uso de IA em docs/uso-de-ia.md (conforme política)
 ├── README.md               # Visão geral do METRA, domínio, setup e governança
 ├── docker-compose.yml      # Manifesto que sobe todos os serviços locais da plataforma (E1 a E4)
 ├── mkdocs.yml              # Configuração do portal de documentação (Material for MkDocs)
@@ -135,7 +135,9 @@ E4            | Análises e Visualizações  |
 ├── requirements-pipeline.txt # Dependências Python da ingestão, das migrações, da extração e do dbt
 ├── .env.example            # Variáveis de ambiente do PostgreSQL (opcional)
 ├── docker/                 # Arquivos de configuração e Dockerfiles dos serviços
-│   └── ingestao/Dockerfile # Imagem da tarefa de ingestão e carga do pipeline E1
+│   ├── ingestao/Dockerfile # Imagem da tarefa de ingestão e carga do pipeline E1
+│   ├── dagster/Dockerfile  # Imagem do webserver e do daemon do Dagster
+│   └── painel/Dockerfile   # Imagem do painel Streamlit (somente leitura do banco analítico)
 ├── src/                    # Scripts de ingestão, pipeline e transformações
 │   ├── analise.py          # Carga PostgreSQL -> DuckDB e indicadores no terminal
 │   ├── cdc/
@@ -226,9 +228,17 @@ docker compose up -d postgres
 #    Se os CSVs pesados estiverem em data/, carrega os 14,7 milhões de registros.
 #    Em uma máquina limpa de terceiro, utiliza automaticamente a amostra de 49 mil linhas versionada.
 docker compose run --rm ingestao-bronze
+
+# 5. Gerar o lake Parquet e as camadas Silver e Gold pelo job do Dagster
+#    (--build reconstrói a imagem quando o código do pipeline mudou)
+docker compose --profile dagster run --build --rm dagster-webserver \
+  dagster job execute -m dagster_metra.definitions -j pipeline_metra
+
+# 6. Subir o painel Streamlit sobre a Gold gerada
+docker compose --profile painel up --build -d painel
 ```
 
-Acesse o portal de documentação em: [http://localhost:8000](http://localhost:8000).
+Acesse o portal de documentação em: [http://localhost:8000](http://localhost:8000) e o painel em: [http://localhost:8501](http://localhost:8501).
 
 ### Análise local com DuckDB
 
@@ -301,9 +311,9 @@ Os modelos `stg_movimentacao`, `stg_municipio`, `stg_cbo` e `stg_cnae` leem o Pa
 
 O `profiles.yml` versionado em `dbt_metra/` dispensa configuração em `~/.dbt/`. As variáveis `METRA_LAKE_PARQUET` (diretório do Parquet, relativo a `dbt_metra/`) e `METRA_DUCKDB` (arquivo de destino) permitem apontar para outros caminhos, como em contêineres ou no orquestrador.
 
-### Qualidade das fontes e da Silver
+### Qualidade das fontes, da Silver e da Gold
 
-Os 122 testes genéricos de qualidade são definidos em `dbt_metra/models/staging/schema.yml` e `_lake__sources.yml`. Verificam schema, chaves, referências, domínios, volume, distribuição e linhagem. Execute `dbt test --profiles-dir .` dentro de `dbt_metra/`, depois de materializar os modelos, ou `dbt build --profiles-dir .` para construir e validar.
+O projeto dbt tem 176 testes. Os 122 das fontes e da Silver estão em `dbt_metra/models/staging/schema.yml` e `_lake__sources.yml` e verificam schema, chaves, referências, domínios, volume, distribuição e linhagem. Os 54 da Gold estão em `dbt_metra/models/marts/_gold__models.yml` e em `dbt_metra/tests/`: chaves únicas e não nulas das dimensões, integridade referencial da fato, grão dos agregados, contagem da fato igual à Silver e os contratos do SCD tipo 2 da CBO. Execute `dbt test --profiles-dir .` dentro de `dbt_metra/`, depois de materializar os modelos, ou `dbt build --profiles-dir .` para construir e validar.
 
 Para validar a detecção de falhas com Parquet sintético isolado, na raiz:
 
@@ -318,6 +328,7 @@ Veja a [camada analítica e o Star Schema](docs/camada-analitica-dbt.md) e a [AD
 O mesmo `dbt build` também reconstrói o schema `gold`, usando `ref()` sobre a Silver:
 
 - Dimensões `dim_competencia`, `dim_municipio`, `dim_cnae`, `dim_cbo` e `dim_perfil_demografico`.
+- Histórico da CBO como dimensão de variação lenta (SCD tipo 2): o snapshot `snp_cbo` preserva cada versão observada e `dim_cbo_historico` a expõe com `observado_desde`, `observado_ate` e `is_versao_vigente`; `dim_cbo` segue com a versão vigente.
 - `fct_movimentacao`: uma linha por evento da Silver, com chaves dimensionais e linhagem.
 - `fct_setor_mensal`: competência × UF × seção CNAE (P1, P2 e P4).
 - `fct_geografia_mensal`: competência × UF × capital/interior (P3).
@@ -376,6 +387,13 @@ O comando sobe o `dagster-webserver` e o `dagster-daemon` com o mesmo `DAGSTER_H
 
 Na interface, materialize `executar_pipeline` para executar as migrações e cargas E1, e em seguida, materialize `exportar_parquet` para gerar os arquivos Parquet. Depois, os assets dbt podem então ser materializados para executar `dbt build` sobre o lake. Os sources `lake/*` são virtuais: representam os Parquets produzidos pela extração e aparecem como parte da linhagem, sem uma materialização adicional. O arquivo DuckDB e os Parquets são montados a partir de `data/`.
 
+Todos os assets têm política de retry (até 3 novas tentativas, com espera exponencial). O job `pipeline_metra` tem o schedule mensal `pipeline_metra_mensal`, e o asset `conciliacao_mensal`, particionado por competência, confere o OLTP contra a fato Gold e permite backfill de um intervalo de meses em uma execução:
+
+```bash
+dagster job execute -m dagster_metra.definitions -j pipeline_metra
+dagster asset materialize -m dagster_metra.definitions --select conciliacao_mensal --partition-range "2023-01-01...2026-10-01"
+```
+
 O procedimento operacional detalhado está em [`docs/orquestracao.md`](./docs/orquestracao.md), enquanto a decisão arquitetural foi registrada na [ADR 0006](./docs/adr/0006-orquestracao-com-dagster.md).
 
 ### Busca Semântica CBO, Assistente Text-to-SQL e Painel Streamlit (E4)
@@ -387,7 +405,13 @@ A camada de consumo interativa (`src/app/dashboard.py`) integra duas abas conect
    - **Assistente Text-to-SQL Governado pelo Catálogo (`src/app/text_to_sql.py`):** traduz perguntas em linguagem natural para consultas SQL auditáveis sobre os contratos da camada `gold` (P1–P5 e ocupações CBO), exibindo a fórmula oficial, ressalvas metodológicas e bloqueando deterministicamente comandos DDL/DML, leituras externas, acessos fora do schema `gold` ou consultas desagregadas de registros individuais (LGPD).
 2. **Painel das 5 Perguntas de Gestão (Contratos Gold):** visualização tabular e gráfica das cinco perguntas estratégicas do projeto sobre as tabelas agregadas da camada `gold`.
 
-Para executar o painel, os testes e o benchmark reproduzível da [`ADR 0007`](./docs/adr/0007-busca-semantica-e-consumo.md):
+No Docker, o serviço `painel` (perfil `painel`) serve o app em `http://localhost:8501` (porta configurável por `PAINEL_PORT`). Ele monta `data/` como somente leitura e só abre o banco durante cada consulta, então o dbt e o Dagster continuam escrevendo na Gold com o painel no ar; depois de uma nova materialização, basta recarregar a página. Sem a Gold gerada, o painel mostra o comando a executar.
+
+```bash
+docker compose --profile painel up --build -d painel
+```
+
+Para executar o painel localmente, os testes e o benchmark reproduzível da [`ADR 0007`](./docs/adr/0007-busca-semantica-e-consumo.md):
 
 ```bash
 streamlit run src/app/dashboard.py

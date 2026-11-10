@@ -318,47 +318,144 @@ def render_auditoria_expander(resposta: RespostaTextToSQL) -> None:
 # PAINÉIS POR PERGUNTA DE GESTÃO (P1 A P5)
 # ==============================================================================
 
-def render_p3_capitais_interior(df_bruto: pd.DataFrame, cargo_label: str = "") -> None:
-    df_tot = df_bruto[df_bruto["nivel"] == "total"].copy()
-    if df_tot.empty:
-        df_tot = df_bruto.copy()
+def render_p3_capitais_interior(
+    df_bruto: pd.DataFrame,
+    cargo_label: str = "",
+    filtros: dict[str, Any] | None = None,
+) -> None:
+    uf_filtro = (filtros or {}).get("sigla_uf")
+    ano_filtro = (filtros or {}).get("ano")
+    recorte_alvo = (
+        uf_filtro
+        if uf_filtro and uf_filtro in df_bruto["recorte"].values
+        else ("Centro-Oeste" if "Centro-Oeste" in df_bruto["recorte"].values else str(df_bruto["recorte"].iloc[0]))
+    )
 
-    linha_co = df_tot[df_tot["recorte"] == "Centro-Oeste"]
-    ref = linha_co.iloc[0] if not linha_co.empty else df_tot.iloc[0]
+    df_tot = df_bruto[df_bruto["nivel"] == "total"].copy()
+    if uf_filtro in df_tot["recorte"].values:
+        # Com a UF filtrada no SQL, a linha "Centro-Oeste" do grouping set contém só essa UF.
+        df_tot = df_tot[df_tot["recorte"] == uf_filtro]
+    df_anual_recorte = (
+        df_bruto[(df_bruto["nivel"] == "anual") & (df_bruto["recorte"] == recorte_alvo)]
+        .sort_values("ano")
+        .copy()
+    )
+    df_tot_recorte = df_tot[df_tot["recorte"] == recorte_alvo].copy()
+
+    if not df_tot_recorte.empty:
+        ref = df_tot_recorte.iloc[0]
+    elif not df_tot.empty:
+        ref = df_tot.iloc[0]
+    elif not df_anual_recorte.empty:
+        ref = df_anual_recorte.iloc[-1]
+    else:
+        ref = df_bruto.iloc[0]
 
     sufixo = f" — {cargo_label}" if cargo_label else ""
-    st.markdown(f"#### Capitais vs. Interior{sufixo}")
-    st.caption("Comparação de saldo líquido de empregos e salário médio de admissão entre capitais e municípios do interior.")
+    st.markdown(f"#### Capitais vs. Interior ({recorte_alvo}){sufixo}")
+    st.caption(
+        "Comparação de saldo líquido de empregos e salário médio nominal de admissão "
+        "entre capitais e municípios do interior (diferença = capital − interior)."
+    )
 
     c1, c2, c3 = st.columns(3)
     with c1:
-        render_kpi("Salário médio (Capitais)", fmt_moeda(ref["salario_capital"]), f"Saldo: {fmt_int(ref['saldo_capital'], True)} vínculos")
-    with c2:
-        render_kpi("Salário médio (Interior)", fmt_moeda(ref["salario_interior"]), f"Saldo: {fmt_int(ref['saldo_interior'], True)} vínculos")
-    with c3:
-        render_kpi("Diferença (Capital - Interior)", fmt_moeda(ref["diferenca_salario"]), f"Diferença de saldo: {fmt_int(ref['diferenca_saldo'], True)}")
-
-    st.write("")
-    col_chart, col_table = st.columns([1, 1])
-
-    with col_chart:
-        st.markdown("**Salário médio de admissão (R$)**")
-        df_plot = df_tot.set_index("recorte")[["salario_capital", "salario_interior"]].rename(
-            columns={"salario_capital": "Capitais", "salario_interior": "Interior"}
+        render_kpi(
+            "Salário médio (Capitais)",
+            fmt_moeda(ref["salario_capital"]),
+            f"Saldo: {fmt_int(ref['saldo_capital'], True)} vínculos · n = {fmt_int(ref.get('n_capital', 0))}",
         )
-        st.bar_chart(df_plot, height=280)
+    with c2:
+        render_kpi(
+            "Salário médio (Interior)",
+            fmt_moeda(ref["salario_interior"]),
+            f"Saldo: {fmt_int(ref['saldo_interior'], True)} vínculos · n = {fmt_int(ref.get('n_interior', 0))}",
+        )
+    with c3:
+        render_kpi(
+            "Diferença (Capital − Interior)",
+            fmt_moeda(ref["diferenca_salario"]),
+            f"Diferença de saldo: {fmt_int(ref['diferenca_saldo'], True)} vínculos",
+        )
 
-    with col_table:
-        st.markdown("**Resumo por Unidade da Federação**")
-        df_exibir = pd.DataFrame({
-            "Recorte": df_tot["recorte"],
-            "Salário Capital": df_tot["salario_capital"].map(fmt_moeda),
-            "Salário Interior": df_tot["salario_interior"].map(fmt_moeda),
-            "Diferença (R$)": df_tot["diferenca_salario"].map(fmt_moeda),
-            "Saldo Capitais": df_tot["saldo_capital"].map(lambda v: fmt_int(v, True)),
-            "Saldo Interior": df_tot["saldo_interior"].map(lambda v: fmt_int(v, True)),
+    # Série anual 2023–2026 + Total (conciliada com python3 -m src.analise)
+    partes_serie: list[pd.DataFrame] = []
+    if not df_anual_recorte.empty:
+        df_a = df_anual_recorte.copy()
+        df_a["periodo"] = df_a["ano"].map(lambda a: str(int(a)) if pd.notna(a) else "—")
+        partes_serie.append(df_a)
+    # Com um ano filtrado, o consolidado repetiria a única linha anual.
+    if not df_tot_recorte.empty and not ano_filtro:
+        df_t = df_tot_recorte.copy()
+        df_t["periodo"] = "Total"
+        partes_serie.append(df_t)
+
+    if partes_serie:
+        df_serie = pd.concat(partes_serie, ignore_index=True)
+        st.write("")
+        titulo_serie = f"Ano {ano_filtro}" if ano_filtro else "Série anual 2023–2026 e consolidado"
+        st.markdown(f"**{titulo_serie} ({recorte_alvo}) — Pergunta Central E1**")
+        df_tabela_anual = pd.DataFrame({
+            "Período": df_serie["periodo"],
+            "Saldo Capital": df_serie["saldo_capital"].map(lambda v: fmt_int(v, True)),
+            "Saldo Interior": df_serie["saldo_interior"].map(lambda v: fmt_int(v, True)),
+            "Dif. Saldo (Cap. − Int.)": df_serie["diferenca_saldo"].map(lambda v: fmt_int(v, True)),
+            "Salário Capital": df_serie["salario_capital"].map(fmt_moeda),
+            "Salário Interior": df_serie["salario_interior"].map(fmt_moeda),
+            "Dif. Salário (Cap. − Int.)": df_serie["diferenca_salario"].map(fmt_moeda),
+            "n Capital": df_serie["n_capital"].map(fmt_int),
+            "n Interior": df_serie["n_interior"].map(fmt_int),
         })
-        st.dataframe(df_exibir, hide_index=True)
+        st.dataframe(df_tabela_anual, hide_index=True)
+
+    if not df_anual_recorte.empty and len(df_anual_recorte) > 1:
+        st.write("")
+        col_g_sal, col_g_saldo = st.columns([1, 1])
+        df_plot_ano = df_anual_recorte.copy()
+        df_plot_ano["Ano"] = df_plot_ano["ano"].map(lambda a: str(int(a)))
+        df_plot_ano = df_plot_ano.set_index("Ano")
+
+        with col_g_sal:
+            st.markdown("**Salário médio de admissão por ano (R$)**")
+            st.bar_chart(
+                df_plot_ano[["salario_capital", "salario_interior"]].rename(
+                    columns={"salario_capital": "Capitais", "salario_interior": "Interior"}
+                ),
+                height=260,
+            )
+
+        with col_g_saldo:
+            st.markdown("**Saldo líquido de empregos por ano (vínculos)**")
+            st.bar_chart(
+                df_plot_ano[["saldo_capital", "saldo_interior"]].rename(
+                    columns={"saldo_capital": "Capitais", "saldo_interior": "Interior"}
+                ),
+                height=260,
+            )
+
+    if not df_tot.empty:
+        st.write("")
+        col_chart, col_table = st.columns([1, 1])
+
+        with col_chart:
+            st.markdown("**Salário médio de admissão por UF (R$)**")
+            df_plot = df_tot.set_index("recorte")[["salario_capital", "salario_interior"]].rename(
+                columns={"salario_capital": "Capitais", "salario_interior": "Interior"}
+            )
+            st.bar_chart(df_plot, height=280)
+
+        with col_table:
+            st.markdown("**Resumo por Unidade da Federação**")
+            df_exibir = pd.DataFrame({
+                "Recorte": df_tot["recorte"],
+                "Saldo Capital": df_tot["saldo_capital"].map(lambda v: fmt_int(v, True)),
+                "Saldo Interior": df_tot["saldo_interior"].map(lambda v: fmt_int(v, True)),
+                "Dif. Saldo": df_tot["diferenca_saldo"].map(lambda v: fmt_int(v, True)),
+                "Salário Capital": df_tot["salario_capital"].map(fmt_moeda),
+                "Salário Interior": df_tot["salario_interior"].map(fmt_moeda),
+                "Dif. Salário (R$)": df_tot["diferenca_salario"].map(fmt_moeda),
+            })
+            st.dataframe(df_exibir, hide_index=True)
 
 
 def render_p1_setores_df(
@@ -705,7 +802,7 @@ def renderizar_resposta_geral(
         st.caption(f"Filtro ocupacional aplicado (CBO 2002): {cbo_tags}")
 
     if resposta.intencao == "p3_capitais_interior":
-        render_p3_capitais_interior(df_bruto, cargo_label)
+        render_p3_capitais_interior(df_bruto, cargo_label, resposta.filtros_aplicados)
     elif resposta.intencao == "p1_setores_df":
         render_p1_setores_df(df_bruto, cargo_label, resposta.filtros_aplicados)
     elif resposta.intencao == "p2_sazonalidade":
@@ -956,7 +1053,7 @@ def render_view_busca_cbo(
         )
         df_g = pd.DataFrame(resp_geo.linhas, columns=resp_geo.colunas)
         if not df_g.empty:
-            render_p3_capitais_interior(df_g, top1.titulo_ocupacao)
+            render_p3_capitais_interior(df_g, top1.titulo_ocupacao, resp_geo.filtros_aplicados)
         else:
             st.info("Sem registros geográficos para esta ocupação no filtro atual.")
 

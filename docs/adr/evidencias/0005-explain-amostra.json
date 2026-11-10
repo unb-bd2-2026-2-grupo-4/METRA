@@ -1,0 +1,99 @@
+{
+  "pergunta": "P1: admissões, desligamentos, saldo e salários por seção CNAE no DF, últimos 12 meses",
+  "janela": [
+    "2025-02-01",
+    "2026-01-01"
+  ],
+  "ambiente": {
+    "python": "3.12.16",
+    "duckdb": "1.5.6",
+    "postgresql": "16.15 (Debian 16.15-1.pgdg13+2)",
+    "plataforma": "Linux-7.0.14-linuxkit-aarch64-with-glibc2.41",
+    "threads_duckdb": 1,
+    "repeticoes": 30
+  },
+  "limites": "49,178 movimentações na fato; cache aquecido; host compartilhado. O DuckDB não oferece BUFFERS; o PostgreSQL, quando incluído, é medido uma vez, como referência da origem.",
+  "resultados_identicos": true,
+  "linhas_lidas": {
+    "antes_fct_movimentacao": 49178,
+    "depois_fct_setor_mensal": 2420
+  },
+  "antes": {
+    "consulta": "select codigo_secao,\n       count(*) filter (where saldo_movimentacao = 1) as admissoes,\n       count(*) filter (where saldo_movimentacao = -1) as desligamentos,\n       sum(saldo_movimentacao) as saldo,\n       sum(case when saldo_movimentacao = 1 and salario_valido then salario_mensal else 0 end) as soma_salarios_admissao,\n       count(*) filter (where saldo_movimentacao = 1 and salario_valido) as qtd_salarios_admissao\nfrom gold.fct_movimentacao\nwhere is_identificado and is_centro_oeste and ano between 2023 and 2026\n  and sigla_uf = 'DF' and competencia between $inicio and $fim\ngroup by codigo_secao\norder by codigo_secao",
+    "mediana_ms": 0.49612499998374915,
+    "tempos_ms": [
+      0.5424170000196682,
+      0.5075000000260843,
+      0.5074590000049284,
+      0.4854170000498925,
+      0.4824999999755164,
+      0.47137499996097176,
+      0.49458399996638036,
+      0.48570800004199555,
+      0.49729099998785387,
+      0.48104199993304064,
+      0.48166700003093865,
+      0.47720899999603716,
+      0.47920899999098765,
+      0.4700410000850752,
+      0.48466699990967754,
+      0.4797500000677246,
+      0.6302499999719657,
+      0.6528750000143191,
+      0.5754159999469266,
+      0.5404580000458736,
+      0.5126669999526712,
+      0.5099589999417731,
+      0.49745800004075136,
+      0.5000410000093325,
+      0.4895419999684236,
+      0.49495899997964443,
+      0.4929169999741134,
+      0.51050000001851,
+      0.5053749999888169,
+      0.5129579999447742
+    ],
+    "explain_analyze": "┌─────────────────────────────────────┐\n│┌───────────────────────────────────┐│\n││    Query Profiling Information    ││\n│└───────────────────────────────────┘│\n└─────────────────────────────────────┘\nexplain analyze  select codigo_secao,        count(*) filter (where saldo_movimentacao = 1) as admissoes,        count(*) filter (where saldo_movimentacao = -1) as desligamentos,        sum(saldo_movimentacao) as saldo,        sum(case when saldo_movimentacao = 1 and salario_valido then salario_mensal else 0 end) as soma_salarios_admissao,        count(*) filter (where saldo_movimentacao = 1 and salario_valido) as qtd_salarios_admissao from gold.fct_movimentacao where is_identificado and is_centro_oeste and ano between 2023 and 2026   and sigla_uf = 'DF' and competencia between $inicio and $fim group by codigo_secao order by codigo_secao \n┌────────────────────────────────────────────────┐\n│┌──────────────────────────────────────────────┐│\n││              Total Time: 0.0008s             ││\n│└──────────────────────────────────────────────┘│\n└────────────────────────────────────────────────┘\n┌───────────────────────────┐\n│           QUERY           │\n└─────────────┬─────────────┘\n┌─────────────┴─────────────┐\n│      EXPLAIN_ANALYZE      │\n│    ────────────────────   │\n│                           │\n│           0 rows          │\n│           0.00s           │\n└─────────────┬─────────────┘\n┌─────────────┴─────────────┐\n│         PROJECTION        │\n│    ────────────────────   │\n│__internal_decompress_strin│\n│           g(#0)           │\n│             #1            │\n│             #2            │\n│             #3            │\n│             #4            │\n│             #5            │\n│                           │\n│                           │\n│                           │\n│          19 rows          │\n│           0.00s           │\n└─────────────┬─────────────┘\n┌─────────────┴─────────────┐\n│          ORDER_BY         │\n│    ────────────────────   │\n│    metra_analitico.gold   │\n│     .fct_movimentacao     │\n│     .codigo_secao ASC     │\n│                           │\n│                           │\n│                           │\n│          19 rows          │\n│           0.00s           │\n└─────────────┬─────────────┘\n┌─────────────┴─────────────┐\n│         PROJECTION        │\n│    ────────────────────   │\n│__internal_compress_string_│\n│        utinyint(#0)       │\n│             #1            │\n│             #2            │\n│             #3            │\n│             #4            │\n│             #5            │\n│                           │\n│                           │\n│                           │\n│          19 rows          │\n│           0.00s           │\n└─────────────┬─────────────┘\n┌─────────────┴─────────────┐\n│         PROJECTION        │\n│    ────────────────────   │\n│__internal_decompress_strin│\n│           g(#0)           │\n│             #1            │\n│             #2            │\n│             #3            │\n│             #4            │\n│             #5            │\n│                           │\n│                           │\n│                           │\n│          19 rows          │\n│           0.00s           │\n└─────────────┬─────────────┘\n┌─────────────┴─────────────┐\n│   PERFECT_HASH_GROUP_BY   │\n│    ────────────────────   │\n│         Groups: #0        │\n│                           │\n│        Aggregates:        │\n│ count_star() FILTER (WHERE│\n│       #2) Filter: #2      │\n│ count_star() FILTER (WHERE│\n│       #3) Filter: #3      │\n│    sum_no_overflow(#3)    │\n│    sum_no_overflow(#4)    │\n│ count_star() FILTER (WHERE│\n│       #4) Filter: #4      │\n│                           │\n│                           │\n│                           │\n│          19 rows          │\n│           0.00s           │\n└─────────────┬─────────────┘\n┌─────────────┴─────────────┐\n│         PROJECTION        │\n│    ────────────────────   │\n│        codigo_secao       │\n│             #1            │\n│ (saldo_movimentacao = -1) │\n│     saldo_movimentacao    │\n│   CASE  WHEN (#3) THEN    │\n│ (salario_mensal) ELSE 0.00│\n│             END           │\n│             #3            │\n│                           │\n│                           │\n│                           │\n│         3,062 rows        │\n│           0.00s           │\n└─────────────┬─────────────┘\n┌─────────────┴─────────────┐\n│         PROJECTION        │\n│    ────────────────────   │\n│__internal_compress_string_│\n│        utinyint(#0)       │\n│             #1            │\n│             #2            │\n│             #3            │\n│             #4            │\n│                           │\n│                           │\n│                           │\n│         3,062 rows        │\n│           0.00s           │\n└─────────────┬─────────────┘\n┌─────────────┴─────────────┐\n│         PROJECTION        │\n│    ────────────────────   │\n│        codigo_secao       │\n│             #1            │\n│     saldo_movimentacao    │\n│  (#1 AND salario_valido)  │\n│       salario_mensal      │\n│                           │\n│                           │\n│                           │\n│         3,062 rows        │\n│           0.00s           │\n└─────────────┬─────────────┘\n┌─────────────┴─────────────┐\n│         PROJECTION        │\n│    ────────────────────   │\n│        codigo_secao       │\n│  (saldo_movimentacao = 1) │\n│     saldo_movimentacao    │\n│       salario_valido      │\n│       salario_mensal      │\n│                           │\n│                           │\n│                           │\n│         3,062 rows        │\n│           0.00s           │\n└─────────────┬─────────────┘\n┌─────────────┴─────────────┐\n│         TABLE_SCAN        │\n│    ────────────────────   │\n│           Table:          │\n│    metra_analitico.gold   │\n│     .fct_movimentacao     │\n│                           │\n│   Type: Sequential Scan   │\n│                           │\n│        Projections:       │\n│        codigo_secao       │\n│     saldo_movimentacao    │\n│       salario_valido      │\n│       salario_mensal      │\n│                           │\n│          Filters:         │\n│      is_identificado      │\n│      is_centro_oeste      │\n│       sigla_uf='DF'       │\n│ competencia>='2025-02-01':│\n│  :DATE AND competencia<=  │\n│     '2026-01-01'::DATE    │\n│                           │\n│                           │\n│                           │\n│         3,062 rows        │\n│           0.00s           │\n└───────────────────────────┘\n"
+  },
+  "depois": {
+    "consulta": "select codigo_secao,\n       sum(admissoes) as admissoes,\n       sum(desligamentos) as desligamentos,\n       sum(saldo) as saldo,\n       sum(soma_salarios_admissao) as soma_salarios_admissao,\n       sum(qtd_salarios_admissao) as qtd_salarios_admissao\nfrom gold.fct_setor_mensal\nwhere sigla_uf = 'DF' and competencia between $inicio and $fim\ngroup by codigo_secao\norder by codigo_secao",
+    "mediana_ms": 0.8975834999773724,
+    "tempos_ms": [
+      0.9025419999488804,
+      0.8942079999769703,
+      0.8808340000996395,
+      0.8948329999611815,
+      0.8757499999774154,
+      0.8675420000372469,
+      0.9300409999468684,
+      0.9134999999105275,
+      0.9139999999661086,
+      0.9293750000551881,
+      0.907124999912412,
+      0.8794579999857888,
+      0.8252920000586528,
+      0.8574170000201775,
+      0.861333999978342,
+      0.9214579999934358,
+      0.9029999999938809,
+      0.9031660000573538,
+      1.023333000034654,
+      1.0573750000730797,
+      0.9793339999077944,
+      1.0021670000242011,
+      0.9379589999980453,
+      0.9003339999935633,
+      0.852583999972012,
+      0.838958000031198,
+      0.836916000025667,
+      0.8563750000121217,
+      0.8615000000418149,
+      0.8644170000025042
+    ],
+    "explain_analyze": "┌─────────────────────────────────────┐\n│┌───────────────────────────────────┐│\n││    Query Profiling Information    ││\n│└───────────────────────────────────┘│\n└─────────────────────────────────────┘\nexplain analyze  select codigo_secao,        sum(admissoes) as admissoes,        sum(desligamentos) as desligamentos,        sum(saldo) as saldo,        sum(soma_salarios_admissao) as soma_salarios_admissao,        sum(qtd_salarios_admissao) as qtd_salarios_admissao from gold.fct_setor_mensal where sigla_uf = 'DF' and competencia between $inicio and $fim group by codigo_secao order by codigo_secao \n┌────────────────────────────────────────────────┐\n│┌──────────────────────────────────────────────┐│\n││              Total Time: 0.0012s             ││\n│└──────────────────────────────────────────────┘│\n└────────────────────────────────────────────────┘\n┌───────────────────────────┐\n│           QUERY           │\n└─────────────┬─────────────┘\n┌─────────────┴─────────────┐\n│      EXPLAIN_ANALYZE      │\n│    ────────────────────   │\n│                           │\n│           0 rows          │\n│           0.00s           │\n└─────────────┬─────────────┘\n┌─────────────┴─────────────┐\n│         PROJECTION        │\n│    ────────────────────   │\n│__internal_decompress_strin│\n│           g(#0)           │\n│             #1            │\n│             #2            │\n│             #3            │\n│             #4            │\n│             #5            │\n│                           │\n│                           │\n│                           │\n│          19 rows          │\n│           0.00s           │\n└─────────────┬─────────────┘\n┌─────────────┴─────────────┐\n│          ORDER_BY         │\n│    ────────────────────   │\n│    metra_analitico.gold   │\n│     .fct_setor_mensal     │\n│     .codigo_secao ASC     │\n│                           │\n│                           │\n│                           │\n│          19 rows          │\n│           0.00s           │\n└─────────────┬─────────────┘\n┌─────────────┴─────────────┐\n│         PROJECTION        │\n│    ────────────────────   │\n│__internal_compress_string_│\n│        utinyint(#0)       │\n│             #1            │\n│             #2            │\n│             #3            │\n│             #4            │\n│             #5            │\n│                           │\n│                           │\n│                           │\n│          19 rows          │\n│           0.00s           │\n└─────────────┬─────────────┘\n┌─────────────┴─────────────┐\n│         PROJECTION        │\n│    ────────────────────   │\n│__internal_decompress_strin│\n│           g(#0)           │\n│             #1            │\n│             #2            │\n│             #3            │\n│             #4            │\n│             #5            │\n│                           │\n│                           │\n│                           │\n│          19 rows          │\n│           0.00s           │\n└─────────────┬─────────────┘\n┌─────────────┴─────────────┐\n│   PERFECT_HASH_GROUP_BY   │\n│    ────────────────────   │\n│         Groups: #0        │\n│                           │\n│        Aggregates:        │\n│    sum_no_overflow(#1)    │\n│    sum_no_overflow(#2)    │\n│          sum(#3)          │\n│          sum(#4)          │\n│    sum_no_overflow(#5)    │\n│                           │\n│                           │\n│                           │\n│          19 rows          │\n│           0.00s           │\n└─────────────┬─────────────┘\n┌─────────────┴─────────────┐\n│         PROJECTION        │\n│    ────────────────────   │\n│        codigo_secao       │\n│         admissoes         │\n│       desligamentos       │\n│           saldo           │\n│   soma_salarios_admissao  │\n│   qtd_salarios_admissao   │\n│                           │\n│                           │\n│                           │\n│          187 rows         │\n│           0.00s           │\n└─────────────┬─────────────┘\n┌─────────────┴─────────────┐\n│         PROJECTION        │\n│    ────────────────────   │\n│__internal_compress_string_│\n│        utinyint(#0)       │\n│             #1            │\n│             #2            │\n│             #3            │\n│             #4            │\n│             #5            │\n│                           │\n│                           │\n│                           │\n│          187 rows         │\n│           0.00s           │\n└─────────────┬─────────────┘\n┌─────────────┴─────────────┐\n│         TABLE_SCAN        │\n│    ────────────────────   │\n│           Table:          │\n│    metra_analitico.gold   │\n│     .fct_setor_mensal     │\n│                           │\n│   Type: Sequential Scan   │\n│                           │\n│        Projections:       │\n│        codigo_secao       │\n│         admissoes         │\n│       desligamentos       │\n│           saldo           │\n│   soma_salarios_admissao  │\n│   qtd_salarios_admissao   │\n│                           │\n│          Filters:         │\n│       sigla_uf='DF'       │\n│ competencia>='2025-02-01':│\n│  :DATE AND competencia<=  │\n│     '2026-01-01'::DATE    │\n│                           │\n│                           │\n│                           │\n│          187 rows         │\n│           0.00s           │\n└───────────────────────────┘\n"
+  },
+  "origem_postgresql": {
+    "consulta": "select s.codigo_secao,\n       count(*) filter (where m.saldo_movimentacao = 1) as admissoes,\n       count(*) filter (where m.saldo_movimentacao = -1) as desligamentos,\n       sum(m.saldo_movimentacao) as saldo,\n       sum(case when m.saldo_movimentacao = 1 and m.salario_mensal > 0 then m.salario_mensal else 0 end) as soma_salarios_admissao,\n       count(*) filter (where m.saldo_movimentacao = 1 and m.salario_mensal > 0) as qtd_salarios_admissao\nfrom oltp.movimentacao m\njoin oltp.municipio mu using (id_municipio)\njoin oltp.cnae_subclasse s on s.codigo = m.cnae_2_subclasse\nwhere mu.sigla_uf = 'DF' and mu.id_municipio <> '9999999'\n  and make_date(m.ano, m.mes, 1) between %(inicio)s and %(fim)s\ngroup by s.codigo_secao\norder by s.codigo_secao",
+    "explain_analyze_buffers": "GroupAggregate  (cost=457.59..457.63 rows=1 width=66) (actual time=3.528..3.834 rows=19 loops=1)\n  Group Key: s.codigo_secao\n  Buffers: shared hit=9910\n  ->  Sort  (cost=457.59..457.59 rows=1 width=11) (actual time=3.523..3.586 rows=3062 loops=1)\n        Sort Key: s.codigo_secao\n        Sort Method: quicksort  Memory: 216kB\n        Buffers: shared hit=9910\n        ->  Nested Loop  (cost=5.43..457.58 rows=1 width=11) (actual time=0.687..3.213 rows=3062 loops=1)\n              Buffers: shared hit=9910\n              ->  Nested Loop  (cost=5.15..456.58 rows=1 width=17) (actual time=0.685..1.123 rows=3062 loops=1)\n                    Buffers: shared hit=724\n                    ->  Seq Scan on municipio mu  (cost=0.00..135.58 rows=1 width=8) (actual time=0.196..0.196 rows=1 loops=1)\n                          Filter: ((id_municipio <> '9999999'::bpchar) AND (sigla_uf = 'DF'::bpchar))\n                          Rows Removed by Filter: 5571\n                          Buffers: shared hit=52\n                    ->  Bitmap Heap Scan on movimentacao m  (cost=5.15..320.99 rows=1 width=25) (actual time=0.488..0.728 rows=3062 loops=1)\n                          Recheck Cond: (id_municipio = mu.id_municipio)\n                          Filter: ((make_date(ano, mes, 1) >= '2025-02-01'::date) AND (make_date(ano, mes, 1) <= '2026-01-01'::date))\n                          Rows Removed by Filter: 5717\n                          Heap Blocks: exact=664\n                          Buffers: shared hit=672\n                          ->  Bitmap Index Scan on idx_oltp_movimentacao_municipio  (cost=0.00..5.15 rows=115 width=0) (actual time=0.096..0.096 rows=8779 loops=1)\n                                Index Cond: (id_municipio = mu.id_municipio)\n                                Buffers: shared hit=8\n              ->  Index Scan using cnae_subclasse_pkey on cnae_subclasse s  (cost=0.28..0.99 rows=1 width=10) (actual time=0.001..0.001 rows=1 loops=3062)\n                    Index Cond: (codigo = m.cnae_2_subclasse)\n                    Buffers: shared hit=9186\nPlanning:\n  Buffers: shared hit=21\nPlanning Time: 0.122 ms\nExecution Time: 3.850 ms"
+  }
+}
