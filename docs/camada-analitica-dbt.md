@@ -10,12 +10,12 @@ flowchart LR
     P -->|dbt sources| S[Silver: quatro modelos stg]
     S --> T[Testes de qualidade]
     S --> G[Gold: dimensões e fatos]
-    G -. integração pendente .-> D[Streamlit]
+    G -->|somente leitura| D["Streamlit (src/app/dashboard.py)"]
 ```
 
 As fontes são `movimentacao`, `municipio`, `cbo_2002`, `cnae_subclasse` e `cnae_secao`. O caminho é `data/lake/parquet/<tabela>/**/*.parquet`, com `hive_partitioning=false`; não é um único conjunto plano de arquivos. A transformação Silver normaliza nomes, acrescenta flags e mantém os códigos como texto. O join entre subclasse e seção CNAE produz `stg_cnae`.
 
-O destino padrão é **`data/metra_analitico.duckdb`**, schema `silver`. `data/metra.duckdb` é usado pela análise anterior: o painel e o Dagster devem respeitar `METRA_DUCKDB` ou alinhar essa configuração antes da integração. Execuções concorrentes de escrita devem ser coordenadas pelo orquestrador.
+O destino padrão é **`data/metra_analitico.duckdb`** (schemas `silver`, `gold` e `snapshots`), compartilhado entre o dbt, o Dagster e o painel Streamlit via `METRA_DUCKDB`. `data/metra.duckdb` permanece restrito ao script standalone `src/analise.py` da E2. Execuções de escrita são coordenadas pelo orquestrador, enquanto o painel abre o banco exclusivamente em modo `READ_ONLY`.
 
 ---
 

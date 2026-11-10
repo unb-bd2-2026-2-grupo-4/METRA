@@ -31,8 +31,8 @@ flowchart TD
     end
 
     subgraph S3["4. Consumo & Decisão (Entrega E4)"]
-        D1["Visualização Analítica (Painel Gerencial)"]
-        D2["Agente de Inteligência Artificial (Text-to-SQL)"]
+        D1["Painel Analítico Streamlit (src/app/dashboard.py)"]
+        D2["Busca Vetorial CBO e Assistente Text-to-SQL"]
     end
 
     subgraph S_ORQ["Orquestração & Governança do Pipeline"]
@@ -99,7 +99,7 @@ O orquestrador atua como o **maestro** da plataforma de dados: é o componente r
 ### E4: Camada de Consumo, Decisão e Governança (Semana 16)
 
 - **Foco:** Disponibilização dos dados para tomada de decisão gerencial, fechamento do ciclo de dados e governança.
-- **Estratégia Dupla de Consumo:**
-  1. *Painel Gerencial:* Visualizações e gráficos interativos para acompanhamento dos indicadores do mercado de trabalho formal;
-  2. *Agente de Inteligência Artificial:* Interface em linguagem natural (Text-to-SQL) conectada ao DuckDB, permitindo consultas dinâmicas e análises preditivas/prescritivas para gestores públicos.
-- **Governança & LGPD:** Rastreabilidade de linhagem e conformidade de privacidade conforme estabelecido na [Política de Uso de IA](uso-de-ia.md).
+- **Estratégia Dupla de Consumo ([ADR 0007](adr/0007-busca-semantica-e-consumo.md)):**
+  1. *Painel Analítico (`src/app/dashboard.py`):* Aplicação **Streamlit** containerizada (serviço `painel` no `docker-compose.yml`, porta `8501`) que consulta `data/metra_analitico.duckdb` em modo somente leitura (`READ_ONLY`) e apresenta as cinco perguntas de gestão (P1 a P5) — incluindo a série anual 2023–2026 de capitais vs. interior conciliada com `src/analise.py` — e a busca semântica vetorial (384 dimensões) sobre o catálogo CBO 2002 (`src/app/busca_cbo.py`);
+  2. *Assistente Text-to-SQL Governado (`src/app/text_to_sql.py`):* Interface em linguagem natural conectada ao schema `gold` do DuckDB, com tradução determinística para os contratos SQL homologados e guardrails de segurança que bloqueiam escrita, acesso externo e listagem de registros individuais.
+- **Governança & LGPD:** Rastreabilidade de linhagem, proteção de microdados no consumo e transparência conforme estabelecido em [Consumo e Governança](consumo-e-governanca.md) e na [Política de Uso de IA](uso-de-ia.md).
