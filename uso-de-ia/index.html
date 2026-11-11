@@ -1,0 +1,2748 @@
+
+<!doctype html>
+<html lang="pt" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="METRA (Monitoramento e Engenharia de dados do TRAbalho) | Projeto Integrado de Banco de Dados 2 (FCTE/UnB) - Squad G4">
+      
+      
+        <meta name="author" content="Squad G4">
+      
+      
+        <link rel="canonical" href="https://unb-bd2-2026-2-grupo-4.github.io/METRA/uso-de-ia/">
+      
+      
+        <link rel="prev" href="../adr/0007-busca-semantica-e-consumo/">
+      
+      
+        <link rel="next" href="../diario/semana-01/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.1">
+    
+    
+      
+        <title>Governança e IA - METRA (Monitoramento e Engenharia de dados do TRAbalho)</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.57a0d79d.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.fb2fffe2.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Poppins:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Poppins";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="teal" data-md-color-accent="deep-purple">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#politica-e-registro-de-uso-de-ia-no-projeto" class="md-skip">
+          Pular para conteúdo
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Cabeçalho">
+    <a href=".." title="METRA (Monitoramento e Engenharia de dados do TRAbalho)" class="md-header__button md-logo" aria-label="METRA (Monitoramento e Engenharia de dados do TRAbalho)" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            METRA (Monitoramento e Engenharia de dados do TRAbalho)
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Governança e IA
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="teal" data-md-color-accent="deep-purple"  aria-label="Alternar para modo escuro"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Alternar para modo escuro" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="teal" data-md-color-accent="deep-purple"  aria-label="Alternar para modo claro"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Alternar para modo claro" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Buscar" placeholder="Buscar" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Pesquisar">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Limpar" aria-label="Limpar" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Inicializando busca
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/unb-bd2-2026-2-grupo-4/METRA" title="Ir para repositório" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    unb-bd2-2026-2-grupo-4/METRA
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Abas" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href=".." class="md-tabs__link">
+          
+  
+  
+  Visão Geral
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../arquitetura/" class="md-tabs__link">
+          
+  
+  
+  Engenharia de Dados
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../adr/0001-modelagem-sistema-origem/" class="md-tabs__link">
+          
+  
+  
+  Governança & Decisões
+
+        </a>
+      </li>
+    
+  
+
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navegação" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="METRA (Monitoramento e Engenharia de dados do TRAbalho)" class="md-nav__button md-logo" aria-label="METRA (Monitoramento e Engenharia de dados do TRAbalho)" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    METRA (Monitoramento e Engenharia de dados do TRAbalho)
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/unb-bd2-2026-2-grupo-4/METRA" title="Ir para repositório" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    unb-bd2-2026-2-grupo-4/METRA
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_1" id="__nav_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Visão Geral
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Visão Geral
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Início
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dominio/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Domínio e Gestão
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engenharia de Dados
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Engenharia de Dados
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../arquitetura/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Arquitetura da Plataforma
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../camada-bronze/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Camada Bronze
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../relacionamentos/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Relacionamento entre as Bases
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cdc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Captura de Mudanças (CDC)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../camada-parquet/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extração para Parquet e Delta
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../camada-analitica-dbt/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Camada Analítica e Qualidade dbt
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../orquestracao/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Orquestração com Dagster
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../consumo-e-governanca/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consumo e Governança
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Governança & Decisões
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Governança & Decisões
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+          
+          
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_1" id="__nav_3_1_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decisões de Arquitetura (ADR)
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Decisões de Arquitetura (ADR)
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0001-modelagem-sistema-origem/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0001: Origem Transacional OLTP
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0002-simplificacao-arquitetural-duckdb/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0002: Simplificação com DuckDB
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0003-compressao-parquet/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0003: Compressão Parquet
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0004-cdc-decodificacao-logica/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0004: Estratégia de CDC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0005-modelagem-analitica-dbt/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0005: Modelagem Analítica e Qualidade
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0006-orquestracao-com-dagster/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0006: Adoção do Dagster para o Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0007-busca-semantica-e-consumo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0007: Busca Semântica CBO e Text-to-SQL
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Governança e IA
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Governança e IA
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Índice">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Índice
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#onde-e-utilizado-e-declarado" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Onde é Utilizado e Declarado
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#registro-de-entradas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Registro de Entradas
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Registro de Entradas">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#15092026-planejamento-de-arquitetura-estruturacao-da-documentacao-e-planilha-tecnica" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        15/09/2026 - Planejamento de Arquitetura, Estruturação da Documentação e Planilha Técnica
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#16092026-camada-bronze-carga-dos-csvs-brutos-do-novo-caged-no-postgresql" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        16/09/2026 - Camada bronze: carga dos CSVs brutos do Novo CAGED no PostgreSQL
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#27092026-camada-bronze-multi-fontes-ibge-e-cbo-modelo-3fn-insert-only-e-reprodutibilidade-e1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        27/09/2026 - Camada Bronze Multi-Fontes (IBGE e CBO), Modelo 3FN Insert-Only e Reprodutibilidade E1
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#05102026-registro-dos-diarios-de-bordo-semanas-05-e-06-feedback-da-e1-e-ajustes-de-arquitetura" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        05/10/2026 - Registro dos Diários de Bordo (Semanas 05 e 06), Feedback da E1 e Ajustes de Arquitetura
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#05102026-correcao-de-codigo-e-criacao-de-diagramas-mermaid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        05/10/2026 - Correção de código e criação de diagramas Mermaid
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#05102026-documentacao-dos-relacionamentos-entre-as-bases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        05/10/2026 - Documentação dos relacionamentos entre as bases
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#05102026-atualizacao-da-documentacao-da-arquitetura-da-plataforma" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        05/10/2026 - Atualização da documentação da arquitetura da plataforma
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#10102026-implementacao-minima-da-adr-0002-com-duckdb" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10/10/2026 - Implementação mínima da ADR 0002 com DuckDB
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#13102026-extracao-para-parquet-e-tabela-delta-e2-tarefa-2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        13/10/2026 - Extração para Parquet e tabela Delta (E2, tarefa 2)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#15102026-comparacao-de-compressao-parquet-e2-tarefa-2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        15/10/2026 - Comparação de compressão Parquet (E2, tarefa 2)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="15/10/2026 - Comparação de compressão Parquet (E2, tarefa 2)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#continuacao-adr-e-evidencias" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Continuação — ADR e evidências
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#continuacao-padrao-de-compressao" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Continuação — padrão de compressão
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#continuacao-diario-e-validacao-final" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Continuação - diário e validação final
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#17102026-implementacao-de-cdc-por-decodificacao-logica-do-wal-e2-tarefa-1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        17/10/2026 - Implementação de CDC por decodificação lógica do WAL (E2, tarefa 1)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="17/10/2026 - Implementação de CDC por decodificação lógica do WAL (E2, tarefa 1)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#continuacao-atualizacao-da-documentacao-no-readme" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Continuação - Atualização da documentação no README
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#continuacao-documentacao-do-cdc-e-reprocessamento-idempotente-e2-tarefa-1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Continuação - Documentação do CDC e Reprocessamento Idempotente (E2, tarefa 1)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#17102026-apoio-a-adr-0004-e-esclarecimentos-sobre-postgresql-e-cdc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        17/10/2026 - Apoio à ADR 0004 e esclarecimentos sobre PostgreSQL e CDC
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#18102026-revisao-de-conformidade-da-e2-correcao-de-bug-sqlite-no-windows-tratamento-de-dado-atrasado-e-diarios-07-a-09" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        18/10/2026 - Revisão de conformidade da E2, correção de bug SQLite no Windows, tratamento de dado atrasado e Diários 07 a 09
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#28102026-projeto-dbt-duckdb-e-camada-silver-e3-marco-1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        28/10/2026 - Projeto dbt-duckdb e camada Silver (E3, Marco 1)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#29102026-antecipacao-das-tarefas-de-qualidade-modelagem-e-governanca-de-euller" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        29/10/2026 - Antecipação das tarefas de qualidade, modelagem e governança de Euller
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#30102026-camada-gold-e-regras-sql-das-cinco-perguntas-e3-marco-1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        30/10/2026 - Camada Gold e regras SQL das cinco perguntas (E3, Marco 1)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#01112026-configuracao-e-validacao-do-ambiente-dagster-e3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        01/11/2026 - Configuração e validação do ambiente Dagster (E3)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="01/11/2026 - Configuração e validação do ambiente Dagster (E3)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#continuacao-transformacao-das-etapas-em-assets-do-dagster-e3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Continuação - Transformação das etapas em assets do Dagster (E3)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#02112026-integracao-da-linhagem-dos-assets-dbt-no-dagster-e3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        02/11/2026 - Integração da linhagem dos assets dbt no Dagster (E3)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="02/11/2026 - Integração da linhagem dos assets dbt no Dagster (E3)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#continuacao-correcoes-da-revisao-do-ambiente-dagster-e3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Continuação - Correções da revisão do ambiente Dagster (E3)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#continuacao-correcao-de-concorrencia-na-exportacao-parquet-e3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Continuação - Correção de concorrência na exportação Parquet (E3)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#03112026-separacao-da-entrega-de-qualidade-e-documentacao-de-euller" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        03/11/2026 - Separação da entrega de qualidade e documentação de Euller
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#03112026-busca-semantica-de-ocupacoes-cbo-assistente-text-to-sql-governado-e-adr-0007-e4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        03/11/2026 - Busca Semântica de Ocupações CBO, Assistente Text-to-SQL Governado e ADR 0007 (E4)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#05112026-adr-0006-e-documentacao-da-orquestracao-com-dagster-e3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        05/11/2026 - ADR-0006 e documentação da orquestração com Dagster (E3)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#09112026-fechamento-da-e3-scd-tipo-2-testes-gold-retrybackfill-e-explain" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        09/11/2026 - Fechamento da E3: SCD tipo 2, testes Gold, retry/backfill e EXPLAIN
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#09112026-painel-streamlit-no-docker-compose" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        09/11/2026 - Painel Streamlit no Docker Compose
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#10112026-serie-anual-da-p3-no-painel-streamlit-atualizacao-da-documentacao-de-consumo-e-diarios-10-e-11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10/11/2026 - Série anual da P3 no painel Streamlit, atualização da documentação de consumo e Diários 10 e 11
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#10112026-revisao-do-pr-15-e-ajustes-na-aba-p3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10/11/2026 - Revisão do PR #15 e ajustes na aba P3
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+          
+          
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Diário de Bordo
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Diário de Bordo
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diario/semana-01/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Semana 01
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diario/semana-02/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Semana 02
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diario/semana-03/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Semana 03
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diario/semana-04/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Semana 04
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diario/semana-05/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Semana 05
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diario/semana-06/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Semana 06
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diario/semana-07/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Semana 07
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diario/semana-08/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Semana 08
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diario/semana-09/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Semana 09
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diario/semana-10/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Semana 10
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diario/semana-11/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Semana 11
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Índice">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Índice
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#onde-e-utilizado-e-declarado" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Onde é Utilizado e Declarado
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#registro-de-entradas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Registro de Entradas
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Registro de Entradas">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#15092026-planejamento-de-arquitetura-estruturacao-da-documentacao-e-planilha-tecnica" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        15/09/2026 - Planejamento de Arquitetura, Estruturação da Documentação e Planilha Técnica
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#16092026-camada-bronze-carga-dos-csvs-brutos-do-novo-caged-no-postgresql" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        16/09/2026 - Camada bronze: carga dos CSVs brutos do Novo CAGED no PostgreSQL
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#27092026-camada-bronze-multi-fontes-ibge-e-cbo-modelo-3fn-insert-only-e-reprodutibilidade-e1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        27/09/2026 - Camada Bronze Multi-Fontes (IBGE e CBO), Modelo 3FN Insert-Only e Reprodutibilidade E1
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#05102026-registro-dos-diarios-de-bordo-semanas-05-e-06-feedback-da-e1-e-ajustes-de-arquitetura" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        05/10/2026 - Registro dos Diários de Bordo (Semanas 05 e 06), Feedback da E1 e Ajustes de Arquitetura
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#05102026-correcao-de-codigo-e-criacao-de-diagramas-mermaid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        05/10/2026 - Correção de código e criação de diagramas Mermaid
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#05102026-documentacao-dos-relacionamentos-entre-as-bases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        05/10/2026 - Documentação dos relacionamentos entre as bases
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#05102026-atualizacao-da-documentacao-da-arquitetura-da-plataforma" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        05/10/2026 - Atualização da documentação da arquitetura da plataforma
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#10102026-implementacao-minima-da-adr-0002-com-duckdb" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10/10/2026 - Implementação mínima da ADR 0002 com DuckDB
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#13102026-extracao-para-parquet-e-tabela-delta-e2-tarefa-2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        13/10/2026 - Extração para Parquet e tabela Delta (E2, tarefa 2)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#15102026-comparacao-de-compressao-parquet-e2-tarefa-2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        15/10/2026 - Comparação de compressão Parquet (E2, tarefa 2)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="15/10/2026 - Comparação de compressão Parquet (E2, tarefa 2)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#continuacao-adr-e-evidencias" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Continuação — ADR e evidências
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#continuacao-padrao-de-compressao" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Continuação — padrão de compressão
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#continuacao-diario-e-validacao-final" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Continuação - diário e validação final
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#17102026-implementacao-de-cdc-por-decodificacao-logica-do-wal-e2-tarefa-1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        17/10/2026 - Implementação de CDC por decodificação lógica do WAL (E2, tarefa 1)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="17/10/2026 - Implementação de CDC por decodificação lógica do WAL (E2, tarefa 1)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#continuacao-atualizacao-da-documentacao-no-readme" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Continuação - Atualização da documentação no README
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#continuacao-documentacao-do-cdc-e-reprocessamento-idempotente-e2-tarefa-1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Continuação - Documentação do CDC e Reprocessamento Idempotente (E2, tarefa 1)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#17102026-apoio-a-adr-0004-e-esclarecimentos-sobre-postgresql-e-cdc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        17/10/2026 - Apoio à ADR 0004 e esclarecimentos sobre PostgreSQL e CDC
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#18102026-revisao-de-conformidade-da-e2-correcao-de-bug-sqlite-no-windows-tratamento-de-dado-atrasado-e-diarios-07-a-09" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        18/10/2026 - Revisão de conformidade da E2, correção de bug SQLite no Windows, tratamento de dado atrasado e Diários 07 a 09
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#28102026-projeto-dbt-duckdb-e-camada-silver-e3-marco-1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        28/10/2026 - Projeto dbt-duckdb e camada Silver (E3, Marco 1)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#29102026-antecipacao-das-tarefas-de-qualidade-modelagem-e-governanca-de-euller" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        29/10/2026 - Antecipação das tarefas de qualidade, modelagem e governança de Euller
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#30102026-camada-gold-e-regras-sql-das-cinco-perguntas-e3-marco-1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        30/10/2026 - Camada Gold e regras SQL das cinco perguntas (E3, Marco 1)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#01112026-configuracao-e-validacao-do-ambiente-dagster-e3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        01/11/2026 - Configuração e validação do ambiente Dagster (E3)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="01/11/2026 - Configuração e validação do ambiente Dagster (E3)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#continuacao-transformacao-das-etapas-em-assets-do-dagster-e3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Continuação - Transformação das etapas em assets do Dagster (E3)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#02112026-integracao-da-linhagem-dos-assets-dbt-no-dagster-e3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        02/11/2026 - Integração da linhagem dos assets dbt no Dagster (E3)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="02/11/2026 - Integração da linhagem dos assets dbt no Dagster (E3)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#continuacao-correcoes-da-revisao-do-ambiente-dagster-e3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Continuação - Correções da revisão do ambiente Dagster (E3)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#continuacao-correcao-de-concorrencia-na-exportacao-parquet-e3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Continuação - Correção de concorrência na exportação Parquet (E3)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#03112026-separacao-da-entrega-de-qualidade-e-documentacao-de-euller" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        03/11/2026 - Separação da entrega de qualidade e documentação de Euller
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#03112026-busca-semantica-de-ocupacoes-cbo-assistente-text-to-sql-governado-e-adr-0007-e4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        03/11/2026 - Busca Semântica de Ocupações CBO, Assistente Text-to-SQL Governado e ADR 0007 (E4)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#05112026-adr-0006-e-documentacao-da-orquestracao-com-dagster-e3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        05/11/2026 - ADR-0006 e documentação da orquestração com Dagster (E3)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#09112026-fechamento-da-e3-scd-tipo-2-testes-gold-retrybackfill-e-explain" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        09/11/2026 - Fechamento da E3: SCD tipo 2, testes Gold, retry/backfill e EXPLAIN
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#09112026-painel-streamlit-no-docker-compose" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        09/11/2026 - Painel Streamlit no Docker Compose
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#10112026-serie-anual-da-p3-no-painel-streamlit-atualizacao-da-documentacao-de-consumo-e-diarios-10-e-11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10/11/2026 - Série anual da P3 no painel Streamlit, atualização da documentação de consumo e Diários 10 e 11
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#10112026-revisao-do-pr-15-e-ajustes-na-aba-p3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10/11/2026 - Revisão do PR #15 e ajustes na aba P3
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="politica-e-registro-de-uso-de-ia-no-projeto">Política e Registro de Uso de IA no projeto</h1>
+<p>O uso de assistentes e agentes de IA nesta disciplina é <strong>esperado, não apenas tolerado</strong>. O princípio norteador é a <strong>transparência e o entendimento real do raciocínio</strong>, conforme estabelecido na <a href="https://unb-bd2.github.io/PlanoEnsino/uso-de-ia/">Política de Uso de IA</a> oficial de Banco de Dados 2 (FCTE-UnB).</p>
+<p><strong>Duas regras de forma:</strong> Escreva <strong>no momento do uso</strong>, não na véspera da Entrega: registro reconstruído de memória sai impreciso, e imprecisão aqui é o que a política pune. E versione junto com o código: uma entrada por commit relevante é melhor que um resumo mensal.</p>
+<p><strong>Não precisa registrar</strong> autocompletar de editor, correção ortográfica ou tradução. Registre o que produziu artefato ou mudou uma decisão.</p>
+<blockquote>
+<p><em>"Não há penalidade por usar. Há penalidade por não declarar e por não entender."</em></p>
+</blockquote>
+<hr />
+<h2 id="onde-e-utilizado-e-declarado">Onde é Utilizado e Declarado</h2>
+<ul>
+<li><strong>Arquitetura e Decisões:</strong> Apoio na exploração de tradeoffs técnicos, confronto de alternativas formais (CRUD vs. Insert-Only, 3FN vs. Flat) e levantamento de restrições de infraestrutura para os ADRs.</li>
+<li><strong>Implementação:</strong> Construção de esquemas SQL versionados, scripts de automação, pipelines de ingestão e testes de integridade referencial.</li>
+<li><strong>Documentação:</strong> Estruturação de páginas técnicas, diagramas conceituais (Mermaid) e relatórios no MkDocs.</li>
+</ul>
+<hr />
+<h2 id="registro-de-entradas">Registro de Entradas</h2>
+<p>Abaixo constam os registros de todas as atividades:</p>
+<h3 id="15092026-planejamento-de-arquitetura-estruturacao-da-documentacao-e-planilha-tecnica">15/09/2026 - Planejamento de Arquitetura, Estruturação da Documentação e Planilha Técnica</h3>
+<ul>
+<li><strong>Ferramenta:</strong> Antigravity (Google DeepMind)</li>
+<li><strong>Onde:</strong> <code>AI-USAGE.md</code>, <code>README.md</code>, <code>docs/diario/</code> e documentação MkDocs.</li>
+<li><strong>O que foi pedido:</strong> Guia na seleção da stack técnica adequada para o Novo CAGED, estruturação do repositório.</li>
+<li><strong>O que foi aproveitado:</strong> A escolha da arquitetura leve baseada em PostgreSQL (OLTP), MinIO/Parquet (Lakehouse), DuckDB/dbt (OLAP) e Metabase (Consumo); as justificativas técnicas e de mitigação de riscos para a planilha; a configuração do site de documentação com MkDocs Material.</li>
+<li><strong>Como foi verificado:</strong> Confrontação com os requisitos do <a href="https://unb-bd2.github.io/PlanoEnsino/">Plano de Ensino</a> e regras das Entregas (E1 a E4), checagem das diretrizes de vocabulário do <a href="https://github.com/UnB-BD2/PlanoEnsino/blob/main/CONTEXT.md">CONTEXT.md</a> e viabilidade de execução reproduzível via Docker em máquina comum.</li>
+<li><strong>Quem revisou:</strong> Arthur Evangelista</li>
+</ul>
+<h3 id="16092026-camada-bronze-carga-dos-csvs-brutos-do-novo-caged-no-postgresql">16/09/2026 - Camada bronze: carga dos CSVs brutos do Novo CAGED no PostgreSQL</h3>
+<ul>
+<li><strong>Ferramenta:</strong> Claude Code (Anthropic, Claude Opus 5)</li>
+<li><strong>Onde:</strong> <code>src/db/</code>, <code>src/ingestao/carga_bronze.py</code>, <code>docker/ingestao/Dockerfile</code>, <code>docker-compose.yml</code>, <code>requirements-pipeline.txt</code>, <code>.dockerignore</code>, <code>.env.example</code>, <code>docs/camada-bronze.md</code>, <code>docs/diario/semana-04.md</code>.</li>
+<li><strong>O que foi pedido:</strong> Atuar como engenheiro de dados para consumir os CSVs de <code>data/</code> e montar a camada bronze (dados brutos) seguindo a arquitetura do METRA.</li>
+<li><strong>O que foi aproveitado:</strong> Perfil dos CSVs feito com DuckDB; schema <code>bronze</code> com todas as colunas como <code>TEXT</code> e linhagem por arquivo e linha; migração versionada com um executor simples; carga via <code>COPY</code> idempotente (SHA-256) e atômica por arquivo; serviços <code>postgres</code> e <code>ingestao-bronze</code> no Compose; página de documentação com as medições e os achados para a próxima camada.</li>
+<li><strong>Como foi verificado:</strong> Carga executada em PostgreSQL 16.2 local com os 14.753.112 registros (54 s). Contagens por arquivo e por ano, nulos, zeros à esquerda e CBOs de 5 dígitos conferidos contra o perfil do DuckDB. Reexecução confirmou a idempotência, inclusive com arquivo renomeado. Um arquivo com linha malformada confirmou o rollback sem carga parcial. O caminho via Docker Compose não foi executado na máquina de desenvolvimento, que não tem Docker.</li>
+<li><strong>Quem revisou:</strong> Lucas Alves</li>
+</ul>
+<h3 id="27092026-camada-bronze-multi-fontes-ibge-e-cbo-modelo-3fn-insert-only-e-reprodutibilidade-e1">27/09/2026 - Camada Bronze Multi-Fontes (IBGE e CBO), Modelo 3FN Insert-Only e Reprodutibilidade E1</h3>
+<ul>
+<li><strong>Ferramenta:</strong> Antigravity (Google DeepMind)</li>
+<li><strong>Onde:</strong> <code>src/db/migracoes/0002_camada_bronze_referencias.sql</code>, <code>src/db/migracoes/0003_modelo_transacional_oltp.sql</code>, <code>src/ingestao/carga_ibge.py</code>, <code>src/ingestao/carga_cbo.py</code>, <code>src/ingestao/carga_oltp.py</code>, <code>src/ingestao/executar_pipeline.py</code>, <code>data/caged_centro_oeste_amostra.csv</code>, <code>docker-compose.yml</code>, <code>docs/adr/0001-modelagem-sistema-origem.md</code>, <code>docs/camada-bronze.md</code>, <code>docs/arquitetura.md</code>, <code>README.md</code>.</li>
+<li><strong>O que foi pedido:</strong> Integrar fontes de dados secundárias oficiais (IBGE Localidades, IBGE CNAE 2.0 e CBO 2002) para cumprir o critério de múltiplas fontes na E1, estruturar suas tabelas brutas na camada Bronze com idempotência e linhagem, implementar a normalização completa do modelo relacional transacional em 3FN com padrão estritamente <em>insert-only</em> e integridade referencial estrita para o Centro-Oeste (2023-2026), criar amostra representativa versionada de 2,8 MB para garantir reprodutibilidade sem passos manuais por terceiros, e documentar formalmente os três carimbos de tempo e a decisão no ADR 0001.</li>
+<li><strong>O que foi aproveitado:</strong> Migração de tabelas bronze de referência; enriquecimento das tabelas de domínio do schema <code>oltp</code> (<code>municipio</code>, <code>cbo_2002</code>, <code>cnae_secao</code>, <code>cnae_subclasse</code>); rotina de transformação e carga idempotente Bronze -&gt; OLTP 3FN com tratamento de outliers e reconciliação de chaves administrativas; unificação do orquestrador de pipeline no contêiner de ingestão; garantia de fallback automático para a amostra representativa de 49 mil linhas se os arquivos pesados de 828 MB não estiverem presentes; revisão ortográfica completa em português culto acentuado.</li>
+<li><strong>Como foi verificado:</strong> Execução real em contêiner PostgreSQL 16 local no Docker, medição de tempo de carga (IBGE municípios 0,33s, CNAE 0,19s, CBO 0,25s), verificação de integridade referencial com junções SQL relacionais, teste de recuperação de linhagem de movimentações para o arquivo CSV físico de origem, teste de build do portal MkDocs e confirmação de idempotência.</li>
+<li><strong>Quem revisou:</strong> Arthur Evangelista</li>
+</ul>
+<h3 id="05102026-registro-dos-diarios-de-bordo-semanas-05-e-06-feedback-da-e1-e-ajustes-de-arquitetura">05/10/2026 - Registro dos Diários de Bordo (Semanas 05 e 06), Feedback da E1 e Ajustes de Arquitetura</h3>
+<ul>
+<li><strong>Ferramenta:</strong> Antigravity (Google DeepMind)</li>
+<li><strong>Onde:</strong> <code>docs/diario/semana-05.md</code>, <code>docs/diario/semana-06.md</code>, <code>mkdocs.yml</code>, <code>README.md</code>, <code>AI-USAGE.md</code>, <code>docs/uso-de-ia.md</code>.</li>
+<li><strong>O que foi pedido:</strong> Estruturar e documentar de forma técnica e profissional as atividades das Semanas 05 e 06 nos diários de bordo, registrando os preparativos para a demonstração, o feedback da professora quanto ao excesso de complexidade acidental e sobrecarga de infraestrutura, a entrega e validação positiva da E1, a recomendação do Dagster em substituição ao Airflow, a avaliação de banco de dados vetorial e o aprimoramento do MER com o CAGED como entidade principal centralizando as chaves estrangeiras de IBGE e CBO.</li>
+<li><strong>O que foi aproveitado:</strong> Redação dos diários de bordo seguindo estritamente as seções canônicas ("O que foi medido e analisado", "O que surpreendeu" e "O que foi decidido") sem inclusão de tabelas ou gráficos conforme instruído; síntese das diretrizes pedagógicas recebidas; atualização do menu de navegação do MkDocs Material e árvore do repositório no README; sincronização dos registros de transparência no uso de IA.</li>
+<li><strong>Como foi verificado:</strong> Revisão do conteúdo técnico frente às orientações da disciplina e aos apontamentos da professora; verificação de links, coerência cronológica e observância à exigência de não inserção de tabelas ou gráficos nos diários.</li>
+<li><strong>Quem revisou:</strong> Arthur Evangelista e Yan Matheus</li>
+</ul>
+<h3 id="05102026-correcao-de-codigo-e-criacao-de-diagramas-mermaid">05/10/2026 - Correção de código e criação de diagramas Mermaid</h3>
+<ul>
+<li><strong>Ferramenta:</strong> Antigravity (Google DeepMind)</li>
+<li><strong>Onde:</strong> <code>docs/relacionamentos.md</code> e arquivos de código-fonte.</li>
+<li><strong>O que foi pedido:</strong> Correção de bugs na implementação atual e auxílio na sintaxe para a criação de diagramas Mermaid.</li>
+<li><strong>O que foi aproveitado:</strong> O código corrigido e a estrutura gerada para a visualização gráfica dos relacionamentos no diagrama.</li>
+<li><strong>Como foi verificado:</strong> Validação do funcionamento do código corrigido e verificação da renderização do diagrama na documentação.</li>
+<li><strong>Quem revisou:</strong> Euller Júlio</li>
+</ul>
+<h3 id="05102026-documentacao-dos-relacionamentos-entre-as-bases">05/10/2026 - Documentação dos relacionamentos entre as bases</h3>
+<ul>
+<li><strong>Ferramenta:</strong> Codex (OpenAI).</li>
+<li><strong>Onde:</strong> <code>docs/relacionamentos.md</code>, <code>docs/camada-bronze.md</code>, <code>docs/dominio.md</code>, <code>mkdocs.yml</code>, <code>AI-USAGE.md</code> e <code>docs/uso-de-ia.md</code>.</li>
+<li><strong>O que foi pedido:</strong> Esclarecer no GitHub Pages os pares de tabelas e os códigos que relacionam CAGED, IBGE, CBO e CNAE na branch <code>fix/git-pages-docs</code>.</li>
+<li><strong>O que foi aproveitado:</strong> Página com correspondências entre fontes Bronze, FKs e cardinalidades do OLTP, diagrama Mermaid, regras de padronização implementadas, limitações e exemplo SQL; inclusão na navegação e links nas páginas existentes.</li>
+<li><strong>Como foi verificado:</strong> Conferência com as migrações 0002 e 0003 e com <code>src/ingestao/carga_oltp.py</code>; geração do site com <code>mkdocs build --strict</code>. A consulta foi conferida contra o schema, mas não executada em PostgreSQL. A renderização visual do Mermaid no navegador não foi verificada.</li>
+<li><strong>Quem revisou:</strong> Euller Júlio</li>
+</ul>
+<h3 id="05102026-atualizacao-da-documentacao-da-arquitetura-da-plataforma">05/10/2026 - Atualização da documentação da arquitetura da plataforma</h3>
+<ul>
+<li><strong>Ferramenta:</strong> ChatGPT (OpenAI).</li>
+<li><strong>Onde:</strong> <code>README.md</code></li>
+<li><strong>O que foi pedido:</strong> Atualizar a documentação para refletir a nova arquitetura pragmática adotada pelo projeto, substituindo a proposta anterior baseada em PostgreSQL + MinIO + CDC + DuckDB + dbt + Metabase + ETL reverso, por uma arquitetura simplificada centrada em PostgreSQL como fonte transacional OLTP e DuckDB como motor analítico principal.</li>
+<li><strong>O que foi aproveitado:</strong> Revisão do diagrama arquitetural; manutenção do PostgreSQL 16 na E1 como fonte transacional em 3FN; remoção do MinIO como componente obrigatório; simplificação da E2 para extração analítica via DuckDB e/ou Parquet; manutenção do dbt-duckdb e Star Schema na E3; e reformulação da E4 para consumo direto de dados e métricas a partir do DuckDB ou Parquet, sem dependência obrigatória de Metabase ou ETL reverso.</li>
+<li><strong>Como foi verificado:</strong> A atualização foi comparada com a decisão arquitetural registrada no ADR de simplificação da plataforma, garantindo consistência entre o diagrama, a descrição das entregas e a separação de responsabilidades entre PostgreSQL e DuckDB.</li>
+<li><strong>Quem revisou:</strong> Davi Camilo</li>
+</ul>
+<h3 id="10102026-implementacao-minima-da-adr-0002-com-duckdb">10/10/2026 - Implementação mínima da ADR 0002 com DuckDB</h3>
+<ul>
+<li><strong>Ferramenta:</strong> Codex (OpenAI).</li>
+<li><strong>Onde:</strong> <code>src/analise.py</code>, <code>requirements-pipeline.txt</code>, <code>README.md</code>, <code>AI-USAGE.md</code> e <code>docs/uso-de-ia.md</code>.</li>
+<li><strong>O que foi pedido:</strong> Implementar o plano mínimo PostgreSQL → DuckDB local → tabelas no terminal, com um único módulo de código, preservando a E1 e evitando componentes adicionais.</li>
+<li><strong>O que foi aproveitado:</strong> Carga transacional em modo somente leitura da origem, substituição integral e atômica da tabela DuckDB, indicadores anuais e consolidados de saldo e salário médio nominal de admissão, diferenças capital − interior, denominadores salariais e competências disponíveis; configuração via variáveis libpq e instruções no README.</li>
+<li><strong>Como foi verificado:</strong> Migrações e cargas Bronze/OLTP da amostra de 49.178 registros em PostgreSQL 16.15 descartável, com cadastros de teste; conciliação de contagens, códigos, tipos e indicadores com SQL PostgreSQL; reexecução sem duplicação; tentativa de escrita na origem recusada; casos controlados de salários nulos/zero, desligamentos, médias por evento, municípios sentinela, grupos ausentes e arredondamento final; rollback em falha SQL e carga vazia; falha de conexão com saída 1, sem apresentação de resultados antigos. Usados DuckDB 1.5.6 e arquivos temporários, sem testes permanentes; documentação validada com <code>python3 -m mkdocs build --strict</code>. A ingestão completa das APIs IBGE/CBO e os benchmarks da ADR não foram reproduzidos.</li>
+<li><strong>Quem revisou:</strong> Tiago Antunes</li>
+</ul>
+<h3 id="13102026-extracao-para-parquet-e-tabela-delta-e2-tarefa-2">13/10/2026 - Extração para Parquet e tabela Delta (E2, tarefa 2)</h3>
+<ul>
+<li><strong>Ferramenta:</strong> Claude Code (Anthropic, Claude Opus 5.5)</li>
+<li><strong>Onde:</strong> <code>src/extracao/exportar_parquet.py</code>, <code>src/extracao/materializar_delta.py</code>, <code>src/extracao/validar_lake.py</code>, <code>requirements-pipeline.txt</code>, <code>docs/camada-parquet.md</code>, <code>mkdocs.yml</code>, <code>README.md</code>, <code>AI-USAGE.md</code> e <code>docs/uso-de-ia.md</code>.</li>
+<li><strong>O que foi pedido:</strong> Analisar como implementar as tarefas 2 e 5 da E2 (Parquet, Delta/Iceberg e compressão) seguindo os padrões do projeto, dividir o trabalho entre dois integrantes e implementar a parte de extração para Parquet e materialização da tabela Delta, deixando a comparação de compressão e o ADR para o outro integrante.</li>
+<li><strong>O que foi aproveitado:</strong> Extração 1:1 das cinco tabelas do schema <code>oltp</code> via DuckDB em modo somente leitura, com <code>movimentacao</code> particionada por ano, conciliação de contagens e substituição atômica; materialização da tabela Delta com <code>deltalake</code> (delta-rs) lida por <code>delta_scan</code>; parâmetro <code>--compressao</code> com padrão provisório <code>snappy</code>; validação que compara a consulta da pergunta central entre PostgreSQL, Parquet e Delta; a escolha de Delta em vez de Iceberg por dispensar catálogo; página de documentação e instruções no README.</li>
+<li><strong>Como foi verificado:</strong> Pipeline E1 executado com a amostra de 49.178 registros em PostgreSQL 16 via Docker Compose; extração, materialização e validação executadas com DuckDB 1.5.6 e deltalake 1.6.6 em Python 3.14, com indicadores idênticos nas três fontes e iguais aos de <code>python3 -m src.analise</code>; conferência de tipos e de zeros à esquerda nos códigos; reexecução sem acúmulo de registros; senha incorreta com saída 1 e extração anterior preservada; materialização sem Parquet com saída 1; teste direto de que a extensão <code>delta</code> do DuckDB 1.5.6 não cria tabelas; documentação validada com <code>mkdocs build --strict</code>. Não foi testado com a base completa de 14,7 milhões de registros nem em Python 3.12; nenhuma comparação de compressão foi medida.</li>
+<li><strong>Quem revisou:</strong> Lucas Alves</li>
+</ul>
+<h3 id="15102026-comparacao-de-compressao-parquet-e2-tarefa-2">15/10/2026 - Comparação de compressão Parquet (E2, tarefa 2)</h3>
+<ul>
+<li><strong>Ferramenta:</strong> Codex (OpenAI).</li>
+<li><strong>Onde:</strong> <code>src/extracao/comparar_compressao.py</code>.</li>
+<li><strong>O que foi pedido:</strong> Implementar somente o benchmark de compressão, ADR 0003, adoção do vencedor, diário e declaração de IA, com commits atômicos.</li>
+<li><strong>O que foi aproveitado:</strong> Benchmark de uncompressed, Snappy e Zstd, cópia única da fonte, particionamento por ano, aquecimento, sete repetições, varredura de todas as colunas, comparação exata dos dados e relatório JSON. Opção local de CSV tipado para reproduzir com a amostra versionada.</li>
+<li><strong>Como foi verificado:</strong> Execução com DuckDB 1.5.6 e Python 3.12 sobre as 49.178 linhas da amostra. Os três codecs preservaram schema e multiconjunto de linhas em todas as rodadas. PostgreSQL e Docker indisponíveis neste ambiente: o modo PostgreSQL não foi executado. Os campos de linhagem no modo amostral são reconstruídos e declarados; não se trata de uma exportação do banco populado.</li>
+<li><strong>Quem revisou:</strong> Euller Júlio.</li>
+</ul>
+<h4 id="continuacao-adr-e-evidencias">Continuação — ADR e evidências</h4>
+<ul>
+<li><strong>Onde:</strong> <code>docs/adr/0003-compressao-parquet.md</code>, relatório JSON em <code>docs/adr/evidencias/</code> e navegação em <code>mkdocs.yml</code>.</li>
+<li><strong>O que foi aproveitado:</strong> ADR no template de seis passos, números reais da execução e critério de seleção definido no benchmark. Snappy venceu; a limitação do recorte amostral está explícita.</li>
+<li><strong>Como foi verificado:</strong> Tabela confrontada com as medianas e tamanhos do JSON; preservação das sete medições por codec e das condições de reprodução.</li>
+</ul>
+<h4 id="continuacao-padrao-de-compressao">Continuação — padrão de compressão</h4>
+<ul>
+<li><strong>Onde:</strong> <code>src/extracao/exportar_parquet.py</code> e <code>docs/camada-parquet.md</code>.</li>
+<li><strong>O que foi aproveitado:</strong> Manutenção de <code>COMPRESSAO_PADRAO = "snappy"</code>, vencedor medido, com remoção da indicação de escolha provisória e referência à ADR 0003.</li>
+<li><strong>Como foi verificado:</strong> O padrão permaneceu Snappy e o benchmark validou seus arquivos. A escrita Delta e o acesso PostgreSQL não foram executados.</li>
+</ul>
+<h4 id="continuacao-diario-e-validacao-final">Continuação - diário e validação final</h4>
+<ul>
+<li><strong>Onde:</strong> <code>docs/diario/semana-08.md</code>, <code>mkdocs.yml</code> e este registro.</li>
+<li><strong>O que foi aproveitado:</strong> Registro do que foi medido, do resultado inesperado e da decisão, sem atribuir ao integrante uma revisão ainda não realizada.</li>
+<li><strong>Como foi verificado:</strong> Benchmark principal completo; casos locais adicionais com valores vazios, salário negativo, códigos com zeros e linhas de entrada repetidas; caminho com apóstrofo; rejeição de origem vazia/ausente, menos de três repetições e zero threads; compilação dos módulos Python, <code>git diff --check</code> e geração da documentação com <code>python -m mkdocs build --strict</code>. Os testes auxiliares usam dados controlados e não compõem os números da ADR.</li>
+</ul>
+<h3 id="17102026-implementacao-de-cdc-por-decodificacao-logica-do-wal-e2-tarefa-1">17/10/2026 - Implementação de CDC por decodificação lógica do WAL (E2, tarefa 1)</h3>
+<ul>
+<li><strong>Ferramenta:</strong> ChatGPT (OpenAI).</li>
+<li><strong>Onde:</strong> <code>docker-compose.yml</code>, <code>src/cdc/01_preparar.sh</code>, <code>src/cdc/02_consumir.sh</code>, <code>src/cdc/03_testar.sh</code>.</li>
+<li><strong>O que foi pedido:</strong> Analisar como implementar o CDC (Change Data Capture) no PostgreSQL existente, seguindo a arquitetura do projeto e os requisitos da E2. Foram avaliadas alternativas com Debezium e Kafka, optando-se pela decodificação lógica nativa do PostgreSQL utilizando <code>pg_recvlogical</code> e o plugin <code>test_decoding</code>, sem necessidade de serviços adicionais, considerando o nível de complexidade do projeto. Também foi solicitada a criação de scripts para configurar o CDC, capturar alterações e comprovar a propagação dos eventos para um arquivo.</li>
+<li><strong>O que foi aproveitado:</strong> Configuração do PostgreSQL 16 com <code>wal_level=logical</code>, <code>max_replication_slots</code> e <code>max_wal_senders</code>; criação do slot lógico <code>metra_cdc_slot</code>; utilização do <code>pg_recvlogical</code> para consumir alterações do WAL; armazenamento dos eventos em <code>data/cdc/eventos.log</code>; criação da tabela auxiliar <code>oltp.cdc_probe</code> para testar operações sem modificar os dados reais do Novo CAGED; scripts automatizados para preparação, consumo e teste de <code>INSERT</code> e <code>UPDATE</code>.</li>
+<li><strong>Como foi verificado:</strong> Execução dos scripts de CDC no ambiente Docker Compose e conferência do arquivo <code>data/cdc/eventos.log</code>. Foi comprovada a captura de um <code>INSERT</code> na tabela <code>oltp.cdc_probe</code>, registrado na transação 769, e de um <code>UPDATE</code> no mesmo registro, registrado na transação 770. Ambos apresentaram os respectivos comandos <code>BEGIN</code> e <code>COMMIT</code>, demonstrando que as alterações confirmadas no PostgreSQL foram capturadas e propagadas para o arquivo. Verificou-se que a regra <code>*.log</code> do <code>.gitignore</code> impede o versionamento de novos arquivos de log. Os testes comprovaram a captura e propagação de eventos, mas não validaram o reprocessamento com deduplicação nem a integração com a camada analítica.</li>
+<li><strong>Quem revisou:</strong> Davi Camilo</li>
+</ul>
+<h4 id="continuacao-atualizacao-da-documentacao-no-readme">Continuação - Atualização da documentação no README</h4>
+<ul>
+<li><strong>Onde:</strong> <code>README.md</code>.</li>
+<li><strong>O que foi pedido:</strong> Auxílio na atualização e padronização do README do projeto, incluindo a descrição da implementação de CDC e reprocessamento idempotente da E2.</li>
+<li><strong>O que foi aproveitado:</strong> Inclusão de instruções para executar os scripts de CDC e replay, com explicações sobre a captura de alterações via <code>pg_recvlogical</code>, armazenamento dos eventos e deduplicação com SQLite.</li>
+<li><strong>Como foi verificado:</strong> Os textos e comandos foram revisados quanto à clareza, coerência técnica e padronização com as demais seções do README.</li>
+</ul>
+<h4 id="continuacao-documentacao-do-cdc-e-reprocessamento-idempotente-e2-tarefa-1">Continuação - Documentação do CDC e Reprocessamento Idempotente (E2, tarefa 1)</h4>
+<ul>
+<li><strong>Onde:</strong> <code>docs/cdc.md</code>.</li>
+<li><strong>O que foi pedido:</strong> Auxílio na elaboração e organização da documentação técnica da implementação de CDC e reprocessamento idempotente, seguindo a ideia adotado nas documentações da Camada Bronze e da extração para Parquet e Delta.</li>
+<li><strong>O que foi aproveitado:</strong> Estruturação da documentação com visão geral, arquitetura e diagrama Mermaid, descrição dos scripts, regras de captura e deduplicação, instruções de execução, testes de validação e evidências de funcionamento. Foram detalhados o uso de <code>pg_recvlogical</code> com <code>test_decoding</code>, a propagação dos eventos para <code>eventos.log</code> e o reprocessamento com deduplicação em SQLite, incluindo as limitações da solução.</li>
+<li><strong>Como foi verificado:</strong> O conteúdo foi revisado quanto à coerência com a implementação existente e à padronização com as demais páginas do projeto. Foram consideradas as evidências reais de captura de <code>INSERT</code> e <code>UPDATE</code>, além dos resultados dos testes automatizados de replay.</li>
+</ul>
+<h3 id="17102026-apoio-a-adr-0004-e-esclarecimentos-sobre-postgresql-e-cdc">17/10/2026 - Apoio à ADR 0004 e esclarecimentos sobre PostgreSQL e CDC</h3>
+<ul>
+<li><strong>Ferramenta:</strong> ChatGPT (OpenAI).</li>
+<li><strong>Onde:</strong> <code>docs/adr/0004-cdc-decodificacao-logica.md</code>; orientações de terminal fornecidas no chat.</li>
+<li><strong>O que foi pedido:</strong> Auxílio para resolver o conflito da porta 5432 no Docker Compose, conectar ao PostgreSQL no container e esclarecer a presença de WAL no projeto; elaboração da estrutura inicial da ADR 0004; e revisão da tabela.</li>
+<li><strong>O que foi aproveitado:</strong> Instruções para usar <code>POSTGRES_PORT=5433</code>, acessar o banco com <code>psql</code> e verificar a biblioteca <code>test_decoding.so</code>, o utilitário <code>pg_recvlogical</code>, <code>wal_level</code> e o carregamento do plugin com um slot temporário. Estruturação da ADR com contexto, alternativas, decisão, consequências e gatilhos de revisão, distinguindo conectores, clientes e plugins. Consulta às documentações oficiais do PostgreSQL, Debezium e wal2json.</li>
+<li><strong>Como foi verificado:</strong> Leitura da configuração do Compose, das ADRs e das evidências da ADR 0003;. Não foram executados conexão ao banco, teste do plugin ou benchmark de CDC. As alterações de documentação solicitadas para a ADR ficaram restritas a ela.</li>
+<li><strong>Quem revisou:</strong> Tiago Antunes.</li>
+</ul>
+<h3 id="18102026-revisao-de-conformidade-da-e2-correcao-de-bug-sqlite-no-windows-tratamento-de-dado-atrasado-e-diarios-07-a-09">18/10/2026 - Revisão de conformidade da E2, correção de bug SQLite no Windows, tratamento de dado atrasado e Diários 07 a 09</h3>
+<ul>
+<li><strong>Ferramenta:</strong> Antigravity (Google DeepMind).</li>
+<li><strong>Onde:</strong> <code>src/cdc/04_reprocessar.py</code>, <code>tests/test_cdc_replay.py</code>, <code>docs/camada-parquet.md</code>, <code>docs/cdc.md</code>, <code>docs/adr/0004-cdc-decodificacao-logica.md</code>, <code>docs/diario/semana-07.md</code>, <code>docs/diario/semana-08.md</code>, <code>docs/diario/semana-09.md</code>, <code>mkdocs.yml</code>, <code>README.md</code> e <code>docs/uso-de-ia.md</code>.</li>
+<li><strong>O que foi pedido:</strong> Auditar todo o repositório frente aos requisitos da Entrega E2, corrigir o bloqueio de arquivo nos testes em ambiente Windows, explicitar e testar o tratamento de dados atrasados e reprocessamento de janela, e auxiliar na documentação dos diários de bordo das Semanas 07, 08 e 09.</li>
+<li><strong>O que foi aproveitado:</strong> Fechamento explícito da conexão SQLite com <code>contextlib.closing</code> em <code>04_reprocessar.py</code>; adição do teste unitário <code>test_dado_atrasado_e_reprocessamento_janela</code>; documentação das regras de roteamento por tempo do evento (<code>ano</code>) e reprocessamento de janela em <code>docs/camada-parquet.md</code> e <code>docs/cdc.md</code>; alinhamento cronológico dos diários das Semanas 07 (apresentação E1 e ADR 0002), 08 (Parquet, Delta Lake e ADR 0003) e 09 (CDC lógico, replay idempotente e ADR 0004); atualização do <code>README.md</code> e <code>ADR 0004</code>.</li>
+<li><strong>Como foi verificado:</strong> Leitura e análise de todos os arquivos modificados pela IA, execução da suíte de testes unitários no Windows (<code>python -m unittest discover -s tests -p "test_cdc_replay.py" -v</code> com 3 testes aprovados em 0,21s) e validação do build estrito da documentação (<code>python -m mkdocs build --strict</code>).</li>
+<li><strong>Quem revisou:</strong> Arthur Evangelista.</li>
+</ul>
+<h3 id="28102026-projeto-dbt-duckdb-e-camada-silver-e3-marco-1">28/10/2026 - Projeto dbt-duckdb e camada Silver (E3, Marco 1)</h3>
+<ul>
+<li><strong>Ferramenta:</strong> Claude Code (Anthropic, Claude Opus 5.5).</li>
+<li><strong>Onde:</strong> <code>dbt_metra/</code> (<code>dbt_project.yml</code>, <code>profiles.yml</code>, <code>macros/generate_schema_name.sql</code>, <code>models/staging/</code>), <code>requirements-pipeline.txt</code>, <code>.gitignore</code>, <code>README.md</code> e <code>docs/uso-de-ia.md</code>.</li>
+<li><strong>O que foi pedido:</strong> Planejar e implementar a inicialização do projeto <code>dbt_metra/</code> com dbt-duckdb lendo o Parquet de <code>data/lake/parquet/</code> e os modelos <code>stg_movimentacao</code>, <code>stg_municipio</code>, <code>stg_cbo</code> e <code>stg_cnae</code> da camada Silver, sem invadir as tarefas de Gold, testes e orquestração dos demais integrantes.</li>
+<li><strong>O que foi aproveitado:</strong> Fontes Parquet por tabela via <code>external_location</code> com <code>hive_partitioning = false</code>; Silver materializada como tabela no schema <code>silver</code> de um arquivo DuckDB próprio (<code>data/metra_analitico.duckdb</code>); macro de schema sem prefixo; modelos 1:1 com nomes padronizados, <code>competencia</code>, <code>tipo_evento</code>, <code>salario_valido</code>, guarda de unicidade por <code>id_movimentacao</code> e marcações de sentinelas e cadastros não oficiais; códigos demográficos mantidos sem decodificação para a Gold; pasta <code>marts/</code> reservada; caminhos configuráveis por <code>METRA_LAKE_PARQUET</code> e <code>METRA_DUCKDB</code>.</li>
+<li><strong>Como foi verificado:</strong> A partir de banco vazio, pipeline E1 com a amostra de 49.178 registros, extração para Parquet e <code>dbt build</code> executados dentro da imagem de ingestão (Python 3.12.15, dbt-core 1.12.6, dbt-duckdb 1.11.1, DuckDB 1.5.6), com os 4 modelos criados e <code>target/manifest.json</code> gerado por <code>dbt parse</code>; o mesmo <code>dbt build</code> na venv local (Python 3.14), reexecutado sem erro e com <code>METRA_LAKE_PARQUET</code> absoluto; diretório inexistente falhando com erro claro; contagens de cada modelo iguais às do Parquet de origem; tipos conferidos (<code>ano</code> INTEGER, códigos texto, salários DECIMAL); pergunta central recalculada sobre <code>silver.stg_movimentacao</code> e <code>silver.stg_municipio</code> idêntica à consulta de <code>src/analise.py</code> sobre o Parquet. Não foram escritos testes dbt (tarefa de outro integrante) nem testado com a base completa de 14,7 milhões de registros.</li>
+<li><strong>Quem revisou:</strong> Lucas Alves.</li>
+</ul>
+<h3 id="29102026-antecipacao-das-tarefas-de-qualidade-modelagem-e-governanca-de-euller">29/10/2026 - Antecipação das tarefas de qualidade, modelagem e governança de Euller</h3>
+<ul>
+<li><strong>Ferramenta:</strong> Codex (OpenAI).</li>
+<li><strong>Onde:</strong> <code>dbt_metra/models/staging/</code>, <code>dbt_metra/tests/generic/qualidade.sql</code>, <code>tests/test_dbt_quality.py</code>, <code>src/qualidade/avaliar_granularidade.py</code>, ADRs 0005/0007 e evidências, <code>docs/camada-analitica-dbt.md</code>, <code>docs/consumo-e-governanca.md</code>, <code>README.md</code>, <code>mkdocs.yml</code> e este registro.</li>
+<li><strong>O que foi pedido:</strong> Revisar a linguagem e formatação das ADRs 0003 e 0004.</li>
+<li><strong>O que foi aproveitado:</strong> 122 testes dbt de schema, integridade, volume, distribuição e regras da Silver/fontes; sete cenários de integração com falhas intencionais; benchmark reproduzível de granularidades; Star Schema e SCD propostos; ADR-0005 com medições; ADR-0007 com contrato e protocolo ainda não implementados; catálogo e governança preliminares.</li>
+<li><strong>Como foi verificado:</strong> Dez testes Python passaram (sete novos de integração dbt e três existentes de CDC), em 19,386 s. No cenário válido, os quatro modelos e 122 testes dbt passaram sobre Parquet sintético isolado; nos negativos, falhas/avisos esperados foram confirmados. O benchmark usou 49.178 registros reais da amostra com normalização e linhagem sintética, reconciliando métricas entre dois grãos; evidências em <code>docs/adr/evidencias/0005-granularidade.json</code>. Build estrito MkDocs e <code>git diff --check</code> passaram.</li>
+<li><strong>Quem revisou:</strong> Euller Júlio</li>
+</ul>
+<h3 id="30102026-camada-gold-e-regras-sql-das-cinco-perguntas-e3-marco-1">30/10/2026 - Camada Gold e regras SQL das cinco perguntas (E3, Marco 1)</h3>
+<ul>
+<li><strong>Ferramenta:</strong> Codex (OpenAI), com a skill ponytail para manter a implementação restrita ao escopo aprovado.</li>
+<li><strong>Onde:</strong> <code>dbt_metra/models/marts/</code>, <code>dbt_metra/macros/</code>, <code>dbt_metra/analyses/</code>, <code>dbt_metra/dbt_project.yml</code>, <code>tests/test_gold.py</code>, <code>README.md</code> e <code>docs/uso-de-ia.md</code>.</li>
+<li><strong>O que foi pedido:</strong> Planejar dimensões e fatos Gold sobre a Silver existente, contratos de consumo e SQL reproduzível das cinco perguntas de gestão, sem implementar as tarefas dos outros integrantes.</li>
+<li><strong>O que foi aproveitado:</strong> Cinco dimensões, fato detalhada e três fatos mensais reconstruídas integralmente; chaves naturais e perfil demográfico por combinação observada; somas e denominadores para médias salariais de admissão; consultas P1–P5 com janela de calendário, distinção entre mês ausente e zero observado, comparação capital/interior e diferenças salariais descritivas.</li>
+<li><strong>Como foi verificado:</strong> Dez testes de negócio aprovados com Parquet temporário e execução real de <code>dbt build</code> e <code>dbt compile</code> em DuckDB isolado (Python 3.12.3, dbt-core 1.12.6, dbt-duckdb 1.11.1 e DuckDB 1.5.6). A amostra versionada, com referências sintéticas de teste, conciliou 49.178 eventos, 25.325 admissões, 23.853 desligamentos e saldo 1.472; as cinco análises compiladas foram executadas sobre ela. Os três testes existentes de CDC também passaram.</li>
+<li><strong>Quem revisou:</strong> Tiago Antunes</li>
+</ul>
+<h3 id="01112026-configuracao-e-validacao-do-ambiente-dagster-e3">01/11/2026 - Configuração e validação do ambiente Dagster (E3)</h3>
+<ul>
+<li><strong>Ferramenta:</strong> Codex e ChatGPT (OpenAI).</li>
+<li><strong>Onde:</strong> <code>dagster_metra/definitions.py</code>, <code>workspace.yaml</code>, <code>docker/dagster/Dockerfile</code>, <code>docker-compose.yml</code>, <code>requirements-pipeline.txt</code> e <code>README.md</code>.</li>
+<li><strong>O que foi pedido:</strong> Auxílio na configuração e validação do ambiente de orquestração da E3, utilizando <code>dagster</code>, <code>dagster-dbt</code> e <code>dagster-webserver</code>, integrado aos modelos dbt do projeto METRA. Foram solicitadas orientações para executar o ambiente localmente, configurar o <code>workspace.yaml</code> e verificar o funcionamento da interface e dos assets.</li>
+<li><strong>O que foi aproveitado:</strong> Estrutura geral fornecida, configuração do carregamento do módulo <code>dagster_metra.definitions</code> pelo <code>workspace.yaml</code> e inicialização do servidor com <code>dagster dev -w workspace.yaml</code>. Também foram aproveitadas recomendações para verificar a integração com o dbt, a disponibilidade dos arquivos Parquet da E2, o carregamento dos assets e a execução das materializações pela interface do Dagster.</li>
+<li><strong>Como foi verificado:</strong> O ambiente foi inicializado com sucesso utilizando <code>dagster dev -w workspace.yaml</code>, com carregamento das variáveis de ambiente do arquivo <code>.env</code> e inicialização dos serviços internos do Dagster. A inicialização confirmou o funcionamento do servidor, mas não comprovou, por si só, a materialização dos assets, a execução completa dos modelos Silver e Gold ou a integração via Docker, os quais já foram validados manualmente (todos OK).</li>
+<li><strong>Quem revisou:</strong> Davi Camilo</li>
+</ul>
+<h4 id="continuacao-transformacao-das-etapas-em-assets-do-dagster-e3">Continuação - Transformação das etapas em assets do Dagster (E3)</h4>
+<ul>
+<li><strong>Onde:</strong> <code>dagster_metra/assets.py</code>, <code>dagster_metra/definitions.py</code>, <code>docker/dagster/Dockerfile</code>, <code>docker-compose.yml</code> e <code>README.md</code>.</li>
+<li><strong>O que foi pedido:</strong> Auxílio para transformar as etapas de <code>src/ingestao/executar_pipeline.py</code> e <code>src/extracao/exportar_parquet.py</code> em assets do Dagster, mantendo a execução original dos scripts e organizando a dependência entre ingestão, extração e camada analítica.</li>
+<li><strong>O que foi aproveitado:</strong> Criação dos assets <code>executar_pipeline</code> e <code>exportar_parquet</code>, com dependência explícita entre eles; registro dos assets no <code>Definitions</code>; inclusão do código <code>src/</code> na imagem do Dagster; configuração das variáveis <code>PG*</code> e da dependência de saúde do PostgreSQL no Compose; atualização das instruções de uso no README.</li>
+<li><strong>Como foi verificado:</strong> Compilação dos módulos Python, validação do carregamento das definições com <code>dagster definitions validate -w workspace.yaml</code>, confirmação da dependência <code>executar_pipeline → exportar_parquet</code>, validação do <code>docker compose config --quiet</code> e execução de <code>git diff --check</code>.</li>
+</ul>
+<h3 id="02112026-integracao-da-linhagem-dos-assets-dbt-no-dagster-e3">02/11/2026 - Integração da linhagem dos assets dbt no Dagster (E3)</h3>
+<ul>
+<li><strong>Ferramenta:</strong> Codex (OpenAI).</li>
+<li><strong>Onde:</strong> <code>dagster_metra/definitions.py</code> e <code>README.md</code>.</li>
+<li><strong>O que foi pedido:</strong> Conectar os assets do dbt aos assets de ingestão e extração do Dagster para que o grafo de linhagem completo apareça na interface do Dagster.</li>
+<li><strong>O que foi aproveitado:</strong> Criação de specs virtuais para os cinco sources <code>lake/*</code> definidos no manifesto dbt, cada um dependente de <code>exportar_parquet</code>; reutilização do <code>DagsterDbtTranslator</code> para preservar as chaves e dependências entre sources, Silver e Gold; atualização da documentação com o fluxo completo <code>executar_pipeline → exportar_parquet → lake/* → Silver → Gold</code>.</li>
+<li><strong>Como foi verificado:</strong> O grafo de assets foi construído com as dependências dos cinco sources apontando para <code>exportar_parquet</code>, e a definição foi validada com <code>Definitions.validate_loadable</code>. Também foram verificadas a compilação dos módulos Python e a ausência de erros de whitespace com <code>git diff --check</code>, e a visualização do grafo de linhagem completo na UI do Dagster também foi revisada.</li>
+<li><strong>Quem revisou:</strong> Davi Camilo</li>
+</ul>
+<h4 id="continuacao-correcoes-da-revisao-do-ambiente-dagster-e3">Continuação - Correções da revisão do ambiente Dagster (E3)</h4>
+<ul>
+<li><strong>Onde:</strong> <code>docker/dagster/Dockerfile</code>, <code>docker-compose.yml</code> e <code>README.md</code>.</li>
+<li><strong>O que foi pedido:</strong> Resolver os pontos levantados na revisão: garantir a geração do manifesto dbt em clone limpo, iniciar o <code>dagster-daemon</code> junto ao webserver e esclarecer no README que os testes genéricos de qualidade do dbt dependem da entrega específica de qualidade.</li>
+<li><strong>O que foi aproveitado:</strong> Inclusão de <code>dbt parse --no-partial-parse</code> no build da imagem Dagster; criação do serviço <code>dagster-daemon</code> com <code>DAGSTER_HOME</code> compartilhado com o webserver; atualização do comando de inicialização para subir explicitamente PostgreSQL, webserver e daemon; e correção da documentação para não afirmar que os <code>data_tests</code> já existem no manifesto.</li>
+<li><strong>Como foi verificado:</strong> O <code>dbt parse</code> local e o build Docker das imagens <code>dagster-webserver</code> e <code>dagster-daemon</code> foram concluídos com sucesso. Os 13 testes existentes passaram. O Compose manteve PostgreSQL saudável, webserver e daemon ativos; uma materialização real de <code>exportar_parquet</code> executada dentro do container terminou com <code>ASSET_MATERIALIZATION</code>, <code>STEP_SUCCESS</code> e <code>RUN_SUCCESS</code>.</li>
+</ul>
+<h4 id="continuacao-correcao-de-concorrencia-na-exportacao-parquet-e3">Continuação - Correção de concorrência na exportação Parquet (E3)</h4>
+<ul>
+<li><strong>Onde:</strong> <code>src/extracao/exportar_parquet.py</code> e <code>requirements-pipeline.txt</code>.</li>
+<li><strong>O que foi pedido:</strong> Investigar falhas repetidas de materialização do asset <code>exportar_parquet</code>, causadas por <code>OSError: [Errno 39] Directory not empty</code> na substituição de <code>data/lake/parquet.tmp</code> por <code>data/lake/parquet</code>.</li>
+<li><strong>O que foi aproveitado:</strong> Diagnóstico de que o diretório temporário fixo não era seguro para execuções concorrentes; inclusão de <code>FileLock</code> para serializar a exportação; criação de diretório temporário exclusivo por execução; troca com diretório de backup e restauração da extração anterior se a substituição falhar; declaração explícita da dependência <code>filelock</code>.</li>
+<li><strong>Como foi verificado:</strong> Compilação e importação do módulo sem erro, <code>git diff --check</code>, execução dos 13 testes existentes com resultado <code>OK</code>, reconstrução das imagens Docker e nova materialização de <code>exportar_parquet</code> no Compose com <code>ASSET_MATERIALIZATION</code>, <code>STEP_SUCCESS</code> e <code>RUN_SUCCESS</code>.</li>
+</ul>
+<h3 id="03112026-separacao-da-entrega-de-qualidade-e-documentacao-de-euller">03/11/2026 - Separação da entrega de qualidade e documentação de Euller</h3>
+<ul>
+<li><strong>Ferramenta:</strong> Codex (OpenAI).</li>
+<li><strong>Onde:</strong> contratos e testes em <code>dbt_metra/models/staging/</code> e <code>dbt_metra/tests/generic/qualidade.sql</code>, <code>tests/test_dbt_quality.py</code>, <code>src/qualidade/avaliar_granularidade.py</code>, <code>docs/adr/0005-modelagem-analitica-dbt.md</code>, suas evidências, <code>docs/camada-analitica-dbt.md</code>, <code>README.md</code>, <code>mkdocs.yml</code> e este registro.</li>
+<li><strong>O que foi pedido:</strong> Abrir um PR restrito à parte já implementada de Euller na E3, preservando a branch <code>feat/qualidade-analitica</code> para continuar o trabalho compartilhado com Arthur.</li>
+<li><strong>O que foi aproveitado:</strong> Separação dos 122 testes genéricos de fontes/Silver, sete cenários de integração, benchmark de granularidade e documentação analítica em branch baseada na main atual. O Star Schema foi alinhado aos nomes e relacionamentos da Gold existente. A cobertura genérica da Gold e o SCD continuam explicitamente pendentes. ADR-0007 e consumo/governança não fazem parte desta entrega.</li>
+<li><strong>Como foi verificado:</strong> Execução dos sete cenários de integração com dbt real e Parquet sintético; build estrito MkDocs; repetição do benchmark sobre as 49.178 linhas da amostra, com reconciliação de métricas e reprodução das contagens/tamanhos. As evidências versionadas da ADR preservam a medição original de 29/10. Comparação do commit e estado local da branch original para garantir sua preservação. A revisão visual do diagrama e a aprovação formal da ADR permanecem pendentes.</li>
+<li><strong>Quem revisou:</strong> Euller Júlio.</li>
+</ul>
+<h3 id="03112026-busca-semantica-de-ocupacoes-cbo-assistente-text-to-sql-governado-e-adr-0007-e4">03/11/2026 - Busca Semântica de Ocupações CBO, Assistente Text-to-SQL Governado e ADR 0007 (E4)</h3>
+<ul>
+<li><strong>Ferramenta:</strong> Antigravity (Google DeepMind).</li>
+<li><strong>Onde:</strong> <code>src/app/</code> (<code>__init__.py</code>, <code>busca_cbo.py</code>, <code>text_to_sql.py</code>, <code>banco_analitico.py</code>, <code>dashboard.py</code>, <code>avaliar_busca_e_text2sql.py</code>), <code>tests/test_busca_e_text2sql.py</code>, <code>docs/adr/0007-busca-semantica-e-consumo.md</code>, <code>docs/adr/evidencias/0007-busca-semantica-e-text2sql.json</code>, <code>docs/consumo-e-governanca.md</code>, <code>mkdocs.yml</code>, <code>requirements-pipeline.txt</code>, <code>README.md</code> e <code>docs/uso-de-ia.md</code>.</li>
+<li><strong>O que foi pedido:</strong> Integrar a busca semântica vetorial de ocupações da CBO 2002 e o assistente Text-to-SQL governado pelo catálogo de métricas da camada <code>gold</code> em uma aba do painel Streamlit, concluir os experimentos do protocolo da ADR 0007 na branch <code>feat/qualidade-analitica</code> (unificada com a <code>main</code>) e documentar as evidências reproduzíveis.</li>
+<li><strong>O que foi aproveitado:</strong> Índice vetorial híbrido de 384 dimensões normalizado em norma $L_2$ (<code>IndiceVetorialCBO</code>) com busca por produto interno em NumPy e <code>array_cosine_similarity(vetor::FLOAT[384], ?::FLOAT[384])</code> sobre relação PyArrow registrada no DuckDB; priorização de códigos exatos de 6 dígitos (incluindo zero inicial); assistente <code>AssistenteTextToSQL</code> cobrindo as cinco perguntas de gestão (P1–P5) e consultas ocupacionais com recomposição de médias salariais ponderadas; validador sintático <code>validar_sql_seguro</code> bloqueando DDL/DML, leitura externa, schemas fora de <code>gold</code> e listagem de registros individuais de <code>gold.fct_movimentacao</code>; painel Streamlit em duas abas; script de benchmark reproduzível e suíte de 8 testes automatizados.</li>
+<li><strong>Como foi verificado:</strong> Execução do benchmark <code>python -m src.app.avaliar_busca_e_text2sql</code> (7 repetições após aquecimento sobre 49.178 movimentações e 1.272 códigos CBO: <code>Hit@5 = 100,0%</code> e <code>Hit@1 = 95,83%</code> vs. <code>58,33%</code> na busca léxica; 6/6 respostas Text-to-SQL idênticas aos SQLs compilados de referência; 10/10 ataques SQL bloqueados), aprovação das 4 suítes de testes do repositório (<code>test_cdc_replay.py</code>, <code>test_dbt_quality.py</code>, <code>test_gold.py</code> e <code>test_busca_e_text2sql.py</code>), validação do build estrito da documentação (<code>python -m mkdocs build --strict</code>) e <code>git diff --check</code>.</li>
+<li><strong>Quem revisou:</strong> Arthur Evangelista e Euller Júlio.</li>
+</ul>
+<h3 id="05112026-adr-0006-e-documentacao-da-orquestracao-com-dagster-e3">05/11/2026 - ADR-0006 e documentação da orquestração com Dagster (E3)</h3>
+<ul>
+<li><strong>Ferramenta:</strong> Codex (OpenAI).</li>
+<li><strong>Onde:</strong> <code>docs/adr/0006-orquestracao-com-dagster.md</code>, <code>docs/orquestracao.md</code>, <code>docs/arquitetura.md</code> e <code>README.md</code>.</li>
+<li><strong>O que foi pedido:</strong> Elaborar a base da ADR-0006 e a documentação operacional da orquestração após a integração dos assets Python e dbt no Dagster.</li>
+<li><strong>O que foi aproveitado:</strong> Registro da adoção do Dagster para o pipeline; documentação da sequência <code>executar_pipeline</code> → <code>exportar_parquet</code> → <code>lake/*</code> → Silver → Gold; explicação de que os cinco sources Parquet são assets virtuais; instruções para execução local e via Docker Compose, uso do manifesto dbt, materialização na UI e diagnóstico; inclusão do grafo visual existente; correção da descrição arquitetural que ainda tratava Dagster como alternativa em avaliação.</li>
+<li><strong>Como foi verificado:</strong> <code>dagster definitions validate -w workspace.yaml</code> concluído com sucesso; <code>docker compose config --quiet</code> concluído com sucesso; <code>git diff --check</code> sem erros. Além disso, as informações do texto foram revisadas e algumas poucas, alteradas.</li>
+<li><strong>Quem revisou:</strong> Davi Camilo</li>
+</ul>
+<h3 id="09112026-fechamento-da-e3-scd-tipo-2-testes-gold-retrybackfill-e-explain">09/11/2026 - Fechamento da E3: SCD tipo 2, testes Gold, retry/backfill e EXPLAIN</h3>
+<ul>
+<li><strong>Ferramenta:</strong> Claude Code (Anthropic, Claude Opus 5.5).</li>
+<li><strong>Onde:</strong> <code>dbt_metra/snapshots/snp_cbo.yml</code>, <code>dbt_metra/models/marts/dim_cbo_historico.sql</code>, <code>dbt_metra/models/marts/_gold__models.yml</code>, <code>dbt_metra/tests/assert_cbo_uma_versao_vigente.sql</code>, <code>dagster_metra/assets.py</code>, <code>dagster_metra/definitions.py</code>, <code>src/qualidade/comparar_explain.py</code>, <code>docs/adr/evidencias/0005-explain-*.json</code>, <code>tests/test_scd_cbo.py</code>, <code>tests/test_orquestracao.py</code>, <code>AI-USAGE.md</code>, <code>README.md</code>, <code>docs/camada-analitica-dbt.md</code>, <code>docs/orquestracao.md</code> e <code>docs/uso-de-ia.md</code>.</li>
+<li><strong>O que foi pedido:</strong> Fechar as lacunas da E3 apontadas na revisão da Squad (SCD, retry/backfill, testes da Gold e EXPLAIN antes/depois) e recriar o <code>AI-USAGE.md</code> na raiz, em commits separados, deixando o Streamlit no Compose e as docs do painel para outro integrante.</li>
+<li><strong>O que foi aproveitado:</strong> Snapshot dbt da CBO (estratégia <code>check</code>, <code>hard_deletes: invalidate</code>) e <code>gold.dim_cbo_historico</code> com intervalos <code>[observado_desde, observado_ate)</code>, mantendo <code>dim_cbo</code> como versão vigente; 54 testes da Gold (<code>unique</code>, <code>not_null</code>, <code>relationships</code>, <code>accepted_values</code>, contagem igual à Silver, grão dos agregados e contratos do SCD); <code>RetryPolicy</code> em todos os assets, job <code>pipeline_metra</code> com schedule mensal e asset <code>conciliacao_mensal</code> particionado por competência com <code>BackfillPolicy.single_run()</code>; script de EXPLAIN que compara a P1 na fato detalhada, no agregado mensal e na origem PostgreSQL com <code>EXPLAIN (ANALYZE, BUFFERS)</code>.</li>
+<li><strong>Como foi verificado:</strong> Na imagem <code>docker/dagster/Dockerfile</code> (Python 3.12.16, Dagster 1.13.28, dbt 1.12.6, DuckDB 1.5.6): suíte com 41 testes aprovados, incluindo o teste que roda o dbt duas vezes e muda um título entre elas; <code>dbt build</code> na amostra com PostgreSQL do zero, com 191 nós e nenhuma falha; job <code>pipeline_metra</code> executado pelo Dagster; backfill das 46 competências de jan/2023 a out/2026 em uma execução, sem divergência; retry demonstrado com o PostgreSQL parado e religado durante as tentativas (duas falhas e sucesso na terceira). EXPLAIN na amostra (sem ganho, abaixo de 1 ms) e numa Gold completa de 14.753.112 movimentações construída em diretório temporário a partir dos CSVs integrais, com os 176 testes dbt aprovados (33,27 ms antes e 0,84 ms depois, respostas idênticas). Não foram verificados: os schedules disparando pelo daemon (estão desligados por padrão), a associação de cada fato à versão histórica da CBO (não implementada) e a base completa no PostgreSQL.</li>
+<li><strong>Quem revisou:</strong> Lucas Alves.</li>
+</ul>
+<h3 id="09112026-painel-streamlit-no-docker-compose">09/11/2026 - Painel Streamlit no Docker Compose</h3>
+<ul>
+<li><strong>Ferramenta:</strong> Claude Code (Anthropic, Claude Opus 5.5).</li>
+<li><strong>Onde:</strong> <code>docker/painel/Dockerfile</code>, <code>docker-compose.yml</code>, <code>.env.example</code>, <code>README.md</code> e <code>docs/uso-de-ia.md</code>.</li>
+<li><strong>O que foi pedido:</strong> Colocar o painel Streamlit no <code>docker-compose.yml</code>, item que a Squad havia reservado a outro integrante e foi assumido nesta branch.</li>
+<li><strong>O que foi aproveitado:</strong> Imagem própria do painel com healthcheck; serviço <code>painel</code> no perfil <code>painel</code>, porta configurável por <code>PAINEL_PORT</code> e <code>data/</code> montado como somente leitura; passo a passo do README com a geração da Gold pelo job do Dagster (com <code>--build</code>) e a subida do painel.</li>
+<li><strong>Como foi verificado:</strong> Contêiner <code>healthy</code> e <code>/_stcore/health</code> respondendo 200, isolado e pelo Compose; painel renderizado com <code>streamlit.testing.v1.AppTest</code> dentro da imagem, com <code>data/</code> somente leitura, mostrando as cinco abas sem exceção; <code>dbt build</code> (191 nós) executado com o painel no ar, sem conflito de bloqueio no DuckDB; passo 5 do README executado como documentado, com <code>RUN_SUCCESS</code>. A navegação manual no navegador não foi feita.</li>
+<li><strong>Quem revisou:</strong> Lucas Alves.</li>
+</ul>
+<h3 id="10112026-serie-anual-da-p3-no-painel-streamlit-atualizacao-da-documentacao-de-consumo-e-diarios-10-e-11">10/11/2026 - Série anual da P3 no painel Streamlit, atualização da documentação de consumo e Diários 10 e 11</h3>
+<ul>
+<li><strong>Ferramenta:</strong> Antigravity (Google DeepMind).</li>
+<li><strong>Onde:</strong> <code>src/app/dashboard.py</code>, <code>docs/arquitetura.md</code>, <code>docs/consumo-e-governanca.md</code>, <code>docs/camada-analitica-dbt.md</code> e <code>docs/uso-de-ia.md</code>.</li>
+<li><strong>O que foi pedido:</strong> Ajustar a aba "Capitais vs. Interior (P3)" em <code>src/app/dashboard.py</code> para exibir o recorte anual de 2023 a 2026 e o consolidado (<code>Total</code>) de saldo e salário médio de admissão (<code>capital × interior</code>), as diferenças (<code>capital − interior</code>) e os denominadores (<code>n_capital</code> e <code>n_interior</code>), conciliando com <code>python3 -m src.analise</code>; e atualizar as páginas de documentação que ainda tratavam o painel Streamlit, a Gold ou o proxy de turnover como pendentes, preservando como pendentes para a E4 a base legal da LGPD, o controle de acesso além de <code>read_only</code> e o ETL reverso.</li>
+<li><strong>O que foi aproveitado:</strong> Inclusão da tabela anual (2023–2026 e <code>Total</code>) e dos gráficos anuais de salário médio e saldo líquido na função <code>render_p3_capitais_interior</code>, além da coluna de diferença de saldo no resumo por UF e dos denominadores <code>n_capital</code>/<code>n_interior</code> nos cartões e na tabela; atualização do diagrama e da seção E4 em <code>docs/arquitetura.md</code>, do fluxo em <code>docs/camada-analitica-dbt.md</code> e das tabelas de catálogo, correspondência das perguntas (proxy de fluxos pareados da ADR 0007 para P4), linhagem, minimização e checklist em <code>docs/consumo-e-governanca.md</code>.</li>
+<li><strong>Como foi verificado:</strong> Confrontação exata de todas as células da série anual da P3 (2023 a 2026 e <code>Total</code>) entre <code>_gerar_sql_p3</code> / <code>dashboard.py</code> e <code>src.analise.consultar_indicadores</code> sobre a mesma base (<code>data/metra_analitico.duckdb</code>, 49.178 movimentações: saldos <code>+128/+280/-152</code>, <code>+223/+321/-98</code>, <code>+127/+270/-143</code>, <code>+50/+73/-23</code> e <code>+528/+944/-416</code>; salários <code>R$ 1.973,20 / R$ 1.975,08 / R$ -1,89</code>, <code>R$ 2.449,45 / R$ 2.079,75 / R$ 369,70</code>, <code>R$ 2.300,69 / R$ 2.332,85 / R$ -32,16</code>, <code>R$ 2.867,75 / R$ 2.231,13 / R$ 636,62</code> e <code>R$ 2.268,97 / R$ 2.138,23 / R$ 130,73</code>; <code>n_capital = 10.514</code> e <code>n_interior = 14.491</code>); execução da suíte de 41 testes automatizados do repositório (<code>tests/</code>), <code>python -m mkdocs build --strict</code> e <code>git diff --check</code>.</li>
+<li><strong>Quem revisou:</strong> Yan Matheus.</li>
+</ul>
+<h3 id="10112026-revisao-do-pr-15-e-ajustes-na-aba-p3">10/11/2026 - Revisão do PR #15 e ajustes na aba P3</h3>
+<ul>
+<li><strong>Ferramenta:</strong> Claude Code (Anthropic).</li>
+<li><strong>Onde:</strong> <code>src/app/dashboard.py</code> e <code>docs/uso-de-ia.md</code>.</li>
+<li><strong>O que foi pedido:</strong> Revisar a aba "Capitais vs. Interior (P3)" e conferir os números de conciliação registrados na entrada anterior.</li>
+<li><strong>O que foi aproveitado:</strong> Correção dos salários e denominadores da entrada anterior, que tinham sido obtidos de uma base sem os 10 salários de admissão acima de R$ 100 mil presentes na amostra; com um ano filtrado, a série deixa de repetir a linha anual como <code>Total</code> e o título passa a indicar o ano; com uma UF filtrada, o resumo por UF deixa de exibir como "Centro-Oeste" uma linha que contém só a UF filtrada.</li>
+<li><strong>Como foi verificado:</strong> Série anual e <code>Total</code> da P3 conferidos célula a célula contra <code>src.analise.consultar_indicadores</code> sobre <code>gold.fct_movimentacao</code> de <code>data/metra_analitico.duckdb</code> (0 divergências); aba P3 renderizada com <code>streamlit.testing.v1.AppTest</code> na imagem do painel, sem exceção, nos recortes padrão, DF, GO, ano 2024 e ocupação "professor"; 41 testes de <code>tests/</code> e <code>mkdocs build --strict</code>.</li>
+<li><strong>Quem revisou:</strong> Lucas Alves.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Voltar para o topo
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "navigation.expand", "content.code.copy", "search.suggest", "search.highlight"], "search": "../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copiado para \u00e1rea de transfer\u00eancia", "clipboard.copy": "Copiar para \u00e1rea de transfer\u00eancia", "search.result.more.one": "mais 1 nesta p\u00e1gina", "search.result.more.other": "# mais nesta p\u00e1gina", "search.result.none": "Nenhum documento encontrado", "search.result.one": "1 documento encontrado", "search.result.other": "# documentos encontrados", "search.result.placeholder": "Digite para iniciar a busca", "search.result.term.missing": "Ausente", "select.version": "Selecione a vers\u00e3o"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.a5f9d56c.min.js"></script>
+      
+    
+  </body>
+</html>
