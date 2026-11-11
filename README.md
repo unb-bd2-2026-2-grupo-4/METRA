@@ -189,7 +189,10 @@ E4            | Análises e Visualizações  |
     │   ├── 0001-modelagem-sistema-origem.md          # Decisão 3FN Insert-Only e multi-fontes
     │   ├── 0002-simplificacao-arquitetural-duckdb.md # Simplificação com DuckDB
     │   ├── 0003-compressao-parquet.md                # Benchmark e escolha de compressão Snappy
-    │   └── 0004-cdc-decodificacao-logica.md          # Estratégia de CDC com pg_recvlogical
+    │   ├── 0004-cdc-decodificacao-logica.md          # Estratégia de CDC com pg_recvlogical
+    │   ├── 0005-modelagem-analitica-dbt.md           # Grão de movimentação, Star Schema e qualidade dbt
+    │   ├── 0006-orquestracao-com-dagster.md          # Orquestração integrada com Dagster e dagster-dbt
+    │   └── 0007-busca-semantica-e-consumo.md         # Busca vetorial CBO 2002 e Text-to-SQL governado
     └── diario/             # Diários de bordo semanais da Squad G4
         ├── semana-01.md    # Formação da Squad e alinhamento dos critérios de avaliação
         ├── semana-02.md    # Escolha do domínio, personas e as 5 perguntas de gestão
@@ -199,7 +202,9 @@ E4            | Análises e Visualizações  |
         ├── semana-06.md    # Validação da E1, Dagster, banco vetorial e refinamento do MER
         ├── semana-07.md    # Apresentação da E1, simplificação com DuckDB e ADR 0002
         ├── semana-08.md    # Extração Parquet, tabela Delta Lake e benchmark de compressão (ADR 0003)
-        └── semana-09.md    # CDC por decodificação lógica, replay idempotente e ADR 0004
+        ├── semana-09.md    # CDC por decodificação lógica, replay idempotente e ADR 0004
+        ├── semana-10.md    # Camadas Silver e Gold no dbt, Star Schema, Dagster (ADRs 0005 e 0006)
+        └── semana-11.md    # Busca vetorial CBO, Text-to-SQL (ADR 0007), SCD2, EXPLAIN e fechamento da E3
 ```
 
 ---

@@ -275,7 +275,7 @@ Abaixo constam os registros de todas as atividades:
 - **Como foi verificado:** Contêiner `healthy` e `/_stcore/health` respondendo 200, isolado e pelo Compose; painel renderizado com `streamlit.testing.v1.AppTest` dentro da imagem, com `data/` somente leitura, mostrando as cinco abas sem exceção; `dbt build` (191 nós) executado com o painel no ar, sem conflito de bloqueio no DuckDB; passo 5 do README executado como documentado, com `RUN_SUCCESS`. A navegação manual no navegador não foi feita.
 - **Quem revisou:** Lucas Alves.
 
-### 10/11/2026 - Série anual da P3 no painel Streamlit e atualização da documentação de consumo
+### 10/11/2026 - Série anual da P3 no painel Streamlit, atualização da documentação de consumo e Diários 10 e 11
 
 - **Ferramenta:** Antigravity (Google DeepMind).
 - **Onde:** `src/app/dashboard.py`, `docs/arquitetura.md`, `docs/consumo-e-governanca.md`, `docs/camada-analitica-dbt.md` e `docs/uso-de-ia.md`.
