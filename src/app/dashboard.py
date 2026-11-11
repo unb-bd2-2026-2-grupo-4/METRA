@@ -215,6 +215,7 @@ def _executar_consulta_dict_cached(
     sigla_uf_override: str | None = None,
     ano_override: int | None = None,
     eixo_override: str | None = None,
+    codigo_secao_override: str | None = None,
 ) -> dict[str, Any]:
     conn = obter_conexao_cached(caminho_str)
     _, assistente, _ = carregar_recursos_analiticos(caminho_str)
@@ -226,6 +227,7 @@ def _executar_consulta_dict_cached(
         sigla_uf_override=sigla_uf_override,
         ano_override=ano_override,
         eixo_override=eixo_override,
+        codigo_secao_override=codigo_secao_override,
     )
     return resp.to_dict()
 
@@ -238,6 +240,7 @@ def obter_resposta_cached(
     sigla_uf_override: str | None = None,
     ano_override: int | None = None,
     eixo_override: str | None = None,
+    codigo_secao_override: str | None = None,
 ) -> RespostaTextToSQL:
     dados = _executar_consulta_dict_cached(
         caminho_str=caminho_str,
@@ -247,6 +250,7 @@ def obter_resposta_cached(
         sigla_uf_override=sigla_uf_override,
         ano_override=ano_override,
         eixo_override=eixo_override,
+        codigo_secao_override=codigo_secao_override,
     )
     return RespostaTextToSQL(
         pergunta_original=dados["pergunta_original"],
@@ -278,6 +282,44 @@ def consultar_indicadores_cbo_cached(
         sigla_uf=sigla_uf,
         ano=ano,
     )
+
+
+@st.cache_data(show_spinner=False)
+def consultar_kpis_recorte_cached(
+    caminho_str: str,
+    sigla_uf: str | None = None,
+    ano: int | None = None,
+    codigo_secao: str | None = None,
+) -> dict[str, Any]:
+    """Consulta os KPIs globais de saldo líquido e salário médio diretamente em gold.fct_setor_mensal."""
+    conn = obter_conexao_cached(caminho_str)
+    clausulas: list[str] = ["1 = 1"]
+    if sigla_uf and sigla_uf in ("DF", "GO", "MT", "MS"):
+        clausulas.append(f"sigla_uf = '{sigla_uf}'")
+    if ano and int(ano) in (2023, 2024, 2025, 2026):
+        clausulas.append(f"year(competencia) = {int(ano)}")
+    if codigo_secao and str(codigo_secao).upper() in SECOES_CNAE_OFICIAIS:
+        clausulas.append(f"codigo_secao = '{str(codigo_secao).upper()}'")
+    where_sql = " AND ".join(clausulas)
+
+    row = conn.execute(f"""
+        SELECT
+            COALESCE(SUM(admissoes), 0) AS admissoes,
+            COALESCE(SUM(desligamentos), 0) AS desligamentos,
+            COALESCE(SUM(saldo), 0) AS saldo,
+            SUM(soma_salarios_admissao) / NULLIF(SUM(qtd_salarios_admissao), 0) AS salario_medio,
+            COALESCE(SUM(qtd_salarios_admissao), 0) AS qtd_salarios
+        FROM gold.fct_setor_mensal
+        WHERE {where_sql}
+    """).fetchone()
+
+    return {
+        "admissoes": int(row[0] or 0),
+        "desligamentos": int(row[1] or 0),
+        "saldo": int(row[2] or 0),
+        "salario_medio": float(row[3]) if row[3] is not None else None,
+        "qtd_salarios": int(row[4] or 0),
+    }
 
 
 # ==============================================================================
@@ -504,7 +546,11 @@ def render_p1_setores_df(
         st.dataframe(df_tab, hide_index=True, height=300)
 
 
-def render_p2_sazonalidade(df_bruto: pd.DataFrame, cargo_label: str = "") -> None:
+def render_p2_sazonalidade(
+    df_bruto: pd.DataFrame,
+    cargo_label: str = "",
+    filtros: dict[str, Any] | None = None,
+) -> None:
     df_val = df_bruto.dropna(subset=["admissoes", "desligamentos", "saldo"]).copy()
     observado_mes = (
         df_val.groupby("mes", as_index=False)
@@ -535,11 +581,13 @@ def render_p2_sazonalidade(df_bruto: pd.DataFrame, cargo_label: str = "") -> Non
     coluna_criterio = "media_saldo" if tem_anos_completos else "saldo_obs"
     rotulo_criterio = "Média (anos completos)" if tem_anos_completos else "Saldo observado (ano parcial)"
 
+    secao_filtro = (filtros or {}).get("codigo_secao")
+    sufixo_secao = f" · Seção {secao_filtro}" if secao_filtro else ""
     sufixo = f" — {cargo_label}" if cargo_label else ""
-    st.markdown(f"#### Sazonalidade mensal das movimentações{sufixo}")
+    st.markdown(f"#### Sazonalidade mensal das movimentações{sufixo_secao}{sufixo}")
     st.caption(
-        "Média mensal calculada exclusivamente sobre anos completos (12 competências com dados), "
-        "sem distorção por anos parciais."
+        "Curva sazonal (média mensal sobre anos completos de 12 competências) e evolução histórica mensal "
+        "de contratações, desligamentos e saldo líquido."
     )
 
     df_criterio = por_mes.dropna(subset=[coluna_criterio])
@@ -568,16 +616,70 @@ def render_p2_sazonalidade(df_bruto: pd.DataFrame, cargo_label: str = "") -> Non
                 f"{qtd_anos_comp} ano(s) completo(s) na média sazonal",
             )
 
+    # Curva histórica por competência (YYYY-MM) + Curva sazonal média (Jan-Dez)
+    serie_comp = (
+        df_val.groupby("competencia", as_index=False)
+        .agg(
+            admissoes=("admissoes", "sum"),
+            desligamentos=("desligamentos", "sum"),
+            saldo=("saldo", "sum"),
+        )
+        .sort_values("competencia")
+    )
+    serie_comp["Competência"] = serie_comp["competencia"].map(lambda c: str(c)[:7])
+
+    st.write("")
+    col_curva_hist, col_curva_saz = st.columns([1, 1])
+
+    with col_curva_hist:
+        st.markdown("**Curva histórica mensal (Admissões vs. Desligamentos)**")
+        if not serie_comp.empty:
+            st.line_chart(
+                serie_comp.set_index("Competência")[["admissoes", "desligamentos", "saldo"]].rename(
+                    columns={
+                        "admissoes": "Admissões",
+                        "desligamentos": "Desligamentos",
+                        "saldo": "Saldo líquido",
+                    }
+                ),
+                height=280,
+            )
+
+    with col_curva_saz:
+        st.markdown(f"**Curva sazonal por mês do calendário ({rotulo_criterio})**")
+        cols_saz = (
+            ["media_admissoes", "media_desligamentos", "media_saldo"]
+            if tem_anos_completos
+            else ["admissoes_obs", "desligamentos_obs", "saldo_obs"]
+        )
+        nomes_saz = (
+            {
+                "media_admissoes": "Média admissões",
+                "media_desligamentos": "Média desligamentos",
+                "media_saldo": "Média saldo",
+            }
+            if tem_anos_completos
+            else {
+                "admissoes_obs": "Admissões",
+                "desligamentos_obs": "Desligamentos",
+                "saldo_obs": "Saldo",
+            }
+        )
+        st.line_chart(
+            por_mes.set_index("nome_mes")[cols_saz].rename(columns=nomes_saz),
+            height=280,
+        )
+
     st.write("")
     c_chart, c_table = st.columns([1, 1])
 
     with c_chart:
-        st.markdown(f"**{rotulo_criterio} por mês**")
+        st.markdown(f"**Saldo por mês do ano ({rotulo_criterio})**")
         st.bar_chart(
             por_mes.set_index("nome_mes")[[coluna_criterio]].rename(
                 columns={coluna_criterio: rotulo_criterio}
             ),
-            height=290,
+            height=270,
         )
 
     with c_table:
@@ -589,10 +691,16 @@ def render_p2_sazonalidade(df_bruto: pd.DataFrame, cargo_label: str = "") -> Non
             "Média saldo (anos compl.)": por_mes["media_saldo"].map(lambda v: fmt_int(v, True)),
             "Saldo acumulado (série total)": por_mes["saldo_obs"].map(lambda v: fmt_int(v, True)),
         })
-        st.dataframe(df_tab, hide_index=True, height=290)
+        st.dataframe(df_tab, hide_index=True, height=270)
 
 
-def render_p4_rotatividade(df_bruto: pd.DataFrame, cargo_label: str = "") -> None:
+# TODO (Tiago): Completar a Matriz Interativa de Turnover (dispersão st.scatter_chart de
+# indice_fluxos_pareados_pct vs. salario_medio_admissao, quadrantes pela mediana e destaque de codigo_secao)
+def render_p4_rotatividade(
+    df_bruto: pd.DataFrame,
+    cargo_label: str = "",
+    filtros: dict[str, Any] | None = None,
+) -> None:
     df_val = df_bruto.dropna(subset=["salario_medio_admissao", "indice_fluxos_pareados_pct"]).copy()
     corr_val = df_bruto["correlacao_pearson"].iloc[0] if "correlacao_pearson" in df_bruto.columns else None
     corr_str = f"{float(corr_val):.3f}".replace(".", ",") if (corr_val is not None and not pd.isna(corr_val)) else "N/A"
@@ -642,6 +750,8 @@ def render_p4_rotatividade(df_bruto: pd.DataFrame, cargo_label: str = "") -> Non
         st.dataframe(df_tab, hide_index=True, height=300)
 
 
+# TODO (Tiago): Completar o painel de Disparidades Sociodemográficas (gráfico comparativo de hiato salarial
+# e saldo líquido por categoria demográfica, colunas de diferença salarial em R$ e saldo na tabela e destaque por seção CNAE)
 def render_p5_sociodemografico(
     df_bruto: pd.DataFrame,
     filtros: dict[str, Any],
@@ -676,6 +786,7 @@ def render_p5_sociodemografico(
             sigla_uf_override=filtros.get("sigla_uf"),
             ano_override=filtros.get("ano"),
             eixo_override=eixo_selecionado,
+            codigo_secao_override=filtros.get("codigo_secao"),
         )
         df_bruto = pd.DataFrame(resp_nova.linhas, columns=resp_nova.colunas)
         eixo_atual = eixo_selecionado
@@ -800,9 +911,9 @@ def renderizar_resposta_geral(
     elif resposta.intencao == "p1_setores_df":
         render_p1_setores_df(df_bruto, cargo_label, resposta.filtros_aplicados)
     elif resposta.intencao == "p2_sazonalidade":
-        render_p2_sazonalidade(df_bruto, cargo_label)
+        render_p2_sazonalidade(df_bruto, cargo_label, resposta.filtros_aplicados)
     elif resposta.intencao == "p4_fluxos_salarios":
-        render_p4_rotatividade(df_bruto, cargo_label)
+        render_p4_rotatividade(df_bruto, cargo_label, resposta.filtros_aplicados)
     elif resposta.intencao == "p5_perfil_remuneracao":
         nova_resp = render_p5_sociodemografico(
             df_bruto,
@@ -859,11 +970,45 @@ def render_view_painel_executivo(
     caminho_str: str,
     filtro_uf: str | None,
     filtro_ano: int | None,
+    filtro_secao: str | None,
     cargo_filtro: str | None,
 ) -> None:
+    kpis_recorte = consultar_kpis_recorte_cached(
+        caminho_str,
+        sigla_uf=filtro_uf,
+        ano=filtro_ano,
+        codigo_secao=filtro_secao,
+    )
+    k1, k2, k3, k4 = st.columns(4)
+    with k1:
+        render_kpi(
+            "Saldo líquido no recorte",
+            fmt_int(kpis_recorte["saldo"], True),
+            f"Admissões − Desligamentos ({filtro_uf or 'Centro-Oeste'})",
+        )
+    with k2:
+        render_kpi(
+            "Salário médio de admissão",
+            fmt_moeda(kpis_recorte["salario_medio"]),
+            f"n = {fmt_int(kpis_recorte['qtd_salarios'])} salários válidos",
+        )
+    with k3:
+        render_kpi(
+            "Total de admissões",
+            fmt_int(kpis_recorte["admissoes"]),
+            f"Período: {filtro_ano or '2023–2026'}",
+        )
+    with k4:
+        render_kpi(
+            "Total de desligamentos",
+            fmt_int(kpis_recorte["desligamentos"]),
+            f"Setor: {f'Seção {filtro_secao}' if filtro_secao else 'Todas as seções'}",
+        )
+
+    st.write("")
     tab_p3, tab_p1, tab_p2, tab_p4, tab_p5 = st.tabs([
         "Capitais vs. Interior (P3)",
-        "Setores no DF (P1)",
+        "Setores Econômicos (P1)",
         "Sazonalidade (P2)",
         "Rotatividade e Salário (P4)",
         "Perfil Demográfico (P5)",
@@ -876,6 +1021,7 @@ def render_view_painel_executivo(
             filtro_cargo=cargo_filtro,
             sigla_uf_override=filtro_uf,
             ano_override=filtro_ano,
+            codigo_secao_override=filtro_secao,
         )
         renderizar_resposta_geral(resp_p3, caminho_str, "painel_p3")
 
@@ -884,8 +1030,9 @@ def render_view_painel_executivo(
             caminho_str,
             "Qual setor econômico mais contratou e demitiu no Distrito Federal nos últimos 12 meses?",
             filtro_cargo=cargo_filtro,
-            sigla_uf_override="DF",
+            sigla_uf_override=filtro_uf or "DF",
             ano_override=filtro_ano,
+            codigo_secao_override=filtro_secao,
         )
         renderizar_resposta_geral(resp_p1, caminho_str, "painel_p1")
 
@@ -896,6 +1043,7 @@ def render_view_painel_executivo(
             filtro_cargo=cargo_filtro,
             sigla_uf_override=filtro_uf,
             ano_override=filtro_ano,
+            codigo_secao_override=filtro_secao,
         )
         renderizar_resposta_geral(resp_p2, caminho_str, "painel_p2")
 
@@ -906,6 +1054,7 @@ def render_view_painel_executivo(
             filtro_cargo=cargo_filtro,
             sigla_uf_override=filtro_uf,
             ano_override=filtro_ano,
+            codigo_secao_override=filtro_secao,
         )
         renderizar_resposta_geral(resp_p4, caminho_str, "painel_p4")
 
@@ -917,6 +1066,7 @@ def render_view_painel_executivo(
             sigla_uf_override=filtro_uf,
             ano_override=filtro_ano,
             eixo_override="sexo",
+            codigo_secao_override=filtro_secao,
         )
         renderizar_resposta_geral(resp_p5, caminho_str, "painel_p5")
 
@@ -1169,6 +1319,16 @@ def main() -> None:
             options=["Todos (2023–2026)", 2023, 2024, 2025, 2026],
             index=0,
         )
+        opcoes_secao = ["Todas as seções (A–U)"] + [
+            f"{cod} - {desc}"
+            for cod, desc in SECOES_CNAE_OFICIAIS.items()
+            if cod != "Z"
+        ]
+        secao_selecionada = st.selectbox(
+            "Setor Econômico (Seção CNAE)",
+            options=opcoes_secao,
+            index=0,
+        )
         cargo_global = st.text_input(
             "Ocupação / CBO (opcional)",
             value="",
@@ -1177,6 +1337,9 @@ def main() -> None:
 
         filtro_uf_efetivo = None if uf_selecionada.startswith("Todas") else uf_selecionada
         filtro_ano_efetivo = None if str(ano_selecionado).startswith("Todos") else int(ano_selecionado)
+        filtro_secao_efetivo = (
+            None if secao_selecionada.startswith("Todas") else secao_selecionada.split(" - ", 1)[0].strip()
+        )
         cargo_efetivo = cargo_global.strip() or None
 
         st.divider()
@@ -1191,6 +1354,11 @@ def main() -> None:
     filtros_ativos = [
         f"UF: {filtro_uf_efetivo}" if filtro_uf_efetivo else "Região: Centro-Oeste (DF, GO, MT, MS)",
         f"Ano: {filtro_ano_efetivo}" if filtro_ano_efetivo else "Período: 2023–2026",
+        (
+            f"Setor: Seção {filtro_secao_efetivo} ({SECOES_CNAE_OFICIAIS.get(filtro_secao_efetivo, '')[:28]})"
+            if filtro_secao_efetivo
+            else "Setor: Todas as seções CNAE"
+        ),
     ]
     if cargo_efetivo:
         filtros_ativos.append(f"Ocupação: {cargo_efetivo}")
@@ -1204,6 +1372,7 @@ def main() -> None:
             str(caminho_duckdb),
             filtro_uf_efetivo,
             filtro_ano_efetivo,
+            filtro_secao_efetivo,
             cargo_efetivo,
         )
     elif opcao_menu == "Busca de Ocupações (CBO 2002)":
