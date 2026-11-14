@@ -694,20 +694,29 @@ def render_p2_sazonalidade(
         st.dataframe(df_tab, hide_index=True, height=270)
 
 
-# TODO (Tiago): Completar a Matriz Interativa de Turnover (dispersão st.scatter_chart de
-# indice_fluxos_pareados_pct vs. salario_medio_admissao, quadrantes pela mediana e destaque de codigo_secao)
 def render_p4_rotatividade(
     df_bruto: pd.DataFrame,
     cargo_label: str = "",
     filtros: dict[str, Any] | None = None,
 ) -> None:
     df_val = df_bruto.dropna(subset=["salario_medio_admissao", "indice_fluxos_pareados_pct"]).copy()
-    corr_val = df_bruto["correlacao_pearson"].iloc[0] if "correlacao_pearson" in df_bruto.columns else None
+    corr_val = df_bruto["correlacao_pearson"].iloc[0] if not df_bruto.empty and "correlacao_pearson" in df_bruto.columns else None
     corr_str = f"{float(corr_val):.3f}".replace(".", ",") if (corr_val is not None and not pd.isna(corr_val)) else "N/A"
 
     sufixo = f" — {cargo_label}" if cargo_label else ""
     st.markdown(f"#### Rotatividade setorial e remuneração{sufixo}")
     st.caption("Relação entre o índice de fluxos pareados (substituição de postos) e o salário médio inicial por seção CNAE.")
+    secao_filtro = (filtros or {}).get("codigo_secao")
+    if secao_filtro:
+        st.caption(f"Seção {secao_filtro} em destaque entre todos os setores do recorte de UF, ano e cargo.")
+
+    mediana_indice = df_val["indice_fluxos_pareados_pct"].median()
+    mediana_salario = df_val["salario_medio_admissao"].median()
+    df_val["Quadrante"] = (
+        df_val["indice_fluxos_pareados_pct"].ge(mediana_indice).map({True: "Índice alto", False: "Índice baixo"})
+        + " / "
+        + df_val["salario_medio_admissao"].ge(mediana_salario).map({True: "salário alto", False: "salário baixo"})
+    )
 
     if not df_val.empty:
         maior_rot = df_val.sort_values("indice_fluxos_pareados_pct", ascending=False).iloc[0]
@@ -725,17 +734,51 @@ def render_p4_rotatividade(
     c_chart, c_table = st.columns([1, 1])
 
     with c_chart:
-        st.markdown("**Salário médio inicial por seção CNAE (R$)**")
-        df_plot = df_val.copy()
-        df_plot["Setor"] = df_plot["codigo_secao"] + " - " + df_plot["codigo_secao"].map(
-            lambda s: SECOES_CNAE_OFICIAIS.get(str(s), str(s))[:20]
-        )
-        st.bar_chart(
-            df_plot.set_index("Setor")[["salario_medio_admissao"]].rename(
-                columns={"salario_medio_admissao": "Salário médio (R$)"}
-            ),
-            height=300,
-        )
+        st.markdown("**Matriz de rotatividade × salário médio**")
+        if df_val.empty:
+            st.info("Sem pares válidos de índice e salário para construir a matriz.")
+        else:
+            df_plot = df_val.copy()
+            df_plot["Setor"] = df_plot["codigo_secao"].map(SECOES_CNAE_OFICIAIS)
+            df_plot["Selecionada"] = df_plot["codigo_secao"].eq(secao_filtro)
+            st.vega_lite_chart(df_plot, {
+                "height": 300,
+                "layer": [
+                    {
+                        "mark": {"type": "rule", "color": "#64748b", "strokeDash": [4, 4]},
+                        "encoding": {"x": {"aggregate": "median", "field": "indice_fluxos_pareados_pct", "type": "quantitative", "title": "Índice de fluxos pareados (%)", "scale": {"zero": False}}},
+                    },
+                    {
+                        "mark": {"type": "rule", "color": "#64748b", "strokeDash": [4, 4]},
+                        "encoding": {"y": {"aggregate": "median", "field": "salario_medio_admissao", "type": "quantitative", "title": "Salário médio de admissão (R$)", "scale": {"zero": False}}},
+                    },
+                    {
+                        "mark": {"type": "point", "filled": True, "opacity": 0.9},
+                        "encoding": {
+                            "x": {"field": "indice_fluxos_pareados_pct", "type": "quantitative", "title": "Índice de fluxos pareados (%)", "scale": {"zero": False}},
+                            "y": {"field": "salario_medio_admissao", "type": "quantitative", "title": "Salário médio de admissão (R$)", "scale": {"zero": False}},
+                            "color": {"field": "Quadrante", "type": "nominal", "legend": {"orient": "bottom", "columns": 1}},
+                            "size": {"condition": {"test": "datum.Selecionada", "value": 240}, "value": 80},
+                            "stroke": {"condition": {"test": "datum.Selecionada", "value": "#111827"}, "value": "transparent"},
+                            "strokeWidth": {"value": 2},
+                            "order": {"field": "Selecionada", "type": "ordinal"},
+                            "tooltip": [
+                                {"field": "codigo_secao", "type": "nominal", "title": "Seção"},
+                                {"field": "Setor", "type": "nominal"},
+                                {"field": "indice_fluxos_pareados_pct", "type": "quantitative", "title": "Índice (%)", "format": ".1f"},
+                                {"field": "salario_medio_admissao", "type": "quantitative", "title": "Salário (R$)", "format": ".2f"},
+                                {"field": "Quadrante", "type": "nominal"},
+                            ],
+                        },
+                    },
+                ],
+            }, width="stretch")
+            st.caption(
+                f"Medianas: índice {fmt_pct(mediana_indice)} e salário {fmt_moeda(mediana_salario)}. "
+                "Valores iguais à mediana pertencem ao grupo alto. O contorno destaca a seção selecionada."
+            )
+        if secao_filtro and not df_val["codigo_secao"].eq(secao_filtro).any():
+            st.info(f"Seção {secao_filtro} sem pares válidos de índice e salário neste recorte.")
 
     with c_table:
         st.markdown("**Seções ordenadas por índice de rotatividade**")
@@ -746,6 +789,7 @@ def render_p4_rotatividade(
             "Índice fluxos": df_ord["indice_fluxos_pareados_pct"].map(fmt_pct),
             "Salário médio": df_ord["salario_medio_admissao"].map(fmt_moeda),
             "Saldo": df_ord["saldo"].map(lambda v: fmt_int(v, True)),
+            "Quadrante": df_ord["codigo_secao"].map(df_val.set_index("codigo_secao")["Quadrante"]).astype("string").fillna("Sem dados"),
         })
         st.dataframe(df_tab, hide_index=True, height=300)
 
