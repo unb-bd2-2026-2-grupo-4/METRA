@@ -794,8 +794,6 @@ def render_p4_rotatividade(
         st.dataframe(df_tab, hide_index=True, height=300)
 
 
-# TODO (Tiago): Completar o painel de Disparidades Sociodemográficas (gráfico comparativo de hiato salarial
-# e saldo líquido por categoria demográfica, colunas de diferença salarial em R$ e saldo na tabela e destaque por seção CNAE)
 def render_p5_sociodemografico(
     df_bruto: pd.DataFrame,
     filtros: dict[str, Any],
@@ -803,6 +801,9 @@ def render_p5_sociodemografico(
     chave_prefixo: str = "p5",
     resposta_original: RespostaTextToSQL | None = None,
 ) -> RespostaTextToSQL | None:
+    if df_bruto.empty:
+        st.info("Sem registros para a dimensão selecionada neste recorte.")
+        return resposta_original
     eixos = list(df_bruto["eixo"].unique())
     eixo_atual = filtros.get("eixo") if filtros.get("eixo") in eixos else eixos[0]
     cargo_label = filtros.get("termo_ocupacao", "")
@@ -811,6 +812,8 @@ def render_p5_sociodemografico(
     sufixo = f" — {cargo_label}" if cargo_label else ""
     st.markdown(f"#### Perfil sociodemográfico e remuneração{sufixo}")
     st.caption("Recorte de admissões, desligamentos e salário médio inicial por sexo, escolaridade, raça/cor e faixa etária.")
+    if filtros.get("codigo_secao"):
+        st.caption(f"Recorte da seção CNAE {filtros['codigo_secao']}.")
 
     eixo_selecionado = st.radio(
         "Dimensão:",
@@ -854,7 +857,7 @@ def render_p5_sociodemografico(
     total_adm = int(consolidado["admissoes"].sum())
     soma_sal = float(consolidado["soma_sal"].sum())
     qtd_sal = int(consolidado["qtd_sal"].sum())
-    media_geral = (soma_sal / qtd_sal) if qtd_sal > 0 else 0.0
+    media_geral = (soma_sal / qtd_sal) if qtd_sal > 0 else float("nan")
 
     consolidado["salario_medio"] = consolidado.apply(
         lambda r: (float(r["soma_sal"]) / int(r["qtd_sal"])) if int(r["qtd_sal"]) > 0 else None,
@@ -866,6 +869,7 @@ def render_p5_sociodemografico(
     consolidado["dif_media_pct"] = consolidado["salario_medio"].map(
         lambda s: (100.0 * (float(s) - media_geral) / media_geral) if (s is not None and media_geral > 0) else None
     )
+    consolidado["dif_media_reais"] = consolidado["salario_medio"] - media_geral
 
     validos = consolidado[
         ~consolidado["categoria"].str.lower().str.contains("não identificad|não informad")
@@ -915,6 +919,28 @@ def render_p5_sociodemografico(
                 columns={"salario_medio": "Salário médio (R$)"}
             )
             st.bar_chart(df_plot, height=290)
+            st.markdown("**Hiato salarial em relação à média do recorte (R$)**")
+            st.caption(f"Referência: média ponderada de {fmt_moeda(media_geral)} (n = {fmt_int(qtd_sal)} salários válidos).")
+            st.vega_lite_chart(validos, {
+                "height": 290,
+                "layer": [
+                    {
+                        "mark": "bar",
+                        "encoding": {
+                            "x": {"field": "dif_media_reais", "type": "quantitative", "title": "Diferença salarial (R$)"},
+                            "y": {"field": "categoria", "type": "nominal", "title": "Categoria"},
+                            "tooltip": [
+                                {"field": "categoria", "type": "nominal", "title": "Categoria"},
+                                {"field": "dif_media_reais", "type": "quantitative", "title": "Diferença (R$)", "format": ".2f"},
+                                {"field": "dif_media_pct", "type": "quantitative", "title": "Diferença (%)", "format": ".1f"},
+                            ],
+                        },
+                    },
+                    {"mark": {"type": "rule", "color": "#64748b"}, "encoding": {"x": {"datum": 0, "type": "quantitative"}}},
+                ],
+            }, width="stretch")
+        else:
+            st.info("Sem salários válidos em categorias identificadas para os gráficos deste recorte.")
 
     with c_tab:
         st.markdown("**Distribuição por categoria**")
@@ -922,7 +948,9 @@ def render_p5_sociodemografico(
             "Categoria": consolidado["categoria"],
             "Salário médio": consolidado["salario_medio"].map(fmt_moeda),
             "Dif. p/ média": consolidado["dif_media_pct"].map(lambda v: fmt_pct(v, True)),
+            "Diferença salarial (R$)": consolidado["dif_media_reais"].map(fmt_moeda),
             "Admissões": consolidado["admissoes"].map(fmt_int),
+            "Saldo líquido": consolidado["saldo"].map(lambda v: fmt_int(v, True)),
             "Participação": consolidado["participacao_pct"].map(fmt_pct),
         })
         st.dataframe(df_tab, hide_index=True, height=290)
