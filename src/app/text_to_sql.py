@@ -375,9 +375,12 @@ def _gerar_sql_p1(filtros: dict[str, Any]) -> str:
     if uf not in ("DF", "GO", "MT", "MS"):
         uf = "DF"
     filtros["sigla_uf"] = uf
-    where_base = ""
+    clausulas_base: list[str] = []
     if "ano" in filtros and int(filtros["ano"]) in (2023, 2024, 2025, 2026):
-        where_base = f"where year(competencia) = {int(filtros['ano'])}"
+        clausulas_base.append(f"year(competencia) = {int(filtros['ano'])}")
+    if "codigo_secao" in filtros and str(filtros["codigo_secao"]).upper() in set("ABCDEFGHIJKLMNOPQRSTU"):
+        clausulas_base.append(f"codigo_secao = '{str(filtros['codigo_secao']).upper()}'")
+    where_base = f"where {' and '.join(clausulas_base)}" if clausulas_base else ""
     corpo_base = _cte_base_setor_mensal(filtros, where_base)
     return f"""with base as (
     {corpo_base}
@@ -417,6 +420,8 @@ def _gerar_sql_p2(filtros: dict[str, Any]) -> str:
         clausulas_base.append(f"sigla_uf = '{filtros['sigla_uf']}'")
     if "ano" in filtros and int(filtros["ano"]) in (2023, 2024, 2025, 2026):
         clausulas_base.append(f"year(competencia) = {int(filtros['ano'])}")
+    if "codigo_secao" in filtros and str(filtros["codigo_secao"]).upper() in set("ABCDEFGHIJKLMNOPQRSTU"):
+        clausulas_base.append(f"codigo_secao = '{str(filtros['codigo_secao']).upper()}'")
     where_base = f"where {' and '.join(clausulas_base)}" if clausulas_base else ""
     corpo_base = _cte_base_setor_mensal(filtros, where_base)
 
@@ -473,18 +478,23 @@ def _gerar_sql_p3(filtros: dict[str, Any]) -> str:
         where_final = f"where nivel = '{filtros['nivel']}'"
 
     codigos_cbo = filtros.get("codigos_cbo")
-    if not codigos_cbo:
+    codigo_secao = str(filtros.get("codigo_secao") or "").upper()
+    tem_secao = codigo_secao in set("ABCDEFGHIJKLMNOPQRSTU")
+    if not codigos_cbo and not tem_secao:
         corpo_base = f"""select *, year(competencia)::integer as ano
     from gold.fct_geografia_mensal
     {where_base}"""
     else:
-        lista_cbo = ", ".join(f"'{str(c).zfill(6)}'" for c in codigos_cbo)
         conds = [
             "f.is_identificado",
             "f.is_centro_oeste",
             "f.ano between 2023 and 2026",
-            f"f.codigo_cbo in ({lista_cbo})",
         ]
+        if codigos_cbo:
+            lista_cbo = ", ".join(f"'{str(c).zfill(6)}'" for c in codigos_cbo)
+            conds.append(f"f.codigo_cbo in ({lista_cbo})")
+        if tem_secao:
+            conds.append(f"f.codigo_secao = '{codigo_secao}'")
         if clausulas_base:
             conds.extend(clausulas_base)
         corpo_base = f"""select
@@ -585,6 +595,8 @@ def _gerar_sql_p5(filtros: dict[str, Any]) -> str:
         clausulas_base.append(f"f.sigla_uf = '{filtros['sigla_uf']}'")
     if "ano" in filtros and int(filtros["ano"]) in (2023, 2024, 2025, 2026):
         clausulas_base.append(f"year(f.competencia) = {int(filtros['ano'])}")
+    if "codigo_secao" in filtros and str(filtros["codigo_secao"]).upper() in set("ABCDEFGHIJKLMNOPQRSTU"):
+        clausulas_base.append(f"f.codigo_secao = '{str(filtros['codigo_secao']).upper()}'")
     where_base = f"where {' and '.join(clausulas_base)}" if clausulas_base else ""
 
     where_eixo = ""
@@ -678,6 +690,8 @@ def _gerar_sql_cbo(codigos_cbo: list[str], filtros: dict[str, Any]) -> str:
         clausulas_f.append(f"f.sigla_uf = '{filtros['sigla_uf']}'")
     if "ano" in filtros and int(filtros["ano"]) in (2023, 2024, 2025, 2026):
         clausulas_f.append(f"f.ano = {int(filtros['ano'])}")
+    if "codigo_secao" in filtros and str(filtros["codigo_secao"]).upper() in set("ABCDEFGHIJKLMNOPQRSTU"):
+        clausulas_f.append(f"f.codigo_secao = '{str(filtros['codigo_secao']).upper()}'")
     cond_f = " and ".join(clausulas_f)
 
     return f"""select
@@ -906,6 +920,7 @@ class AssistenteTextToSQL:
         sigla_uf_override: str | None = None,
         ano_override: int | None = None,
         eixo_override: str | None = None,
+        codigo_secao_override: str | None = None,
     ) -> RespostaTextToSQL:
         """Traduz a pergunta para o contrato SQL Gold, valida guardrails e executa em modo leitura."""
         texto = (pergunta or "").strip()
@@ -954,6 +969,8 @@ class AssistenteTextToSQL:
             filtros["ano"] = int(ano_override)
         if eixo_override and eixo_override in ("sexo", "raca_cor", "escolaridade", "faixa_etaria"):
             filtros["eixo"] = eixo_override
+        if codigo_secao_override and str(codigo_secao_override).upper() in set("ABCDEFGHIJKLMNOPQRSTU"):
+            filtros["codigo_secao"] = str(codigo_secao_override).upper()
 
         ocupacoes_resolvidas: list[dict[str, Any]] = []
 
