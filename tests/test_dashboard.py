@@ -5,6 +5,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 import altair as alt
+import duckdb
 import pandas as pd
 from streamlit.testing.v1 import AppTest
 
@@ -92,6 +93,26 @@ class DashboardTest(unittest.TestCase):
             MagicMock() for _ in range(larguras if isinstance(larguras, int) else len(larguras))
         ]
         self.st.radio.return_value = "sexo"
+
+    def test_painel_propaga_cbos_resolvidos_aos_kpis_e_pergunta_p1(self) -> None:
+        self.st.tabs.return_value = [MagicMock() for _ in range(5)]
+        resposta = SimpleNamespace(filtros_aplicados={"codigos_cbo": ["231205", "231210"]})
+        indicadores = {"saldo": 3, "salario_medio": 3000, "qtd_salarios": 3, "admissoes": 4, "desligamentos": 1}
+        with (
+            patch.object(dashboard, "obter_resposta_cached", return_value=resposta) as consulta,
+            patch.object(dashboard, "consultar_kpis_recorte_cached", return_value=indicadores) as kpis,
+            patch.object(dashboard, "renderizar_resposta_geral"),
+        ):
+            dashboard.render_view_painel_executivo("teste.duckdb", "GO", 2024, "G", "professor")
+        kpis.assert_called_once_with(
+            "teste.duckdb", sigla_uf="GO", ano=2024, codigo_secao="G", codigos_cbo=("231205", "231210"),
+        )
+        self.assertEqual(consulta.call_count, 5)
+        pergunta_p1 = consulta.call_args_list[1].args[1]
+        self.assertIn("em GO em 2024", pergunta_p1)
+        self.assertNotIn("Distrito Federal", pergunta_p1)
+        self.assertNotIn("12 meses", pergunta_p1)
+        self.assertEqual(consulta.call_args_list[0].kwargs["filtro_cargo"], "professor")
 
     def test_p1_ranking_top8_kpis_e_filtros(self) -> None:
         with patch.object(dashboard, "render_kpi") as kpi:
@@ -184,6 +205,8 @@ class DashboardTest(unittest.TestCase):
         self.assertEqual(pontos.loc[pontos["Selecionada"], "codigo_secao"].tolist(), ["B"])
         tabela = self.st.dataframe.call_args.args[0].set_index("Seção")
         self.assertEqual(tabela.loc["F", "Quadrante"], "Sem dados")
+        self.assertTrue(any("KPIs do topo consideram apenas a seção selecionada" in chamada.args[0]
+                            for chamada in self.st.caption.call_args_list))
         pd.testing.assert_frame_equal(df, original)
 
     def test_p4_sem_filtro_sem_pares_e_secao_indisponivel(self) -> None:
@@ -252,6 +275,72 @@ class DashboardTest(unittest.TestCase):
             "eixo_override": "raca_cor", "codigo_secao_override": "C",
         })
         self.assertEqual(set(self.st.vega_lite_chart.call_args.args[0]["categoria"]), {"Homens", "Mulheres"})
+
+
+class KpisDashboardTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.conn = duckdb.connect()
+        self.addCleanup(self.conn.close)
+        self.conn.execute("""
+            CREATE SCHEMA gold;
+            CREATE TABLE gold.fct_movimentacao AS
+            SELECT make_date(ano, 1, 1) AS competencia, * FROM (VALUES
+                (2024, 'GO', 'G', '231205',  1,  1000, true,  true,  true),
+                (2024, 'GO', 'G', '231205',  1,  3000, true,  true,  true),
+                (2024, 'GO', 'G', '231205', -1, 50000, true,  true,  true),
+                (2024, 'GO', 'G', '231210',  1,  5000, true,  true,  true),
+                (2024, 'GO', 'G', '212405',  1,  9000, true,  true,  true),
+                (2023, 'GO', 'G', '231205',  1,  7000, true,  true,  true),
+                (2024, 'DF', 'G', '231205',  1,  8000, true,  true,  true),
+                (2024, 'GO', 'A', '231205',  1,  6000, true,  true,  true),
+                (2024, 'GO', 'G', '231205',  1,     0, false, true,  true),
+                (2024, 'GO', 'G', '231205',  1, 11000, true,  false, true),
+                (2024, 'GO', 'G', '231205',  1, 12000, true,  true,  false),
+                (2022, 'GO', 'G', '231205',  1, 13000, true,  true,  true)
+            ) AS t(ano, sigla_uf, codigo_secao, codigo_cbo, saldo_movimentacao,
+                   salario_mensal, salario_valido, is_identificado, is_centro_oeste);
+            CREATE TABLE gold.fct_setor_mensal AS
+            SELECT competencia, sigla_uf, codigo_secao,
+                count(*) FILTER (WHERE saldo_movimentacao = 1) AS admissoes,
+                count(*) FILTER (WHERE saldo_movimentacao = -1) AS desligamentos,
+                sum(saldo_movimentacao) AS saldo,
+                sum(CASE WHEN saldo_movimentacao = 1 AND salario_valido THEN salario_mensal ELSE 0 END) AS soma_salarios_admissao,
+                count(*) FILTER (WHERE saldo_movimentacao = 1 AND salario_valido) AS qtd_salarios_admissao
+            FROM gold.fct_movimentacao
+            WHERE is_identificado AND is_centro_oeste AND ano BETWEEN 2023 AND 2026
+            GROUP BY competencia, sigla_uf, codigo_secao;
+        """)
+        conexao = patch.object(dashboard, "obter_conexao_cached", return_value=self.conn)
+        conexao.start()
+        self.addCleanup(conexao.stop)
+        dashboard.consultar_kpis_recorte_cached.clear()
+        self.addCleanup(dashboard.consultar_kpis_recorte_cached.clear)
+
+    def test_kpis_com_e_sem_ocupacao_respeitam_filtros_e_cache(self) -> None:
+        casos = [
+            ({}, (5, 1, 4, 4500, 4)),
+            ({"codigos_cbo": ("231205",)}, (3, 1, 2, 2000, 2)),
+            ({"codigos_cbo": ("231205", "231210")}, (4, 1, 3, 3000, 3)),
+            ({"codigos_cbo": ("231205",), "codigo_secao": "A"}, (1, 0, 1, 6000, 1)),
+            ({"codigos_cbo": ("231205",), "ano": 2023}, (1, 0, 1, 7000, 1)),
+            ({"codigos_cbo": ("231205",), "sigla_uf": "DF"}, (1, 0, 1, 8000, 1)),
+            ({"codigos_cbo": ("999999",)}, (0, 0, 0, None, 0)),
+            ({}, (5, 1, 4, 4500, 4)),
+        ]
+        for overrides, valores in casos:
+            with self.subTest(overrides=overrides):
+                filtros = {"sigla_uf": "GO", "ano": 2024, "codigo_secao": "G", **overrides}
+                resultado = dashboard.consultar_kpis_recorte_cached("teste.duckdb", **filtros)
+                self.assertEqual(resultado, dict(zip(
+                    ("admissoes", "desligamentos", "saldo", "salario_medio", "qtd_salarios"), valores,
+                )))
+
+    def test_kpis_ocupacao_sem_salario_valido(self) -> None:
+        self.conn.execute("UPDATE gold.fct_movimentacao SET salario_valido = false WHERE codigo_cbo = '231205'")
+        resultado = dashboard.consultar_kpis_recorte_cached(
+            "teste.duckdb", sigla_uf="GO", ano=2024, codigo_secao="G", codigos_cbo=("231205",),
+        )
+        self.assertEqual(resultado, {"admissoes": 3, "desligamentos": 1, "saldo": 2, "salario_medio": None, "qtd_salarios": 0})
 
 
 class DashboardStreamlitTest(unittest.TestCase):

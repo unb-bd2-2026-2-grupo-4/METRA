@@ -23,6 +23,8 @@ import duckdb
 
 from src.app.busca_cbo import IndiceVetorialCBO, normalizar_texto
 
+SECOES_CNAE_VALIDAS = frozenset("ABCDEFGHIJKLMNOPQRSTU")
+
 TABELAS_GOLD_PERMITIDAS = frozenset({
     "gold.dim_competencia",
     "gold.dim_municipio",
@@ -378,7 +380,7 @@ def _gerar_sql_p1(filtros: dict[str, Any]) -> str:
     clausulas_base: list[str] = []
     if "ano" in filtros and int(filtros["ano"]) in (2023, 2024, 2025, 2026):
         clausulas_base.append(f"year(competencia) = {int(filtros['ano'])}")
-    if "codigo_secao" in filtros and str(filtros["codigo_secao"]).upper() in set("ABCDEFGHIJKLMNOPQRSTU"):
+    if "codigo_secao" in filtros and str(filtros["codigo_secao"]).upper() in SECOES_CNAE_VALIDAS:
         clausulas_base.append(f"codigo_secao = '{str(filtros['codigo_secao']).upper()}'")
     where_base = f"where {' and '.join(clausulas_base)}" if clausulas_base else ""
     corpo_base = _cte_base_setor_mensal(filtros, where_base)
@@ -420,7 +422,7 @@ def _gerar_sql_p2(filtros: dict[str, Any]) -> str:
         clausulas_base.append(f"sigla_uf = '{filtros['sigla_uf']}'")
     if "ano" in filtros and int(filtros["ano"]) in (2023, 2024, 2025, 2026):
         clausulas_base.append(f"year(competencia) = {int(filtros['ano'])}")
-    if "codigo_secao" in filtros and str(filtros["codigo_secao"]).upper() in set("ABCDEFGHIJKLMNOPQRSTU"):
+    if "codigo_secao" in filtros and str(filtros["codigo_secao"]).upper() in SECOES_CNAE_VALIDAS:
         clausulas_base.append(f"codigo_secao = '{str(filtros['codigo_secao']).upper()}'")
     where_base = f"where {' and '.join(clausulas_base)}" if clausulas_base else ""
     corpo_base = _cte_base_setor_mensal(filtros, where_base)
@@ -479,7 +481,7 @@ def _gerar_sql_p3(filtros: dict[str, Any]) -> str:
 
     codigos_cbo = filtros.get("codigos_cbo")
     codigo_secao = str(filtros.get("codigo_secao") or "").upper()
-    tem_secao = codigo_secao in set("ABCDEFGHIJKLMNOPQRSTU")
+    tem_secao = codigo_secao in SECOES_CNAE_VALIDAS
     if not codigos_cbo and not tem_secao:
         corpo_base = f"""select *, year(competencia)::integer as ano
     from gold.fct_geografia_mensal
@@ -595,7 +597,7 @@ def _gerar_sql_p5(filtros: dict[str, Any]) -> str:
         clausulas_base.append(f"f.sigla_uf = '{filtros['sigla_uf']}'")
     if "ano" in filtros and int(filtros["ano"]) in (2023, 2024, 2025, 2026):
         clausulas_base.append(f"year(f.competencia) = {int(filtros['ano'])}")
-    if "codigo_secao" in filtros and str(filtros["codigo_secao"]).upper() in set("ABCDEFGHIJKLMNOPQRSTU"):
+    if "codigo_secao" in filtros and str(filtros["codigo_secao"]).upper() in SECOES_CNAE_VALIDAS:
         clausulas_base.append(f"f.codigo_secao = '{str(filtros['codigo_secao']).upper()}'")
     where_base = f"where {' and '.join(clausulas_base)}" if clausulas_base else ""
 
@@ -690,7 +692,7 @@ def _gerar_sql_cbo(codigos_cbo: list[str], filtros: dict[str, Any]) -> str:
         clausulas_f.append(f"f.sigla_uf = '{filtros['sigla_uf']}'")
     if "ano" in filtros and int(filtros["ano"]) in (2023, 2024, 2025, 2026):
         clausulas_f.append(f"f.ano = {int(filtros['ano'])}")
-    if "codigo_secao" in filtros and str(filtros["codigo_secao"]).upper() in set("ABCDEFGHIJKLMNOPQRSTU"):
+    if "codigo_secao" in filtros and str(filtros["codigo_secao"]).upper() in SECOES_CNAE_VALIDAS:
         clausulas_f.append(f"f.codigo_secao = '{str(filtros['codigo_secao']).upper()}'")
     cond_f = " and ".join(clausulas_f)
 
@@ -969,7 +971,7 @@ class AssistenteTextToSQL:
             filtros["ano"] = int(ano_override)
         if eixo_override and eixo_override in ("sexo", "raca_cor", "escolaridade", "faixa_etaria"):
             filtros["eixo"] = eixo_override
-        if codigo_secao_override and str(codigo_secao_override).upper() in set("ABCDEFGHIJKLMNOPQRSTU"):
+        if codigo_secao_override and str(codigo_secao_override).upper() in SECOES_CNAE_VALIDAS:
             filtros["codigo_secao"] = str(codigo_secao_override).upper()
 
         ocupacoes_resolvidas: list[dict[str, Any]] = []

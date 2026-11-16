@@ -26,7 +26,12 @@ from src.app.banco_analitico import (
     obter_caminho_duckdb,
 )
 from src.app.busca_cbo import IndiceVetorialCBO, consultar_indicadores_cbo
-from src.app.text_to_sql import AssistenteTextToSQL, RespostaTextToSQL
+from src.app.text_to_sql import (
+    SECOES_CNAE_VALIDAS,
+    AssistenteTextToSQL,
+    RespostaTextToSQL,
+    _cte_base_setor_mensal,
+)
 
 # ==============================================================================
 # ESTILO SÓBRIO E INSTITUCIONAL
@@ -290,27 +295,29 @@ def consultar_kpis_recorte_cached(
     sigla_uf: str | None = None,
     ano: int | None = None,
     codigo_secao: str | None = None,
+    codigos_cbo: tuple[str, ...] = (),
 ) -> dict[str, Any]:
-    """Consulta os KPIs globais de saldo líquido e salário médio diretamente em gold.fct_setor_mensal."""
+    """Consulta os KPIs do recorte, usando a fato detalhada quando há filtro CBO."""
     conn = obter_conexao_cached(caminho_str)
     clausulas: list[str] = ["1 = 1"]
     if sigla_uf and sigla_uf in ("DF", "GO", "MT", "MS"):
         clausulas.append(f"sigla_uf = '{sigla_uf}'")
     if ano and int(ano) in (2023, 2024, 2025, 2026):
         clausulas.append(f"year(competencia) = {int(ano)}")
-    if codigo_secao and str(codigo_secao).upper() in SECOES_CNAE_OFICIAIS:
+    if codigo_secao and str(codigo_secao).upper() in SECOES_CNAE_VALIDAS:
         clausulas.append(f"codigo_secao = '{str(codigo_secao).upper()}'")
     where_sql = " AND ".join(clausulas)
+    corpo_base = _cte_base_setor_mensal({"codigos_cbo": codigos_cbo}, f"WHERE {where_sql}")
 
     row = conn.execute(f"""
+        WITH base AS ({corpo_base})
         SELECT
             COALESCE(SUM(admissoes), 0) AS admissoes,
             COALESCE(SUM(desligamentos), 0) AS desligamentos,
             COALESCE(SUM(saldo), 0) AS saldo,
             SUM(soma_salarios_admissao) / NULLIF(SUM(qtd_salarios_admissao), 0) AS salario_medio,
             COALESCE(SUM(qtd_salarios_admissao), 0) AS qtd_salarios
-        FROM gold.fct_setor_mensal
-        WHERE {where_sql}
+        FROM base
     """).fetchone()
 
     return {
@@ -708,7 +715,10 @@ def render_p4_rotatividade(
     st.caption("Relação entre o índice de fluxos pareados (substituição de postos) e o salário médio inicial por seção CNAE.")
     secao_filtro = (filtros or {}).get("codigo_secao")
     if secao_filtro:
-        st.caption(f"Seção {secao_filtro} em destaque entre todos os setores do recorte de UF, ano e cargo.")
+        st.caption(
+            f"Seção {secao_filtro} em destaque entre todos os setores do recorte de UF, ano e cargo. "
+            "Os KPIs do topo consideram apenas a seção selecionada."
+        )
 
     mediana_indice = df_val["indice_fluxos_pareados_pct"].median()
     mediana_salario = df_val["salario_medio_admissao"].median()
@@ -1045,11 +1055,20 @@ def render_view_painel_executivo(
     filtro_secao: str | None,
     cargo_filtro: str | None,
 ) -> None:
+    resp_p3 = obter_resposta_cached(
+        caminho_str,
+        "Qual é a diferença no saldo líquido e no salário médio entre as capitais e o interior?",
+        filtro_cargo=cargo_filtro,
+        sigla_uf_override=filtro_uf,
+        ano_override=filtro_ano,
+        codigo_secao_override=filtro_secao,
+    )
     kpis_recorte = consultar_kpis_recorte_cached(
         caminho_str,
         sigla_uf=filtro_uf,
         ano=filtro_ano,
         codigo_secao=filtro_secao,
+        codigos_cbo=tuple(resp_p3.filtros_aplicados.get("codigos_cbo", ())),
     )
     k1, k2, k3, k4 = st.columns(4)
     with k1:
@@ -1087,20 +1106,13 @@ def render_view_painel_executivo(
     ])
 
     with tab_p3:
-        resp_p3 = obter_resposta_cached(
-            caminho_str,
-            "Qual é a diferença no saldo líquido e no salário médio entre as capitais e o interior?",
-            filtro_cargo=cargo_filtro,
-            sigla_uf_override=filtro_uf,
-            ano_override=filtro_ano,
-            codigo_secao_override=filtro_secao,
-        )
         renderizar_resposta_geral(resp_p3, caminho_str, "painel_p3")
 
     with tab_p1:
+        periodo_p1 = f"em {filtro_ano}" if filtro_ano else "nos últimos 12 meses"
         resp_p1 = obter_resposta_cached(
             caminho_str,
-            "Qual setor econômico mais contratou e demitiu no Distrito Federal nos últimos 12 meses?",
+            f"Qual setor econômico mais contratou e demitiu em {filtro_uf or 'DF'} {periodo_p1}?",
             filtro_cargo=cargo_filtro,
             sigla_uf_override=filtro_uf or "DF",
             ano_override=filtro_ano,
