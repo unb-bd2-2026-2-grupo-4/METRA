@@ -311,3 +311,12 @@ Abaixo constam os registros de todas as atividades:
 - **Como foi verificado:** Execução de `python -m unittest discover -s tests -p 'test_*.py' -v`, com os 55 testes aprovados, incluindo os 14 do dashboard com DuckDB em memória e `AppTest`, além de builds reais do dbt em bases temporárias. A classificação da pergunta da P1 foi conferida nas quatro UFs, com e sem ano explícito. `git diff --check` sem erros. A inspeção manual no navegador e a conferência na Gold de produção não foram realizadas.
 - **Quem revisou:** Tiago Antunes.
 
+### 16/11/2026 - Fluxo completo reproduzível do zero (E4)
+
+- **Ferramenta:** Claude Code (Anthropic).
+- **Onde:** `dagster_metra/assets.py`, `dagster_metra/definitions.py`, `src/qualidade/verificar_fluxo.py`, `scripts/metra-do-zero.sh`, `docker-compose.yml`, `tests/test_orquestracao.py`, `tests/test_verificar_fluxo.py`, `README.md` e `docs/orquestracao.md`.
+- **O que foi pedido:** Garantir que um único fluxo reproduzível rode tudo do zero (Bronze → OLTP → Parquet/Delta → dbt Silver/Gold → painel), deixando os testes automatizados da Gold para Davi.
+- **O que foi aproveitado:** Asset `materializar_delta` no job `pipeline_metra`, que antes só gerava a Delta pela linha de comando; verificador que concilia contagem e saldo das seis camadas e confere as tabelas Gold do painel; serviços `pipeline` e `painel-completo` no perfil `completo`, com o painel dependendo obrigatoriamente do sucesso do pipeline; script que apaga volumes e artefatos gerados antes de executar o fluxo. Na primeira versão, o painel dependia do pipeline com `required: false` e subia mesmo após uma falha; a revisão trocou isso por um serviço separado.
+- **Como foi verificado:** Fluxo executado do zero em um projeto Compose isolado (`COMPOSE_PROJECT_NAME=metra_zero`, volumes novos): `PASS=191` no dbt, seis camadas com 49.178 movimentações e saldo +1.472 e painel `healthy` com `/_stcore/health` 200; histórico SCD recriado com uma versão vigente por ocupação; com o PostgreSQL inacessível, o job falhou após três novas tentativas e saiu com código 1; com o pipeline forçado a falhar, o script saiu com erro e o painel não foi iniciado; o perfil `painel` continuou subindo sozinho sobre a Gold existente; 60 testes de `tests/` aprovados. A execução num clone novo, sem imagens em cache, não foi medida.
+- **Quem revisou:** Lucas Alves.
+
