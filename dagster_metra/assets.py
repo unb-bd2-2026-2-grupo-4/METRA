@@ -25,6 +25,7 @@ import duckdb
 import psycopg
 
 from src.extracao.exportar_parquet import exportar
+from src.extracao.materializar_delta import materializar
 from src.ingestao.executar_pipeline import main as executar_pipeline_main
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -77,6 +78,25 @@ def exportar_parquet_asset(context: AssetExecutionContext) -> MaterializeResult:
     context.log.info("Iniciando a exportação OLTP -> Parquet pelo Dagster")
     exportar()
     return MaterializeResult(metadata={"destino": "data/lake/parquet"})
+
+
+@asset(
+    name="materializar_delta",
+    deps=[exportar_parquet_asset],
+    group_name="extracao",
+    description=(
+        "Sobrescreve a tabela Delta de movimentações a partir do Parquet extraído, "
+        "conferindo a contagem de linhas."
+    ),
+    kinds={"python", "delta"},
+    retry_policy=POLITICA_RETRY,
+)
+def materializar_delta_asset(context: AssetExecutionContext) -> MaterializeResult:
+    """Materializa a tabela Delta depois da extração para Parquet."""
+
+    context.log.info("Iniciando a materialização Parquet -> Delta pelo Dagster")
+    versao = materializar()
+    return MaterializeResult(metadata={"destino": "data/lake/delta/movimentacao", "versao_delta": versao})
 
 
 def caminho_banco_analitico() -> Path:

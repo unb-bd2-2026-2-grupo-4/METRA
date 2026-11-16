@@ -24,6 +24,7 @@ from dagster_metra.assets import (
     conciliacao_mensal_asset,
     executar_pipeline_asset,
     exportar_parquet_asset,
+    materializar_delta_asset,
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -67,11 +68,15 @@ def metra_dbt_assets(context, dbt: DbtCliResource):
     yield from dbt.cli(["build"], context=context).stream()
 
 
-# Pipeline completo: OLTP -> Parquet -> Silver/Gold (inclui o snapshot SCD da CBO).
+# Pipeline completo: OLTP -> Parquet/Delta -> Silver/Gold (inclui o snapshot SCD da CBO).
 pipeline_metra_job = define_asset_job(
     "pipeline_metra",
-    selection=AssetSelection.assets(executar_pipeline_asset, exportar_parquet_asset, metra_dbt_assets),
-    description="Executa a ingestão, a extração para Parquet e o dbt build da Silver e da Gold.",
+    selection=AssetSelection.assets(
+        executar_pipeline_asset, exportar_parquet_asset, materializar_delta_asset, metra_dbt_assets
+    ),
+    description=(
+        "Executa a ingestão, a extração para Parquet e Delta e o dbt build da Silver e da Gold."
+    ),
 )
 
 # O Novo CAGED publica uma competência por mês; o pipeline roda no dia 5, às 6h.
@@ -99,6 +104,7 @@ defs = Definitions(
     assets=[
         executar_pipeline_asset,
         exportar_parquet_asset,
+        materializar_delta_asset,
         *metra_lake_source_assets,
         metra_dbt_assets,
         conciliacao_mensal_asset,

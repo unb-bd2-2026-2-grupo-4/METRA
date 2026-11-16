@@ -41,6 +41,15 @@ class OrquestracaoTest(unittest.TestCase):
         self.assertEqual(sem_retry, [])
         self.assertEqual(self.assets.POLITICA_RETRY.max_retries, 3)
 
+    def test_pipeline_materializa_delta_depois_do_parquet(self):
+        job = self.defs.resolve_job_def("pipeline_metra")
+        chaves = {chave.to_user_string() for chave in job.asset_layer.selected_asset_keys}
+        self.assertTrue({"executar_pipeline", "exportar_parquet", "materializar_delta"} <= chaves)
+        delta = self.defs.resolve_assets_def("materializar_delta")
+        self.assertEqual(
+            {dep.to_user_string() for dep in delta.asset_deps[delta.key]}, {"exportar_parquet"}
+        )
+
     def test_schedules_mensais(self):
         schedules = {s.name: s for s in self.defs.schedules}
         pipeline = schedules["pipeline_metra_mensal"]
