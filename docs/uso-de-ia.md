@@ -275,6 +275,15 @@ Abaixo constam os registros de todas as atividades:
 - **Como foi verificado:** Contêiner `healthy` e `/_stcore/health` respondendo 200, isolado e pelo Compose; painel renderizado com `streamlit.testing.v1.AppTest` dentro da imagem, com `data/` somente leitura, mostrando as cinco abas sem exceção; `dbt build` (191 nós) executado com o painel no ar, sem conflito de bloqueio no DuckDB; passo 5 do README executado como documentado, com `RUN_SUCCESS`. A navegação manual no navegador não foi feita.
 - **Quem revisou:** Lucas Alves.
 
+### 10/11/2026 - Revisão do PR #15 e ajustes na aba P3
+
+- **Ferramenta:** Claude Code (Anthropic).
+- **Onde:** `src/app/dashboard.py` e `docs/uso-de-ia.md`.
+- **O que foi pedido:** Revisar a aba "Capitais vs. Interior (P3)" e conferir os números de conciliação registrados na entrada anterior.
+- **O que foi aproveitado:** Correção dos salários e denominadores da entrada anterior, que tinham sido obtidos de uma base sem os 10 salários de admissão acima de R$ 100 mil presentes na amostra; com um ano filtrado, a série deixa de repetir a linha anual como `Total` e o título passa a indicar o ano; com uma UF filtrada, o resumo por UF deixa de exibir como "Centro-Oeste" uma linha que contém só a UF filtrada.
+- **Como foi verificado:** Série anual e `Total` da P3 conferidos célula a célula contra `src.analise.consultar_indicadores` sobre `gold.fct_movimentacao` de `data/metra_analitico.duckdb` (0 divergências); aba P3 renderizada com `streamlit.testing.v1.AppTest` na imagem do painel, sem exceção, nos recortes padrão, DF, GO, ano 2024 e ocupação "professor"; 41 testes de `tests/` e `mkdocs build --strict`.
+- **Quem revisou:** Lucas Alves.
+
 ### 10/11/2026 - Série anual da P3 no painel Streamlit, atualização da documentação de consumo e Diários 10 e 11
 
 - **Ferramenta:** Antigravity (Google DeepMind).
@@ -284,11 +293,21 @@ Abaixo constam os registros de todas as atividades:
 - **Como foi verificado:** Confrontação exata de todas as células da série anual da P3 (2023 a 2026 e `Total`) entre `_gerar_sql_p3` / `dashboard.py` e `src.analise.consultar_indicadores` sobre a mesma base (`data/metra_analitico.duckdb`, 49.178 movimentações: saldos `+128/+280/-152`, `+223/+321/-98`, `+127/+270/-143`, `+50/+73/-23` e `+528/+944/-416`; salários `R$ 1.973,20 / R$ 1.975,08 / R$ -1,89`, `R$ 2.449,45 / R$ 2.079,75 / R$ 369,70`, `R$ 2.300,69 / R$ 2.332,85 / R$ -32,16`, `R$ 2.867,75 / R$ 2.231,13 / R$ 636,62` e `R$ 2.268,97 / R$ 2.138,23 / R$ 130,73`; `n_capital = 10.514` e `n_interior = 14.491`); execução da suíte de 41 testes automatizados do repositório (`tests/`), `python -m mkdocs build --strict` e `git diff --check`.
 - **Quem revisou:** Yan Matheus.
 
-### 10/11/2026 - Revisão do PR #15 e ajustes na aba P3
+### 14/11/2026 - Matriz de rotatividade, disparidades salariais e testes do dashboard (E4)
 
-- **Ferramenta:** Claude Code (Anthropic).
-- **Onde:** `src/app/dashboard.py` e `docs/uso-de-ia.md`.
-- **O que foi pedido:** Revisar a aba "Capitais vs. Interior (P3)" e conferir os números de conciliação registrados na entrada anterior.
-- **O que foi aproveitado:** Correção dos salários e denominadores da entrada anterior, que tinham sido obtidos de uma base sem os 10 salários de admissão acima de R$ 100 mil presentes na amostra; com um ano filtrado, a série deixa de repetir a linha anual como `Total` e o título passa a indicar o ano; com uma UF filtrada, o resumo por UF deixa de exibir como "Centro-Oeste" uma linha que contém só a UF filtrada.
-- **Como foi verificado:** Série anual e `Total` da P3 conferidos célula a célula contra `src.analise.consultar_indicadores` sobre `gold.fct_movimentacao` de `data/metra_analitico.duckdb` (0 divergências); aba P3 renderizada com `streamlit.testing.v1.AppTest` na imagem do painel, sem exceção, nos recortes padrão, DF, GO, ano 2024 e ocupação "professor"; 41 testes de `tests/` e `mkdocs build --strict`.
-- **Quem revisou:** Lucas Alves.
+- **Ferramenta:** Antigravity (Google DeepMind).
+- **Onde:** `src/app/dashboard.py` e `tests/test_dashboard.py`.
+- **O que foi pedido:** Apoio na implementação das visões P4 e P5 na branch `feat/e4-ajustes`, mantendo o escopo das cinco perguntas de gestão, e acrescentar testes de interface para P1, P2 e P3.
+- **O que foi aproveitado:** Matriz de índice de fluxos pareados × salário médio com quadrantes definidos pelas medianas, tooltips, destaque da seção CNAE selecionada e classificação na tabela; gráfico de hiato salarial em relação à média ponderada do recorte, diferença salarial em reais e saldo líquido na P5; tratamento de dados ausentes; testes de ranking, sazonalidade, recortes geográficos, quadrantes, médias ponderadas e preservação dos filtros.
+- **Como foi verificado:** Os 11 testes de `tests/test_dashboard.py` passaram, incluindo a renderização das cinco visões com `streamlit.testing.v1.AppTest`. Os 14 testes existentes de busca e Text-to-SQL também passaram, incluindo comparação das consultas P1–P5 com as análises oficiais do dbt. `git diff --check` sem erros. A inspeção manual no navegador e a suíte completa não foram executadas nessa etapa.
+- **Quem revisou:** Tiago Antunes.
+
+### 16/11/2026 - Correções da revisão do painel executivo (E4)
+
+- **Ferramenta:** Antigravity (Google DeepMind).
+- **Onde:** `src/app/dashboard.py`, `src/app/text_to_sql.py`, `tests/test_dashboard.py` e este registro.
+- **O que foi pedido:** Identificar os erros nos KPIs do topo que ignoravam a ocupação selecionada, registrar o uso de IA que havia esquecido, centralizar a lista de seções CNAE aceitas, adequar a pergunta da P1 à UF ativa e esclarecer a diferença entre o destaque setorial da P4 e o filtro dos KPIs.
+- **O que foi aproveitado:** Reutilização dos códigos CBO resolvidos para a P3 e da agregação `_cte_base_setor_mensal` nos KPIs; leitura de `gold.fct_movimentacao` quando há ocupação e manutenção de `gold.fct_setor_mensal` sem esse filtro; inclusão dos CBOs na chave do cache; constante única `SECOES_CNAE_VALIDAS` para A–U; pergunta da P1 refletindo UF e período; aviso na P4 de que os KPIs do topo consideram apenas a seção selecionada; três testes adicionais para a integração do painel e os KPIs com filtros combinados, cache, recorte vazio e ausência de salário válido.
+- **Como foi verificado:** Execução de `python -m unittest discover -s tests -p 'test_*.py' -v`, com os 55 testes aprovados, incluindo os 14 do dashboard com DuckDB em memória e `AppTest`, além de builds reais do dbt em bases temporárias. A classificação da pergunta da P1 foi conferida nas quatro UFs, com e sem ano explícito. `git diff --check` sem erros. A inspeção manual no navegador e a conferência na Gold de produção não foram realizadas.
+- **Quem revisou:** Tiago Antunes.
+
