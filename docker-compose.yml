@@ -101,7 +101,7 @@ services:
 
   # Fluxo completo em um comando: Bronze -> OLTP -> Parquet/Delta -> dbt Silver/Gold,
   # conciliação entre as camadas e, só depois do sucesso, o painel.
-  #   docker compose --profile completo up --build -d
+  #   docker compose --profile completo up --build -d painel-completo
   pipeline:
     build:
       context: .
@@ -125,14 +125,9 @@ services:
     build:
       context: .
       dockerfile: docker/painel/Dockerfile
-    profiles: ["painel", "completo"]
+    profiles: ["painel"]
     container_name: g4_painel
     restart: unless-stopped
-    depends_on:
-      # No perfil completo, espera o pipeline terminar com sucesso; no perfil painel, usa a Gold existente.
-      pipeline:
-        condition: service_completed_successfully
-        required: false
     ports:
       - "${PAINEL_PORT:-8501}:8501"
     environment:
@@ -141,6 +136,16 @@ services:
       # Somente leitura: o painel nunca cria, altera ou apaga o banco analítico.
       - ./data:/app/data:ro
       - ./src:/app/src:ro
+
+  # O mesmo painel no perfil completo: só sobe se o pipeline terminar com sucesso.
+  painel-completo:
+    extends:
+      service: painel
+    # !override substitui a lista herdada em vez de juntá-la a ["painel"].
+    profiles: !override ["completo"]
+    depends_on:
+      pipeline:
+        condition: service_completed_successfully
 
 volumes:
   postgres_data:
