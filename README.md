@@ -138,6 +138,8 @@ E4            | Análises e Visualizações  |
 │   ├── ingestao/Dockerfile # Imagem da tarefa de ingestão e carga do pipeline E1
 │   ├── dagster/Dockerfile  # Imagem do webserver e do daemon do Dagster
 │   └── painel/Dockerfile   # Imagem do painel Streamlit (somente leitura do banco analítico)
+├── scripts/
+│   └── metra-do-zero.sh    # Fluxo completo do zero: volumes limpos -> Bronze ... Gold -> painel
 ├── src/                    # Scripts de ingestão, pipeline e transformações
 │   ├── analise.py          # Carga PostgreSQL -> DuckDB e indicadores no terminal
 │   ├── cdc/
@@ -150,6 +152,8 @@ E4            | Análises e Visualizações  |
 │   │   ├── exportar_parquet.py   # Extração PostgreSQL (oltp) -> Parquet, com compressão configurável
 │   │   ├── materializar_delta.py # Materialização Parquet -> tabela Delta de movimentações
 │   │   └── validar_lake.py       # Confere a pergunta central em PostgreSQL, Parquet e Delta
+│   ├── qualidade/
+│   │   └── verificar_fluxo.py    # Concilia contagem e saldo de Bronze, OLTP, Parquet, Delta, Silver e Gold
 │   ├── db/
 │   │   ├── migrar.py       # Aplica migrações pendentes (registradas em public.schema_migracoes)
 │   │   └── migracoes/      # Migrações SQL versionadas
@@ -216,7 +220,21 @@ E4            | Análises e Visualizações  |
 - [Git](https://git-scm.com/)
 - [Docker Engine](https://docs.docker.com/engine/) e [Docker Compose](https://docs.docker.com/compose/)
 
+### Fluxo completo em um comando
+
+Na raiz do clone, um único comando executa o METRA do zero (Bronze → OLTP → Parquet/Delta → dbt Silver/Gold → painel):
+
+```bash
+sh scripts/metra-do-zero.sh
+```
+
+O script pede confirmação, apaga os volumes do PostgreSQL e do Dagster e os artefatos gerados em `data/` (lake e `metra_analitico.duckdb`) e executa o job `pipeline_metra`. Em seguida, `src.qualidade.verificar_fluxo` confere que as seis camadas têm a mesma quantidade de movimentações e o mesmo saldo e que as tabelas Gold do painel têm dados. O painel só sobe se tudo passar. A amostra versionada e os CSVs completos não são apagados. Com as imagens já construídas, o fluxo sobre a amostra leva menos de um minuto; a primeira execução também constrói as imagens. Para pular a confirmação, como na CI, use `--sim`.
+
+Sem apagar os volumes, o mesmo fluxo roda com `docker compose --profile completo up --build -d painel-completo`.
+
 ### Passos de Execução
+
+Os passos abaixo executam as mesmas etapas uma a uma.
 
 ```bash
 # 1. Clonar o repositório
@@ -234,7 +252,7 @@ docker compose up -d postgres
 #    Em uma máquina limpa de terceiro, utiliza automaticamente a amostra de 49 mil linhas versionada.
 docker compose run --rm ingestao-bronze
 
-# 5. Gerar o lake Parquet e as camadas Silver e Gold pelo job do Dagster
+# 5. Gerar o lake Parquet/Delta e as camadas Silver e Gold pelo job do Dagster
 #    (--build reconstrói a imagem quando o código do pipeline mudou)
 docker compose --profile dagster run --build --rm dagster-webserver \
   dagster job execute -m dagster_metra.definitions -j pipeline_metra
