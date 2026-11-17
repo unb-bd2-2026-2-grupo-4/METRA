@@ -125,7 +125,8 @@ E4            | Análises e Visualizações  |
 .
 ├── .github/
 │   └── workflows/
-│       └── deploy-docs.yml # Pipeline de deploy automatizado no GitHub Pages
+│       ├── deploy-docs.yml # Pipeline de deploy automatizado no GitHub Pages
+│       └── testes-integracao.yml # Fluxo do zero e suíte de testes no Docker
 ├── .gitignore              # Regras de exclusão para dados pesados (permite a amostra de 2.8 MB)
 ├── AI-USAGE.md             # Ponteiro para o registro de uso de IA em docs/uso-de-ia.md (conforme política)
 ├── README.md               # Visão geral do METRA, domínio, setup e governança
@@ -231,6 +232,22 @@ sh scripts/metra-do-zero.sh
 O script pede confirmação, apaga os volumes do PostgreSQL e do Dagster e os artefatos gerados em `data/` (lake e `metra_analitico.duckdb`) e executa o job `pipeline_metra`. Em seguida, `src.qualidade.verificar_fluxo` confere que as seis camadas têm a mesma quantidade de movimentações e o mesmo saldo e que as tabelas Gold do painel têm dados. O painel só sobe se tudo passar. A amostra versionada e os CSVs completos não são apagados. Com as imagens já construídas, o fluxo sobre a amostra leva menos de um minuto; a primeira execução também constrói as imagens. Para pular a confirmação, como na CI, use `--sim`.
 
 Sem apagar os volumes, o mesmo fluxo roda com `docker compose --profile completo up --build -d painel-completo`.
+
+### Testes automatizados e integração contínua
+
+Depois do fluxo completo, execute todos os testes na imagem Python 3.12 do Dagster, a partir da raiz:
+
+```bash
+docker compose --profile dagster run --build --rm \
+  -v "$PWD":/repo -w /repo dagster-webserver \
+  python -m unittest discover -s tests -v
+```
+
+Esse ambiente instala `requirements-pipeline.txt` e fornece as variáveis de conexão com o PostgreSQL do Compose. Evita depender do Python 3.14 local, que não instala `dagster-dbt`. A suíte foi validada com **72 testes passando**, incluindo os 12 de integração com a Gold real. Para executar somente esses 12, acrescente `-p 'test_gold_integracao.py'` ao comando `unittest discover`.
+
+[`tests/test_gold_integracao.py`](tests/test_gold_integracao.py) abre `data/metra_analitico.duckdb` somente para leitura, respeitando `METRA_DUCKDB`. Sem o arquivo, a classe é pulada; com ele presente, banco inválido, tabelas ausentes ou falha de conexão ao Postgres são erros. O OLTP precisa corresponder à carga que gerou a Gold. Na execução fora do Docker, configure `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER` e `PGPASSWORD`; sem `PGHOST`, o psycopg procura um socket local.
+
+O workflow [Fluxo completo e testes](.github/workflows/testes-integracao.yml) roda em pushes, pull requests e manualmente pelo GitHub Actions. Em um runner limpo, usa a amostra versionada, executa `sh scripts/metra-do-zero.sh --sim`, exige que o DuckDB tenha sido criado e roda a suíte completa no Dagster. Se houver falha, imprime o estado e os logs dos serviços; ao terminar, remove serviços e volumes (a validação local executou a suíte sobre os bancos existentes, sem apagar os dados locais).
 
 ### Passos de Execução
 
@@ -344,7 +361,7 @@ Para validar a detecção de falhas com Parquet sintético isolado, na raiz:
 python -m unittest discover -s tests -p 'test_dbt_quality.py' -v
 ```
 
-Veja a [camada analítica e o Star Schema](docs/camada-analitica-dbt.md) e a [ADR-0005](docs/adr/0005-modelagem-analitica-dbt.md). A cobertura genérica específica da Gold e o histórico SCD permanecem pendentes; os testes de negócio Gold abaixo continuam disponíveis.
+Veja a [camada analítica e o Star Schema](docs/camada-analitica-dbt.md) e a [ADR-0005](docs/adr/0005-modelagem-analitica-dbt.md). Os testes de negócio Gold abaixo e os testes de integração sobre a carga real complementam os contratos dbt e o histórico SCD.
 
 ### Camada Gold e perguntas de gestão (E3)
 

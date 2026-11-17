@@ -72,6 +72,44 @@ A suíte cria cinco conjuntos Parquet sintéticos em diretório temporário, exe
 
 ---
 
+## Integração sobre a Gold real e CI
+
+Os 12 testes de `tests/test_gold_integracao.py` leem o banco produzido pelo fluxo, sem reconstruí-lo ou alterá-lo. Eles complementam as bases sintéticas de `test_dbt_quality.py` e `test_gold.py`:
+
+| Verificação | Contrato validado |
+|---|---|
+| Três agregados mensais | Admissões, desligamentos, saldo, soma e quantidade de salários iguais à agregação de `fct_movimentacao`, no grão de cada tabela; detecta grupos ausentes, extras e duplicados |
+| OLTP × Gold | Toda a `fct_movimentacao` contra `oltp.movimentacao`, por competência e UF, incluindo municípios não identificados; compara quantidade de eventos e as cinco medidas acima |
+| Respostas P1–P5 | Intenção, colunas e todas as linhas do `AssistenteTextToSQL` usado pelo painel contra os SQLs versionados em `dbt_metra/analyses/`, resolvendo `ref()`; preserva nulos e admite tolerância de sete casas decimais para ponto flutuante |
+| Município sentinela | `9999999` não pode estar marcado como identificado; a recomposição dos agregados exclui explicitamente esse código, pois eles não possuem `id_municipio` |
+| Salário médio | Soma dividida pela quantidade, com tolerância absoluta de `0,0000001`; sem salários válidos, soma zero e média nula; rejeita denominadores negativos/nulos e médias não finitas |
+| Competências | Nenhum mês faltante entre os extremos carregados, na dimensão, fato e agregados; não exige anos completos nem eventos em toda combinação de UF/setor/perfil |
+
+A comparação dos agregados aplica municípios identificados do Centro-Oeste entre 2023 e 2026. A continuidade mensal dos agregados usa os extremos desse recorte na fato; a dimensão e a fato usam os extremos de toda a fato. Agregados vazios falham. A ausência de um mês na carga real falha nesse teste de integração, enquanto o teste dbt de volume mensal pode emitir apenas um aviso e a P2 continua distinguindo mês ausente de zero observado.
+
+Na raiz do repositório:
+
+```bash
+# Pede confirmação antes de apagar volumes e artefatos gerados.
+sh scripts/metra-do-zero.sh
+
+# Somente os testes sobre a carga real.
+docker compose --profile dagster run --build --rm \
+  -v "$PWD":/repo -w /repo dagster-webserver \
+  python -m unittest discover -s tests -p 'test_gold_integracao.py' -v
+
+# Suíte completa, validada com 72 testes passando.
+docker compose --profile dagster run --rm \
+  -v "$PWD":/repo -w /repo dagster-webserver \
+  python -m unittest discover -s tests -v
+```
+
+O caminho padrão é `data/metra_analitico.duckdb`, substituível por `METRA_DUCKDB`. Somente a ausência do arquivo pula a classe. Com o arquivo presente, erros de schema e de conexão ao Postgres falham; o OLTP deve ser o mesmo que originou a Gold. O Compose fornece as variáveis `PG*`; fora dele, configure explicitamente host, porta, banco, usuário e senha. Use a imagem Python 3.12 do Dagster para evitar a incompatibilidade de instalação de `dagster-dbt` com o Python 3.14 local.
+
+O workflow `.github/workflows/testes-integracao.yml` executa em push, pull request ou acionamento manual. Primeiro roda `sh scripts/metra-do-zero.sh --sim` sobre a amostra versionada em runner limpo; depois exige um DuckDB não vazio e executa todos os testes no Dagster. Assim, a ausência do banco não resulta em uma CI aprovada por testes pulados. O job tem limite de 30 minutos, imprime estado e logs em caso de falha e sempre tenta remover serviços e volumes. A ingestão inicial depende de acesso às fontes externas e às extensões do DuckDB. Localmente foram executados os 72 testes, sem refazer a limpeza destrutiva do fluxo.
+
+---
+
 ## Star Schema implementado na Gold
 
 **Grão da fato:** uma linha por movimentação de admissão ou desligamento do Novo CAGED, identificada por `id_movimentacao` da origem. Não é uma linha por trabalhador, por vínculo ativo ou por município/mês. Os microdados utilizados não permitem estimar individualmente a probabilidade de recolocação.
