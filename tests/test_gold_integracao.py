@@ -18,6 +18,13 @@ import psycopg
 
 
 ROOT = Path(__file__).resolve().parents[1]
+AGREGADOS = {
+    "fct_setor_mensal": ("competencia", "sigla_uf", "codigo_secao"),
+    "fct_geografia_mensal": ("competencia", "sigla_uf", "is_capital"),
+    "fct_perfil_mensal": (
+        "competencia", "sigla_uf", "is_capital", "codigo_secao", "id_perfil_demografico"
+    ),
+}
 
 
 class GoldIntegracaoTest(unittest.TestCase):
@@ -33,7 +40,7 @@ class GoldIntegracaoTest(unittest.TestCase):
         cls.conn = duckdb.connect(str(banco), read_only=True)
         cls.addClassCleanup(cls.conn.close)
 
-    def conferir_agregado(self, tabela, dimensoes):
+    def conferir_agregado(self, tabela, dimensoes, identificado="is_identificado"):
         # Mesmo recorte de negócio dos marts; a referência é calculada a partir
         # dos eventos, sem reutilizar a macro dbt que produz os agregados.
         chaves = ", ".join(dimensoes)
@@ -53,7 +60,7 @@ class GoldIntegracaoTest(unittest.TestCase):
                         where saldo_movimentacao = 1 and salario_valido
                     ) as qtd_salarios_admissao
                 from gold.fct_movimentacao
-                where is_identificado and is_centro_oeste
+                where {identificado} and is_centro_oeste
                     and ano between 2023 and 2026
                 group by {chaves}
             ), atual as (
@@ -94,6 +101,72 @@ class GoldIntegracaoTest(unittest.TestCase):
             ("competencia", "sigla_uf", "is_capital", "codigo_secao",
              "id_perfil_demografico"),
         )
+
+    def test_agregados_excluem_municipio_sentinela(self):
+        self.assertEqual(self.conn.execute("""
+            select id_municipio from gold.dim_municipio
+            where id_municipio = '9999999' and is_identificado is distinct from false
+        """).fetchall(), [], "O município sentinela não pode ser identificado.")
+        # Os agregados não guardam id_municipio. Reconstituir seus valores
+        # excluindo o código diretamente detecta contribuição indevida mesmo
+        # quando ela fica misturada a municípios válidos no mesmo grupo.
+        for tabela, dimensoes in AGREGADOS.items():
+            with self.subTest(tabela=tabela):
+                self.conferir_agregado(
+                    tabela, dimensoes,
+                    "is_identificado and id_municipio <> '9999999'",
+                )
+
+    def test_salario_medio_igual_soma_dividida_por_quantidade(self):
+        for tabela in AGREGADOS:
+            with self.subTest(tabela=tabela):
+                divergencias = self.conn.execute(f"""
+                    select * from gold.{tabela}
+                    where qtd_salarios_admissao is null
+                       or qtd_salarios_admissao < 0
+                       or soma_salarios_admissao is null
+                       or (qtd_salarios_admissao = 0 and (
+                           salario_medio_admissao is not null
+                           or soma_salarios_admissao <> 0
+                       ))
+                       or (qtd_salarios_admissao > 0 and (
+                           salario_medio_admissao is null
+                           or not isfinite(salario_medio_admissao)
+                           or abs(salario_medio_admissao -
+                               soma_salarios_admissao / qtd_salarios_admissao) > 0.0000001
+                       ))
+                    limit 10
+                """).fetchall()
+                self.assertEqual(divergencias, [],
+                                 f"gold.{tabela}: salário médio inconsistente (até 10 linhas).")
+
+    def test_competencias_sem_meses_faltando(self):
+        # Exige continuidade somente entre os extremos carregados; não exige
+        # anos completos nem eventos em cada combinação de UF/setor/perfil.
+        for tabela in ("dim_competencia", "fct_movimentacao", *AGREGADOS):
+            with self.subTest(tabela=tabela):
+                filtro = (
+                    "where is_identificado and is_centro_oeste and ano between 2023 and 2026"
+                    if tabela in AGREGADOS else ""
+                )
+                faltantes = self.conn.execute(f"""
+                    with limites as (
+                        select min(competencia) as inicio, max(competencia) as fim
+                        from gold.fct_movimentacao
+                        {filtro}
+                    ), esperadas as (
+                        select unnest(generate_series(inicio, fim, interval '1 month'))::date
+                            as competencia from limites
+                    )
+                    select competencia from esperadas
+                    except select competencia from gold.{tabela}
+                    order by competencia
+                """).fetchall()
+                self.assertGreater(
+                    self.conn.execute(f"select count(*) from gold.{tabela}").fetchone()[0],
+                    0, f"gold.{tabela} está vazio.",
+                )
+                self.assertEqual(faltantes, [], f"gold.{tabela}: meses faltantes.")
 
     def test_movimentacao_bate_com_postgres_por_competencia_e_uf(self):
         # Concilia toda a fato, incluindo municípios não identificados: o
