@@ -1,4 +1,4 @@
-"""Conciliação dos agregados na Gold real, sem criar ou alterar o banco.
+"""Conciliação dos agregados, OLTP e respostas P1-P5 na Gold real.
 
 Executar após scripts/metra-do-zero.sh, na imagem do Dagster:
     python -m unittest discover -s tests -p 'test_gold_integracao.py' -v
@@ -144,6 +144,64 @@ class GoldIntegracaoTest(unittest.TestCase):
             "Métricas: movimentações, admissões, desligamentos, saldo, "
             "soma e quantidade de salários de admissão. "
             f"Amostra (chave, OLTP, Gold): {divergencias[:10]}",
+        )
+
+    def conferir_resposta_painel(self, analise, pergunta):
+        from src.app.avaliar_busca_e_text2sql import _carregar_sql_analise_dbt
+        from src.app.text_to_sql import AssistenteTextToSQL
+
+        # Lê o SQL canônico versionado em analyses/, resolvendo apenas ref().
+        # Não depende de arquivos compilados antigos em target/ nem gera dados.
+        referencia = self.conn.sql(_carregar_sql_analise_dbt(analise))
+        colunas = list(referencia.columns)
+        esperado = referencia.fetchall()
+        self.assertTrue(esperado, f"A análise {analise} não retornou dados na Gold real.")
+
+        resposta = AssistenteTextToSQL().responder(self.conn, pergunta)
+        self.assertTrue(resposta.suportada, resposta.motivo_recusa)
+        self.assertEqual(resposta.intencao, analise)
+        self.assertEqual(resposta.colunas, colunas)
+        self.assertEqual(len(resposta.linhas), len(esperado))
+        # A ordenação faz parte dos contratos SQL. Nulos e valores exatos são
+        # preservados; tolerância só para cálculos de ponto flutuante.
+        for numero, (atual, referencia) in enumerate(zip(resposta.linhas, esperado)):
+            for coluna, valor, valor_esperado in zip(colunas, atual, referencia):
+                with self.subTest(analise=analise, linha=numero, coluna=coluna):
+                    if isinstance(valor, float) and isinstance(valor_esperado, float):
+                        self.assertAlmostEqual(valor, valor_esperado, places=7)
+                    else:
+                        self.assertEqual(valor, valor_esperado)
+
+    def test_p1_painel_bate_com_analise_dbt(self):
+        self.conferir_resposta_painel(
+            "p1_setores_df",
+            "Qual setor econômico mais contratou e demitiu no Distrito Federal "
+            "nos últimos 12 meses?",
+        )
+
+    def test_p2_painel_bate_com_analise_dbt(self):
+        self.conferir_resposta_painel(
+            "p2_sazonalidade",
+            "Existe sazonalidade evidente nas contratações e demissões?",
+        )
+
+    def test_p3_painel_bate_com_analise_dbt(self):
+        self.conferir_resposta_painel(
+            "p3_capitais_interior",
+            "Qual é a diferença no saldo líquido e no salário médio entre "
+            "as capitais e os municípios do interior?",
+        )
+
+    def test_p4_painel_bate_com_analise_dbt(self):
+        self.conferir_resposta_painel(
+            "p4_fluxos_salarios",
+            "Os setores com maior taxa de rotatividade praticam salários médios mais baixos?",
+        )
+
+    def test_p5_painel_bate_com_analise_dbt(self):
+        self.conferir_resposta_painel(
+            "p5_perfil_remuneracao",
+            "Como o perfil sociodemográfico impacta o nível salarial e as movimentações?",
         )
 
 
