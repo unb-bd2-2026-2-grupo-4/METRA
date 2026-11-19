@@ -1,0 +1,46 @@
+name: Fluxo completo e testes
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fluxo-e-testes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout do repositório
+        uses: actions/checkout@v4
+
+      - name: Conferir Docker Compose
+        run: docker compose version
+
+      - name: Gerar a base do zero e iniciar o painel
+        run: sh scripts/metra-do-zero.sh --sim
+
+      # Os testes locais pulam sem o banco. Na CI, sua ausência é uma falha.
+      - name: Exigir o banco analítico gerado
+        run: test -s data/metra_analitico.duckdb
+
+      - name: Executar todos os testes na imagem do Dagster
+        run: >-
+          docker compose --profile dagster run --build --rm
+          -v "$PWD":/repo -w /repo
+          dagster-webserver python -m unittest discover -s tests -v
+
+      - name: Mostrar estado e logs em caso de falha
+        if: failure()
+        run: |
+          docker compose --profile completo --profile dagster ps --all
+          docker compose --profile completo --profile dagster logs --no-color --tail 200
+
+      - name: Encerrar serviços e remover volumes
+        if: always()
+        run: >-
+          docker compose --profile completo --profile dagster
+          --profile painel --profile ingestao
+          down --volumes --remove-orphans

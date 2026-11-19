@@ -63,7 +63,7 @@ services:
         condition: service_healthy
     ports:
       - "${DAGSTER_PORT:-3000}:3000"
-    environment:
+    environment: &ambiente-dagster
       DAGSTER_HOME: /opt/dagster/dagster_home
       PGHOST: postgres
       PGPORT: 5432
@@ -99,6 +99,26 @@ services:
       - ./data:/app/data
       - dagster_home:/opt/dagster/dagster_home
 
+  # Fluxo completo em um comando: Bronze -> OLTP -> Parquet/Delta -> dbt Silver/Gold,
+  # conciliação entre as camadas e, só depois do sucesso, o painel.
+  #   docker compose --profile completo up --build -d painel-completo
+  pipeline:
+    build:
+      context: .
+      dockerfile: docker/dagster/Dockerfile
+    profiles: ["completo"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment: *ambiente-dagster
+    command:
+      - sh
+      - -c
+      - dagster job execute -m dagster_metra.definitions -j pipeline_metra && python -m src.qualidade.verificar_fluxo
+    volumes:
+      - ./data:/app/data
+      - dagster_home:/opt/dagster/dagster_home
+
   # Painel Streamlit (E4): lê a Gold gerada pelo dbt/Dagster, sem escrever no banco.
   #   docker compose --profile painel up --build -d painel
   painel:
@@ -116,6 +136,16 @@ services:
       # Somente leitura: o painel nunca cria, altera ou apaga o banco analítico.
       - ./data:/app/data:ro
       - ./src:/app/src:ro
+
+  # O mesmo painel no perfil completo: só sobe se o pipeline terminar com sucesso.
+  painel-completo:
+    extends:
+      service: painel
+    # !override substitui a lista herdada em vez de juntá-la a ["painel"].
+    profiles: !override ["completo"]
+    depends_on:
+      pipeline:
+        condition: service_completed_successfully
 
 volumes:
   postgres_data:
