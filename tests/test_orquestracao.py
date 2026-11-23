@@ -58,6 +58,21 @@ class OrquestracaoTest(unittest.TestCase):
         self.assertEqual(pipeline.job_name, "pipeline_metra")
         self.assertEqual(schedules["conciliacao_mensal"].job_name, "conciliacao_mensal_job")
 
+    def test_exportacao_publica_depende_das_views_e_integra_jobs(self):
+        from dagster import Definitions
+
+        Definitions.validate_loadable(self.defs)
+        exportacao = self.defs.resolve_assets_def("exportar_json_consumo")
+        self.assertEqual(
+            {dep.to_user_string() for dep in exportacao.asset_deps[exportacao.key]},
+            {"consumo/setor_mensal", "consumo/geografia_mensal",
+             "consumo/perfil_mensal", "consumo/calendario"},
+        )
+        completo = self.defs.resolve_job_def("pipeline_metra")
+        self.assertIn(exportacao.key, completo.asset_layer.selected_asset_keys)
+        isolado = self.defs.resolve_job_def("exportar_json_consumo_job")
+        self.assertEqual(set(isolado.asset_layer.selected_asset_keys), {exportacao.key})
+
     def test_conciliacao_particionada_por_mes_com_backfill_em_execucao_unica(self):
         conciliacao = self.defs.resolve_assets_def("conciliacao_mensal")
         chaves = conciliacao.partitions_def.get_partition_keys()

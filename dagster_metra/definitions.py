@@ -24,6 +24,7 @@ from dagster_metra.assets import (
     conciliacao_mensal_asset,
     executar_pipeline_asset,
     exportar_parquet_asset,
+    exportar_json_consumo_asset,
     materializar_delta_asset,
 )
 
@@ -72,11 +73,18 @@ def metra_dbt_assets(context, dbt: DbtCliResource):
 pipeline_metra_job = define_asset_job(
     "pipeline_metra",
     selection=AssetSelection.assets(
-        executar_pipeline_asset, exportar_parquet_asset, materializar_delta_asset, metra_dbt_assets
+        executar_pipeline_asset, exportar_parquet_asset, materializar_delta_asset, metra_dbt_assets,
+        exportar_json_consumo_asset,
     ),
     description=(
-        "Executa a ingestão, a extração para Parquet e Delta e o dbt build da Silver e da Gold."
+        "Executa ingestão, Parquet/Delta, dbt build e exportação do JSON público para consumo."
     ),
+)
+
+exportar_json_consumo_job = define_asset_job(
+    "exportar_json_consumo_job",
+    selection=AssetSelection.assets(exportar_json_consumo_asset),
+    description="Regenera o JSON a partir das views públicas já materializadas.",
 )
 
 # O Novo CAGED publica uma competência por mês; o pipeline roda no dia 5, às 6h.
@@ -108,8 +116,9 @@ defs = Definitions(
         *metra_lake_source_assets,
         metra_dbt_assets,
         conciliacao_mensal_asset,
+        exportar_json_consumo_asset,
     ],
-    jobs=[pipeline_metra_job, conciliacao_mensal_job],
+    jobs=[pipeline_metra_job, conciliacao_mensal_job, exportar_json_consumo_job],
     schedules=[pipeline_mensal_schedule, conciliacao_mensal_schedule],
     resources={
         "dbt": DbtCliResource(

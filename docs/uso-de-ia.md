@@ -362,3 +362,13 @@ Abaixo constam os registros de todas as atividades:
   - **Documentação:** passou em `mkdocs build --strict` na imagem Docker de docs, com saída temporária no contêiner.
   - **Não executados nesta etapa:** inspeção manual do painel no navegador e o workflow do GitHub Actions.
 - **Quem revisou:** Euller Júlio.
+
+### 23/11/2026 - ETL reverso para JSON público (E4, frente do Tiago)
+
+- **Ferramenta:** Codex (OpenAI).
+- **Onde:** `src/consumo/`, assets e jobs do Dagster, Compose, CI, consumidor JavaScript no MkDocs e testes de exportação/consumo.
+- **O que foi pedido:** Implementar o plano de ETL reverso com métricas da camada semântica, chave idempotente, retry, publicação manual por PR e uma página mínima que lê o JSON. O usuário escolheu cobrir os recortes de P1–P5 e depender das views públicas da frente de Lucas, com omissão de grupos abaixo de cinco movimentações e supressão salarial abaixo de cinco salários válidos.
+- **O que foi aproveitado:** Exportador que lê somente `consumo.*` em transação de leitura, valida o contrato e recompõe métricas pelo compilador semântico; arquivo determinístico substituído atomicamente sob lock; asset no pipeline mensal e job isolado; metadados com hash e cobertura; montagem do destino público no Compose; página sem backend, chaves ou dependências novas; contrato de integração e procedimento de revisão/publicação.
+- **Como foi verificado:** Testes com DuckDB temporário para conciliação, limites de supressão, calendário, chaves, idempotência e correção histórica. Falha na substituição do arquivo reproduzida e recuperada por retry real do Dagster. Grafo e jobs validados; a suíte Python executou 82 testes sem falhas, com uma classe de integração pulada por ausência do banco real. Quatro testes JavaScript passaram. `docker compose config` confirmou o destino e os mounts dos três serviços; o build estrito MkDocs passou. Um build isolado com JSON sintético confirmou os bytes do artefato, a inclusão do JavaScript e as URLs relativas do consumidor. Fixtures não foram publicadas como dados reais.
+- **Limites:** As views de produção de Lucas e o DuckDB real não estão disponíveis nesta implementação local. O primeiro JSON real, o fluxo completo no Docker, o deploy e a demonstração no Pages permanecem pendentes dessas dependências e da revisão com a equipe. O pipeline completo passa a exigir as views e não deve ser apresentado como integrado antes disso. O contrato proposto das views precisa ser confirmado com Lucas; nenhuma implementação de controle de acesso foi acrescentada nesta frente.
+- **Quem revisou:** Pendente de revisão humana.
