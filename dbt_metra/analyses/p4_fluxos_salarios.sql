@@ -3,18 +3,15 @@ with base as (
     select * from {{ ref('fct_setor_mensal') }}
     where codigo_secao <> 'Z'
     -- Aplique aqui os filtros de período/UF, antes de recalcular o índice.
-), totais as (
-    select codigo_secao,
-           sum(admissoes) as admissoes, sum(desligamentos) as desligamentos,
-           sum(saldo) as saldo,
-           sum(soma_salarios_admissao) as soma_salarios_admissao,
-           sum(qtd_salarios_admissao) as qtd_salarios_admissao
-    from base group by codigo_secao
 ), setores as (
-    select *, soma_salarios_admissao / nullif(qtd_salarios_admissao, 0) as salario_medio_admissao,
-           200.0 * least(admissoes, desligamentos)
-               / nullif(admissoes + desligamentos, 0) as indice_fluxos_pareados_pct
-    from totais
+    -- Métricas recompostas das medidas aditivas pela camada semântica (metricas.yml).
+    select codigo_secao,
+           {%- for m in ['admissoes', 'desligamentos', 'saldo', 'soma_salarios_admissao',
+                         'qtd_salarios_admissao', 'salario_medio_admissao',
+                         'indice_fluxos_pareados_pct'] %}
+           {{ metrica(m, 'agregado') }} as {{ m }}{{ ',' if not loop.last }}
+           {%- endfor %}
+    from base group by codigo_secao
 ), pares as (
     select * from setores
     where indice_fluxos_pareados_pct is not null and salario_medio_admissao is not null

@@ -11,8 +11,9 @@ with base as (
     where competencia between inicio and fim
 ), setores as (
     select codigo_secao,
-           sum(admissoes) as admissoes, sum(desligamentos) as desligamentos,
-           sum(saldo) as saldo
+           {{ metrica('admissoes', 'agregado') }} as admissoes,
+           {{ metrica('desligamentos', 'agregado') }} as desligamentos,
+           {{ metrica('saldo', 'agregado') }} as saldo
     from base cross join janela
     where sigla_uf = 'DF' and codigo_secao <> 'Z'
       and competencia between inicio and fim

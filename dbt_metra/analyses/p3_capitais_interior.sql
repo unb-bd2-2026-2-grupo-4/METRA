@@ -8,10 +8,11 @@ with base as (
            case when grouping(competencia) = 0 then 'mensal'
                 when grouping(ano) = 0 then 'anual' else 'total' end as nivel,
            is_capital,
-           sum(admissoes) as admissoes, sum(desligamentos) as desligamentos,
-           sum(saldo) as saldo,
-           sum(soma_salarios_admissao) / nullif(sum(qtd_salarios_admissao), 0) as salario,
-           sum(qtd_salarios_admissao) as n_salarios
+           {{ metrica('admissoes', 'agregado') }} as admissoes,
+           {{ metrica('desligamentos', 'agregado') }} as desligamentos,
+           {{ metrica('saldo', 'agregado') }} as saldo,
+           {{ metrica('salario_medio_admissao', 'agregado') }} as salario,
+           {{ metrica('qtd_salarios_admissao', 'agregado') }} as n_salarios
     from base
     group by grouping sets (
         (competencia, sigla_uf, is_capital), (competencia, is_capital),
