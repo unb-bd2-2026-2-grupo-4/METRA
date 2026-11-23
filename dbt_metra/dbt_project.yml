@@ -19,3 +19,12 @@ models:
     marts:
       +schema: gold
       +materialized: table
+    # Consumo: views agregadas com supressão de pequenos grupos, únicas relações
+    # publicadas para consumidores externos (ver macros/consumo.sql).
+    consumo:
+      +schema: consumo
+      +materialized: view
+
+vars:
+  # Mínimo de movimentações por grupo e de salários válidos por medida salarial.
+  metra_limite_publicacao: 5
