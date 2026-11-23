@@ -23,6 +23,8 @@ import unicodedata
 from typing import Any, Sequence
 
 import duckdb
+
+from src.metricas.camada_semantica import expressao as _m
 import numpy as np
 
 DIMENSAO_VETOR = 384
@@ -944,9 +946,8 @@ def consultar_indicadores_cbo(
 
     Segue estritamente as regras compartilhadas do contrato Gold:
     - Municípios identificados (`is_identificado = TRUE`) do Centro-Oeste (`is_centro_oeste = TRUE`), 2023-2026;
-    - Saldo = soma de `saldo_movimentacao`;
-    - Salário médio nominal de admissão = `sum(salario_mensal) / nullif(count(*), 0)` apenas sobre
-      eventos com `saldo_movimentacao = 1 AND salario_valido = TRUE`.
+    - Métricas compiladas da camada semântica única (`dbt_metra/models/semantic/metricas.yml`):
+      saldo, admissões, desligamentos e salário médio de admissão recomposto das medidas aditivas.
     """
     codigos_limpos = sorted({str(c).strip().zfill(6) for c in codigos_cbo if str(c).strip()})
     if not codigos_limpos:
@@ -972,20 +973,12 @@ def consultar_indicadores_cbo(
     resumo = conn.execute(
         f"""
         SELECT
-            COALESCE(COUNT(*) FILTER (WHERE f.saldo_movimentacao = 1), 0) AS admissoes,
-            COALESCE(COUNT(*) FILTER (WHERE f.saldo_movimentacao = -1), 0) AS desligamentos,
-            COALESCE(SUM(f.saldo_movimentacao), 0) AS saldo,
-            COALESCE(
-                SUM(CASE WHEN f.saldo_movimentacao = 1 AND f.salario_valido THEN f.salario_mensal ELSE 0 END),
-                0
-            ) AS soma_salarios_admissao,
-            COALESCE(
-                COUNT(*) FILTER (WHERE f.saldo_movimentacao = 1 AND f.salario_valido),
-                0
-            ) AS qtd_salarios_admissao,
-            SUM(CASE WHEN f.saldo_movimentacao = 1 AND f.salario_valido THEN f.salario_mensal ELSE 0 END)
-                / NULLIF(COUNT(*) FILTER (WHERE f.saldo_movimentacao = 1 AND f.salario_valido), 0)
-                AS salario_medio_admissao,
+            COALESCE({_m('admissoes', 'evento')}, 0) AS admissoes,
+            COALESCE({_m('desligamentos', 'evento')}, 0) AS desligamentos,
+            COALESCE({_m('saldo', 'evento')}, 0) AS saldo,
+            COALESCE({_m('soma_salarios_admissao', 'evento')}, 0) AS soma_salarios_admissao,
+            COALESCE({_m('qtd_salarios_admissao', 'evento')}, 0) AS qtd_salarios_admissao,
+            {_m('salario_medio_admissao', 'evento')} AS salario_medio_admissao,
             MIN(f.competencia) AS competencia_inicial,
             MAX(f.competencia) AS competencia_final
         FROM gold.fct_movimentacao f
@@ -1000,16 +993,11 @@ def consultar_indicadores_cbo(
             c.codigo_cbo,
             c.titulo_ocupacao,
             c.is_cadastro_oficial,
-            COALESCE(COUNT(f.id_movimentacao) FILTER (WHERE f.saldo_movimentacao = 1), 0) AS admissoes,
-            COALESCE(COUNT(f.id_movimentacao) FILTER (WHERE f.saldo_movimentacao = -1), 0) AS desligamentos,
-            COALESCE(SUM(f.saldo_movimentacao), 0) AS saldo,
-            COALESCE(
-                COUNT(f.id_movimentacao) FILTER (WHERE f.saldo_movimentacao = 1 AND f.salario_valido),
-                0
-            ) AS qtd_salarios_admissao,
-            SUM(CASE WHEN f.saldo_movimentacao = 1 AND f.salario_valido THEN f.salario_mensal ELSE 0 END)
-                / NULLIF(COUNT(f.id_movimentacao) FILTER (WHERE f.saldo_movimentacao = 1 AND f.salario_valido), 0)
-                AS salario_medio_admissao
+            COALESCE({_m('admissoes', 'evento')}, 0) AS admissoes,
+            COALESCE({_m('desligamentos', 'evento')}, 0) AS desligamentos,
+            COALESCE({_m('saldo', 'evento')}, 0) AS saldo,
+            COALESCE({_m('qtd_salarios_admissao', 'evento')}, 0) AS qtd_salarios_admissao,
+            {_m('salario_medio_admissao', 'evento')} AS salario_medio_admissao
         FROM gold.dim_cbo c
         LEFT JOIN gold.fct_movimentacao f
             ON c.codigo_cbo = f.codigo_cbo
@@ -1029,13 +1017,11 @@ def consultar_indicadores_cbo(
         f"""
         SELECT
             f.sigla_uf,
-            COUNT(*) FILTER (WHERE f.saldo_movimentacao = 1) AS admissoes,
-            COUNT(*) FILTER (WHERE f.saldo_movimentacao = -1) AS desligamentos,
-            SUM(f.saldo_movimentacao) AS saldo,
-            COUNT(*) FILTER (WHERE f.saldo_movimentacao = 1 AND f.salario_valido) AS qtd_salarios_admissao,
-            SUM(CASE WHEN f.saldo_movimentacao = 1 AND f.salario_valido THEN f.salario_mensal ELSE 0 END)
-                / NULLIF(COUNT(*) FILTER (WHERE f.saldo_movimentacao = 1 AND f.salario_valido), 0)
-                AS salario_medio_admissao
+            {_m('admissoes', 'evento')} AS admissoes,
+            {_m('desligamentos', 'evento')} AS desligamentos,
+            {_m('saldo', 'evento')} AS saldo,
+            {_m('qtd_salarios_admissao', 'evento')} AS qtd_salarios_admissao,
+            {_m('salario_medio_admissao', 'evento')} AS salario_medio_admissao
         FROM gold.fct_movimentacao f
         WHERE {where_sql}
         GROUP BY f.sigla_uf

@@ -4,8 +4,9 @@ Converte perguntas em linguagem natural em consultas SQL parametrizadas e audit�
 o schema `gold` do DuckDB, garantindo:
 1. Alinhamento exato com as 5 consultas de referência (`p1_setores_df` a `p5_perfil_remuneracao`)
    e com o contrato de indicadores por ocupação CBO (`gold.fct_movimentacao` + `gold.dim_cbo`).
-2. Recomposição estrita de médias salariais (`sum(soma_salarios_admissao) / nullif(sum(qtd_salarios_admissao), 0)`),
-   nunca realizando média de médias.
+2. Métricas compiladas da camada semântica única (`dbt_metra/models/semantic/metricas.yml`, via
+   `src.metricas.camada_semantica`): médias salariais sempre recompostas das medidas aditivas,
+   nunca realizando média de médias, e nenhuma fórmula escrita neste módulo.
 3. Validação estrutural e de segurança (`validar_sql_seguro`): bloqueia DDL/DML, múltiplas instruções,
    leitura de arquivos externos (por funções ou caminhos entre aspas em `FROM`/`JOIN`), tabelas fora do
    schema `gold` e consultas de linhas individuais sem agregação na projeção de `gold.fct_movimentacao` (LGPD).
@@ -22,6 +23,7 @@ from typing import Any, Iterable
 import duckdb
 
 from src.app.busca_cbo import IndiceVetorialCBO, normalizar_texto
+from src.metricas.camada_semantica import expressao as _m
 
 SECOES_CNAE_VALIDAS = frozenset("ABCDEFGHIJKLMNOPQRSTU")
 
@@ -339,6 +341,35 @@ def _extrair_filtros_pergunta(pergunta: str) -> dict[str, Any]:
     return filtros
 
 
+def _colunas_medidas_evento() -> str:
+    """Medidas aditivas sobre gold.fct_movimentacao, compiladas da camada semântica.
+
+    `coalesce` trata grupos sem evento; a fórmula de cada medida vem de metricas.yml.
+    """
+    return ",\n        ".join([
+        f"{_m('admissoes', 'evento')} as admissoes",
+        f"{_m('desligamentos', 'evento')} as desligamentos",
+        f"coalesce({_m('saldo', 'evento')}, 0) as saldo",
+        f"coalesce({_m('soma_salarios_admissao', 'evento')}, 0) as soma_salarios_admissao",
+        f"{_m('qtd_salarios_admissao', 'evento')} as qtd_salarios_admissao",
+    ])
+
+
+_COLUNAS_MEDIDAS_EVENTO = _colunas_medidas_evento()
+_COLUNAS_P4 = ",\n           ".join(
+    f"{_m(n, 'agregado')} as {n}" for n in (
+        "admissoes", "desligamentos", "saldo", "soma_salarios_admissao",
+        "qtd_salarios_admissao", "salario_medio_admissao", "indice_fluxos_pareados_pct",
+    )
+)
+_COLUNAS_P5 = ",\n           ".join(
+    f"{_m(n, 'agregado')} as {n}" for n in (
+        "admissoes", "desligamentos", "saldo", "soma_salarios_admissao",
+        "qtd_salarios_admissao", "salario_medio_admissao",
+    )
+)
+
+
 def _cte_base_setor_mensal(filtros: dict[str, Any], where_extra: str = "") -> str:
     """Gera a CTE `base` equivalente a `gold.fct_setor_mensal`, filtrando por CBO quando solicitado."""
     codigos_cbo = filtros.get("codigos_cbo")
@@ -360,13 +391,8 @@ def _cte_base_setor_mensal(filtros: dict[str, Any], where_extra: str = "") -> st
     where_sql = " and ".join(condicoes)
     return f"""select
         f.competencia, f.sigla_uf, f.codigo_secao,
-        count(*) filter (where f.saldo_movimentacao = 1) as admissoes,
-        count(*) filter (where f.saldo_movimentacao = -1) as desligamentos,
-        coalesce(sum(f.saldo_movimentacao), 0) as saldo,
-        coalesce(sum(case when f.saldo_movimentacao = 1 and f.salario_valido then f.salario_mensal else 0 end), 0) as soma_salarios_admissao,
-        count(*) filter (where f.saldo_movimentacao = 1 and f.salario_valido) as qtd_salarios_admissao,
-        sum(case when f.saldo_movimentacao = 1 and f.salario_valido then f.salario_mensal else 0 end)
-            / nullif(count(*) filter (where f.saldo_movimentacao = 1 and f.salario_valido), 0) as salario_medio_admissao
+        {_COLUNAS_MEDIDAS_EVENTO},
+        {_m('salario_medio_admissao', 'evento')} as salario_medio_admissao
     from gold.fct_movimentacao f
     where {where_sql}
     group by f.competencia, f.sigla_uf, f.codigo_secao"""
@@ -396,8 +422,9 @@ def _gerar_sql_p1(filtros: dict[str, Any]) -> str:
     where competencia between inicio and fim
 ), setores as (
     select codigo_secao,
-           sum(admissoes) as admissoes, sum(desligamentos) as desligamentos,
-           sum(saldo) as saldo
+           {_m('admissoes', 'agregado')} as admissoes,
+           {_m('desligamentos', 'agregado')} as desligamentos,
+           {_m('saldo', 'agregado')} as saldo
     from base cross join janela
     where sigla_uf = '{uf}' and codigo_secao <> 'Z'
       and competencia between inicio and fim
@@ -501,11 +528,7 @@ def _gerar_sql_p3(filtros: dict[str, Any]) -> str:
             conds.extend(clausulas_base)
         corpo_base = f"""select
         f.competencia, f.sigla_uf, f.is_capital,
-        count(*) filter (where f.saldo_movimentacao = 1) as admissoes,
-        count(*) filter (where f.saldo_movimentacao = -1) as desligamentos,
-        coalesce(sum(f.saldo_movimentacao), 0) as saldo,
-        coalesce(sum(case when f.saldo_movimentacao = 1 and f.salario_valido then f.salario_mensal else 0 end), 0) as soma_salarios_admissao,
-        count(*) filter (where f.saldo_movimentacao = 1 and f.salario_valido) as qtd_salarios_admissao,
+        {_COLUNAS_MEDIDAS_EVENTO},
         year(f.competencia)::integer as ano
     from gold.fct_movimentacao f
     where {' and '.join(conds)}
@@ -519,10 +542,11 @@ def _gerar_sql_p3(filtros: dict[str, Any]) -> str:
            case when grouping(competencia) = 0 then 'mensal'
                 when grouping(ano) = 0 then 'anual' else 'total' end as nivel,
            is_capital,
-           sum(admissoes) as admissoes, sum(desligamentos) as desligamentos,
-           sum(saldo) as saldo,
-           sum(soma_salarios_admissao) / nullif(sum(qtd_salarios_admissao), 0) as salario,
-           sum(qtd_salarios_admissao) as n_salarios
+           {_m('admissoes', 'agregado')} as admissoes,
+           {_m('desligamentos', 'agregado')} as desligamentos,
+           {_m('saldo', 'agregado')} as saldo,
+           {_m('salario_medio_admissao', 'agregado')} as salario,
+           {_m('qtd_salarios_admissao', 'agregado')} as n_salarios
     from base
     group by grouping sets (
         (competencia, sigla_uf, is_capital), (competencia, is_capital),
@@ -562,18 +586,10 @@ def _gerar_sql_p4(filtros: dict[str, Any]) -> str:
 
     return f"""with base as (
     {corpo_base}
-), totais as (
-    select codigo_secao,
-           sum(admissoes) as admissoes, sum(desligamentos) as desligamentos,
-           sum(saldo) as saldo,
-           sum(soma_salarios_admissao) as soma_salarios_admissao,
-           sum(qtd_salarios_admissao) as qtd_salarios_admissao
-    from base group by codigo_secao
 ), setores as (
-    select *, soma_salarios_admissao / nullif(qtd_salarios_admissao, 0) as salario_medio_admissao,
-           200.0 * least(admissoes, desligamentos)
-               / nullif(admissoes + desligamentos, 0) as indice_fluxos_pareados_pct
-    from totais
+    select codigo_secao,
+           {_COLUNAS_P4}
+    from base group by codigo_secao
 ), pares as (
     select * from setores
     where indice_fluxos_pareados_pct is not null and salario_medio_admissao is not null
@@ -627,11 +643,7 @@ def _gerar_sql_p5(filtros: dict[str, Any]) -> str:
         p.codigo_raca_cor, p.raca_cor,
         p.codigo_grau_instrucao, p.escolaridade,
         p.codigo_faixa_etaria, p.faixa_etaria,
-        count(*) filter (where f.saldo_movimentacao = 1) as admissoes,
-        count(*) filter (where f.saldo_movimentacao = -1) as desligamentos,
-        coalesce(sum(f.saldo_movimentacao), 0) as saldo,
-        coalesce(sum(case when f.saldo_movimentacao = 1 and f.salario_valido then f.salario_mensal else 0 end), 0) as soma_salarios_admissao,
-        count(*) filter (where f.saldo_movimentacao = 1 and f.salario_valido) as qtd_salarios_admissao
+        {_COLUNAS_MEDIDAS_EVENTO}
     from gold.fct_movimentacao f
     left join gold.dim_perfil_demografico p using (id_perfil_demografico)
     where {' and '.join(conds)}
@@ -658,16 +670,12 @@ def _gerar_sql_p5(filtros: dict[str, Any]) -> str:
     ) e(eixo, codigo_categoria, categoria)
 ), grupos as (
     select sigla_uf, is_capital, codigo_secao, eixo, codigo_categoria, categoria,
-           sum(admissoes) as admissoes, sum(desligamentos) as desligamentos,
-           sum(saldo) as saldo,
-           sum(soma_salarios_admissao) as soma_salarios_admissao,
-           sum(qtd_salarios_admissao) as qtd_salarios_admissao
+           {_COLUNAS_P5}
     from eixos group by sigla_uf, is_capital, codigo_secao, eixo, codigo_categoria, categoria
 ), referencias as (
-    select *, soma_salarios_admissao / nullif(qtd_salarios_admissao, 0) as salario_medio_admissao,
-           sum(admissoes) over recorte as admissoes_recorte,
-           sum(soma_salarios_admissao) over recorte
-               / nullif(sum(qtd_salarios_admissao) over recorte, 0) as salario_medio_recorte
+    select *,
+           {_m('admissoes', 'agregado', janela='recorte')} as admissoes_recorte,
+           {_m('salario_medio_admissao', 'agregado', janela='recorte')} as salario_medio_recorte
     from grupos
     window recorte as (partition by sigla_uf, is_capital, codigo_secao, eixo)
 )
@@ -700,12 +708,11 @@ def _gerar_sql_cbo(codigos_cbo: list[str], filtros: dict[str, Any]) -> str:
     c.codigo_cbo,
     c.titulo_ocupacao,
     c.is_cadastro_oficial,
-    coalesce(count(f.id_movimentacao) filter (where f.saldo_movimentacao = 1), 0) as admissoes,
-    coalesce(count(f.id_movimentacao) filter (where f.saldo_movimentacao = -1), 0) as desligamentos,
-    coalesce(sum(f.saldo_movimentacao), 0) as saldo,
-    coalesce(count(f.id_movimentacao) filter (where f.saldo_movimentacao = 1 and f.salario_valido), 0) as qtd_salarios_admissao,
-    sum(case when f.saldo_movimentacao = 1 and f.salario_valido then f.salario_mensal else 0 end)
-        / nullif(count(f.id_movimentacao) filter (where f.saldo_movimentacao = 1 and f.salario_valido), 0) as salario_medio_admissao
+    coalesce({_m('admissoes', 'evento')}, 0) as admissoes,
+    coalesce({_m('desligamentos', 'evento')}, 0) as desligamentos,
+    coalesce({_m('saldo', 'evento')}, 0) as saldo,
+    coalesce({_m('qtd_salarios_admissao', 'evento')}, 0) as qtd_salarios_admissao,
+    {_m('salario_medio_admissao', 'evento')} as salario_medio_admissao
 from gold.dim_cbo c
 left join gold.fct_movimentacao f
     on c.codigo_cbo = f.codigo_cbo
@@ -1055,7 +1062,7 @@ class AssistenteTextToSQL:
             titulo = f"P3 — Comparação de Saldo Líquido e Salário Médio de Admissão: Capitais vs. Interior{sufixo_cargo}"
             formula = (
                 "diferenca_saldo = saldo_capital - saldo_interior; "
-                "salario = SUM(soma_salarios_admissao) / NULLIF(SUM(qtd_salarios_admissao), 0); "
+                f"salario = {_m('salario_medio_admissao', 'agregado')}; "
                 "diferenca_salario = salario_capital - salario_interior."
             )
             ressalva = (
@@ -1066,7 +1073,7 @@ class AssistenteTextToSQL:
             sql = _gerar_sql_p4(filtros)
             titulo = f"P4 — Equilíbrio de Fluxos Pareados (Proxy) e Salário Médio por Seção CNAE{sufixo_cargo}"
             formula = (
-                "indice_fluxos_pareados_pct = 200.0 * LEAST(admissoes, desligamentos) / NULLIF(admissoes + desligamentos, 0); "
+                f"indice_fluxos_pareados_pct = {_m('indice_fluxos_pareados_pct', 'agregado')}; "
                 "correlacao_pearson = CORR(indice_fluxos_pareados_pct, salario_medio_admissao)."
             )
             ressalva = (
@@ -1132,8 +1139,8 @@ class AssistenteTextToSQL:
             sql = _gerar_sql_cbo(filtros["codigos_cbo"], filtros)
             titulo = f"Indicadores por Ocupação CBO 2002 (Busca Semântica: '{termo_cbo}')"
             formula = (
-                "admissoes = COUNT(*) FILTER (saldo = 1); desligamentos = COUNT(*) FILTER (saldo = -1); "
-                "saldo = SUM(saldo_movimentacao); salario_medio_admissao = SUM(salario_valido) / NULLIF(COUNT(salario_valido), 0)."
+                f"admissoes = {_m('admissoes', 'evento')}; desligamentos = {_m('desligamentos', 'evento')}; "
+                f"saldo = {_m('saldo', 'evento')}; salario_medio_admissao = {_m('salario_medio_admissao', 'evento')}."
             )
             ressalva = (
                 "Ocupações resolvidas via índice vetorial CBO 2002 (384 dimensões). "
