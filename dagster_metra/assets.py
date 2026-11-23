@@ -24,6 +24,7 @@ from dagster import (
 import duckdb
 import psycopg
 
+from src.acesso.base_consumo import RELACOES_CONSUMO, caminho_base_consumo, publicar as publicar_base_consumo
 from src.extracao.exportar_parquet import exportar
 from src.extracao.materializar_delta import materializar
 from src.ingestao.executar_pipeline import main as executar_pipeline_main
@@ -190,3 +191,22 @@ def conciliacao_mensal_asset(context: AssetExecutionContext) -> MaterializeResul
             "movimentacoes": sum(qtd for qtd, _ in oltp.values()),
         }
     )
+
+
+@asset(
+    name="base_consumo",
+    deps=[AssetKey(["consumo", relacao]) for relacao in RELACOES_CONSUMO],
+    group_name="consumo",
+    description=(
+        "Publica a base isolada que consumidores externos abrem: só as views agregadas "
+        "do schema consumo, sem acesso ao banco analítico nem ao lake."
+    ),
+    kinds={"python", "duckdb"},
+    retry_policy=POLITICA_RETRY,
+)
+def base_consumo_asset(context: AssetExecutionContext) -> MaterializeResult:
+    """Copia as views de consumo para data/metra_consumo.duckdb depois do dbt build."""
+
+    linhas = publicar_base_consumo(caminho_banco_analitico(), caminho_base_consumo())
+    context.log.info("Base de consumo publicada em %s", caminho_base_consumo())
+    return MaterializeResult(metadata={"destino": str(caminho_base_consumo()), **linhas})
