@@ -153,6 +153,9 @@ E4            | Análises e Visualizações  |
 │   │   ├── exportar_parquet.py   # Extração PostgreSQL (oltp) -> Parquet, com compressão configurável
 │   │   ├── materializar_delta.py # Materialização Parquet -> tabela Delta de movimentações
 │   │   └── validar_lake.py       # Confere a pergunta central em PostgreSQL, Parquet e Delta
+│   ├── acesso/
+│   │   ├── base_consumo.py       # Base de consumo isolada (só views consumo.*) e conexão do consumidor
+│   │   └── demonstrar_acesso.py  # Acessos permitidos e negados ao detalhe, por perfil
 │   ├── qualidade/
 │   │   └── verificar_fluxo.py    # Concilia contagem e saldo de Bronze, OLTP, Parquet, Delta, Silver e Gold
 │   ├── db/
@@ -174,6 +177,7 @@ E4            | Análises e Visualizações  |
 │   └── models/
 │       ├── staging/        # Silver: fontes Parquet e modelos stg_movimentacao, stg_municipio, stg_cbo, stg_cnae
 │       ├── marts/          # Gold: dimensões e fatos do Star Schema
+│       ├── consumo/        # Views agregadas públicas, com supressão de grupos com menos de 5
 │       └── semantic/       # Camada semântica: metricas.yml (definição única das métricas) e time spine
 ├── tests/
 │   └── test_cdc_replay.py  # Testes unitários de replay idempotente, transações incompletas e dados atrasados
@@ -467,6 +471,18 @@ streamlit run src/app/dashboard.py
 python -m unittest discover -s tests -p 'test_busca_e_text2sql.py' -v
 python -m src.app.avaliar_busca_e_text2sql --saida docs/adr/evidencias/0007-busca-semantica-e-text2sql.json
 ```
+
+### Controle de acesso (E4)
+
+Consumidores externos não abrem o banco analítico. O dbt publica as views agregadas `consumo.setor_mensal`, `consumo.geografia_mensal`, `consumo.perfil_mensal` e `consumo.calendario`, que omitem grupos com menos de 5 movimentações e anulam o salário com menos de 5 salários válidos. O asset `base_consumo` copia essas views para `data/metra_consumo.duckdb`, a única base que o consumidor abre: somente leitura, sem acesso externo e com a configuração travada, sem caminho até a Gold detalhada.
+
+```bash
+python -m src.acesso.base_consumo        # publica a base de consumo (o pipeline_metra já faz isso)
+python -m src.acesso.demonstrar_acesso   # acessos permitidos e negados, por perfil
+python -m unittest discover -s tests -p 'test_controle_acesso.py' -v
+```
+
+A demonstração também roda ao fim do fluxo completo. Perfis, saída esperada e limites estão em [Consumo e governança](docs/consumo-e-governanca.md#controle-de-acesso).
 
 ---
 

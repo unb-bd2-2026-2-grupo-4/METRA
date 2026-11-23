@@ -17,9 +17,11 @@ lake/* (cinco sources Parquet virtuais)
     ↓
 Silver (stg_*)  →  snapshots/snp_cbo (SCD tipo 2)
     ↓
-Gold (dim_* e fct_*)
+Gold (dim_* e fct_*)  →  conciliacao_mensal (particionado por competência)
     ↓
-conciliacao_mensal (particionado por competência)
+consumo (views agregadas com supressão)
+    ↓
+base_consumo (data/metra_consumo.duckdb)
 ```
 
 Na interface, o grafo completo aparece com as dependências entre as etapas Python, os sources do lake e os modelos Silver e Gold:
@@ -43,6 +45,8 @@ A decisão arquitetural da equipe está registrada na [ADR 0006](adr/0006-orques
 | `stg_*` | Limpar, padronizar e cruzar os Parquets | `dbt build` no DuckDB, schema `silver` |
 | `snp_cbo` | Capturar novas versões das ocupações CBO (SCD tipo 2) | `dbt build` no DuckDB, schema `snapshots` |
 | `dim_*` e `fct_*` | Disponibilizar dimensões, histórico da CBO, fato detalhada e agregados Gold | `dbt build` no DuckDB, schema `gold` |
+| `consumo/*` | Views agregadas com supressão de grupos com menos de 5 ([controle de acesso](consumo-e-governanca.md#controle-de-acesso)) | `dbt build` no DuckDB, schema `consumo` |
+| `base_consumo` | Copiar as views de consumo para a base que consumidores externos abrem | Atualiza `data/metra_consumo.duckdb` |
 | `conciliacao_mensal` | Conferir, por competência, contagem e saldo do OLTP contra a fato Gold | Partição mensal; falha se houver divergência |
 
 Os cinco sources são `movimentacao`, `municipio`, `cbo_2002`, `cnae_subclasse` e `cnae_secao`. Cada spec virtual recebe `exportar_parquet` como dependência adicional; as demais dependências entre sources, Silver e Gold vêm do manifesto dbt.
@@ -143,7 +147,7 @@ Definidos em `dagster_metra/assets.py` e `dagster_metra/definitions.py`:
 | Recurso | Configuração |
 |---|---|
 | Retry | `POLITICA_RETRY` em todos os assets: até 3 novas tentativas, espera exponencial a partir de 10 s, com variação aleatória. As etapas são idempotentes (a carga ignora arquivos já ingeridos, a extração troca o lake atomicamente e o dbt reconstrói os modelos), então repetir não duplica dados. A conciliação não repete quando encontra divergência real, só em falhas transitórias. |
-| Job `pipeline_metra` | `executar_pipeline` → `exportar_parquet` → `materializar_delta` e `dbt build` (Silver, snapshot e Gold). |
+| Job `pipeline_metra` | `executar_pipeline` → `exportar_parquet` → `materializar_delta` e `dbt build` (Silver, snapshot, Gold e consumo) → `base_consumo`. |
 | Schedule `pipeline_metra_mensal` | Dia 5 de cada mês, às 6h (America/Sao_Paulo), acompanhando a publicação mensal do Novo CAGED. |
 | Job `conciliacao_mensal_job` e schedule `conciliacao_mensal` | Asset particionado por mês desde jan/2023; o schedule concilia o mês anterior no dia 5, às 8h. |
 | Backfill | `BackfillPolicy.single_run()`: um intervalo de competências é reprocessado em uma única execução. |

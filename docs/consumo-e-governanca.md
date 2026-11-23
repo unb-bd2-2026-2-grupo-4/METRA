@@ -1,6 +1,6 @@
 # Consumo e governança
 
-**Documento de integração atualizado em 22/11/2026.** O repositório já contém ingestão, OLTP, exportação Parquet/Delta, camadas Silver e Gold com 176 testes dbt de qualidade, SCD tipo 2 da CBO (`gold.dim_cbo_historico`), orquestração Dagster (com retry, schedule e backfill) e a integração da Busca Semântica CBO + Assistente Text-to-SQL Governado no painel Streamlit (`src/app/dashboard.py`), validada na [ADR-0007](adr/0007-busca-semantica-e-consumo.md), e a camada semântica única de métricas (`dbt_metra/models/semantic/metricas.yml`), consumida por dbt, painel e assistente. Os pontos de controle de acesso formal, LGPD institucional e ETL reverso seguem em consolidação para o fechamento da E4.
+**Documento de integração atualizado em 22/11/2026.** O repositório já contém ingestão, OLTP, exportação Parquet/Delta, camadas Silver e Gold com 176 testes dbt de qualidade, SCD tipo 2 da CBO (`gold.dim_cbo_historico`), orquestração Dagster (com retry, schedule e backfill) e a integração da Busca Semântica CBO + Assistente Text-to-SQL Governado no painel Streamlit (`src/app/dashboard.py`), validada na [ADR-0007](adr/0007-busca-semantica-e-consumo.md), e a camada semântica única de métricas (`dbt_metra/models/semantic/metricas.yml`), consumida por dbt, painel e assistente. O controle de acesso por views de consumo agregadas e base de consumo isolada está implementado e demonstrado; LGPD institucional e ETL reverso seguem em consolidação para o fechamento da E4.
 
 ## Camada semântica: catálogo único de métricas
 
@@ -76,13 +76,67 @@ O modelo atual não contém CPF ou nome do trabalhador, mas combina município, 
 | Finalidade | Análise acadêmica agregada do mercado formal | Registrar responsável institucional e escopo aprovado |
 | Base legal | **Pendente de validação institucional** | Documentar a hipótese aplicável; não presumir que dado público ou trabalho acadêmico resolve todo enquadramento |
 | Minimização | Painel implementado (`src/app/dashboard.py`) expõe apenas métricas agregadas da Gold; sem linhagem individual nas telas públicas e com bloqueio de linhas individuais no validador Text-to-SQL | Criar visões/relações dedicadas caso outros processos de consumo acessem o banco sem passar pelo validador da aplicação |
-| Pequenos grupos | Proposta de suprimir resultados com menos de 5 observações salariais válidas | Validar limiar e ataques por diferença entre filtros; limiar isolado não prova anonimização |
+| Pequenos grupos | Implementado nas views `consumo.*`: grupos com menos de 5 movimentações são omitidos e medidas salariais com menos de 5 salários válidos ficam nulas (ver [Controle de acesso](#controle-de-acesso)) | Validar o limiar e os ataques por diferença entre recortes; o limiar isolado não prova anonimização |
 | Retenção | Proposta: manter artefatos locais até 30 dias após encerramento da avaliação e recursos, sujeito à política institucional | Aprovar prazo, inventariar cópias e automatizar descarte; nenhum descarte executado nesta tarefa |
 | Descarte | Remover cópias locais, índices, backups e logs conforme política aprovada | Documentar execução e verificar ausência de cópias não autorizadas |
 | Repositório público | Já contém amostra de microdados | Revisar risco e finalidade da publicação; ignorar arquivos novos não remove histórico Git existente |
 | Modelo externo | Nenhum provedor escolhido nesta proposta | Definir dados permitidos, custos e retenção antes de enviar perguntas ou contexto |
 
-**Controle de acesso proposto:** separar execução do pipeline e processo de consumo; publicar apenas relações/arquivos agregados aprovados e dar ao processo do painel acesso somente a esse artefato. Uma conexão DuckDB `read_only` impede escrita no banco, mas não implementa por si só recorte de linha/coluna. Demonstrar um acesso permitido e uma tentativa negada ao detalhe antes de considerar atendido o checklist da E4.
+## Controle de acesso
+
+Uma conexão DuckDB `read_only` impede escrita, mas não recorta linhas nem colunas: quem abre `data/metra_analitico.duckdb` lê `gold.fct_movimentacao`, com uma linha por movimentação. O DuckDB também não tem usuários nem `GRANT`. Por isso, o acesso é separado em duas camadas.
+
+**1. Views de consumo agregadas** (`dbt_metra/models/consumo/`, schema `consumo`): as únicas relações publicadas para consumidores externos.
+
+| View | Grão |
+|---|---|
+| `consumo.setor_mensal` | competência × UF × seção CNAE (P1, P2 e P4) |
+| `consumo.geografia_mensal` | competência × UF × capital/interior (P3) |
+| `consumo.perfil_mensal` | competência × UF × capital/interior × seção × categoria de um eixo demográfico por vez (P5) |
+| `consumo.calendario` | competência, com `tem_dados` |
+
+A macro `publicar_grupos` (`dbt_metra/macros/consumo.sql`) recompõe as medidas pela camada semântica e aplica a supressão com o limite da variável `metra_limite_publicacao` (5):
+
+- grupos com `admissoes + desligamentos < 5` são omitidos;
+- com menos de 5 salários válidos (inclusive zero), `soma_salarios_admissao` e `qtd_salarios_admissao` ficam nulas juntas, e os fluxos permanecem;
+- os eixos demográficos não se cruzam: cruzar sexo, raça/cor, escolaridade e idade criaria grupos menores.
+
+As views expõem só dimensões agregadas e medidas aditivas: nenhum identificador de movimentação, município ou CBO. Os testes em `_consumo__models.yml` fixam as colunas e os tipos de cada view, conferem o limite e a supressão salarial, e um teste singular confere que setores e geografia publicam exatamente os grupos liberados da Gold, com os mesmos fluxos. Sem a supressão na macro, três testes falham.
+
+**2. Base de consumo isolada** (`src/acesso/base_consumo.py`): o asset `base_consumo` do Dagster copia as quatro views para `data/metra_consumo.duckdb` a cada execução do `pipeline_metra`, com troca atômica. O consumidor externo abre só esse arquivo, por `conectar_consumidor()`: somente leitura, com `enable_external_access = false` e `lock_configuration = true`. O detalhe não está no arquivo, e a configuração travada impede alcançá-lo por `ATTACH`, `read_parquet` ou `COPY`.
+
+| Perfil | Abre | Pode | Não pode |
+|---|---|---|---|
+| Consumidor externo (JSON público, Pages, agente) | `data/metra_consumo.duckdb` | ler `consumo.*` | ler a Gold, anexar o banco analítico, ler o lake, exportar arquivos, alterar a configuração ou escrever |
+| Analista interno (painel Streamlit, dbt, Dagster) | `data/metra_analitico.duckdb` em `read_only` | ler Silver, Gold e consumo | escrever (só o pipeline escreve) |
+
+O painel Streamlit continua sendo uma ferramenta interna: lê a Gold detalhada e protege o detalhe com o validador do Text-to-SQL, não com esta base.
+
+### Demonstração
+
+`python -m src.acesso.demonstrar_acesso` executa cada tentativa e falha se algum resultado divergir do esperado. Ela roda ao fim do serviço `pipeline` do perfil `completo`, então o fluxo do zero (`sh scripts/metra-do-zero.sh`) também falha se um acesso negado passar. Saída sobre a amostra:
+
+```text
+[    ok    ] consumidor agregado por setor         PERMITIDO (1681,)
+[    ok    ] consumidor perfis um eixo por vez     PERMITIDO (11326,)
+[    ok    ] consumidor detalhe da Gold            NEGADO    CatalogException: Catalog Error: Table with name "gold.fct_movimentacao" does not exist ...
+[    ok    ] consumidor anexar o banco analítico   NEGADO    PermissionException: Permission Error: Cannot access file ".../metra_analitico.duckdb" ...
+[    ok    ] consumidor ler o lake Parquet         NEGADO    PermissionException: Permission Error: Cannot access file ".../lake/parquet/movimentacao/**/*.parquet" ...
+[    ok    ] consumidor religar o acesso externo   NEGADO    InvalidInputException: Invalid Input Error: Cannot change configuration option "enable_external_access" ...
+[    ok    ] consumidor exportar para arquivo      NEGADO    PermissionException: Permission Error: Cannot access file "consumo.csv" ...
+[    ok    ] analista   detalhe da Gold            PERMITIDO (49178,)
+[    ok    ] analista   alterar a Gold             NEGADO    InvalidInputException: Invalid Input Error: Cannot execute statement of type "DELETE" ...
+
+Controle de acesso conforme o esperado.
+```
+
+A leitura do detalhe é uma contagem, para que nem a demonstração imprima registros individuais.
+
+### Limites
+
+- **Proteção por arquivo, não por usuário.** O controle vale para quem recebe só a base de consumo. Quem tem acesso ao sistema de arquivos com `data/metra_analitico.duckdb`, ao lake ou ao PostgreSQL continua lendo o detalhe; a separação desses ambientes é operacional.
+- **Ataques por diferença.** A supressão é aplicada em cada view, isoladamente. Um grupo omitido pode ser estimado subtraindo, do total de um recorte publicado, os grupos publicados de outro (por exemplo, a geografia de uma UF menos os setores publicados dessa UF). A análise desse risco e do limiar fica com a frente de LGPD.
+- **Amostra do repositório.** `data/caged_centro_oeste_amostra.csv` continua público no repositório; o controle de acesso não muda isso.
 
 ## Operação e freshness
 
@@ -98,6 +152,7 @@ Um caminho possível é exportar um resumo mensal validado de saldo e remuneraç
 - [x] Centralizar a definição de cada métrica na camada semântica (`metricas.yml`), com marts, análises, painel, busca CBO e assistente compilando dela e teste que impede fórmula duplicada (E4).
 - [x] Integrar painel Streamlit (`src/app/dashboard.py`), busca semântica CBO e consulta em linguagem natural conforme [ADR-0007](adr/0007-busca-semantica-e-consumo.md).
 - [x] Demonstrar SCD tipo 2 (`snp_cbo` / `gold.dim_cbo_historico`), retry, schedule mensal e backfill no Dagster, com consumo em modo somente leitura após materialização da Gold.
-- [ ] Validar base legal da LGPD, retenção, pequenos grupos e controle de acesso (além de `read_only`); guardar evidências reais (E4).
+- [x] Controle de acesso além de `read_only`: views `consumo.*` com supressão de grupos com menos de 5 movimentações, base de consumo isolada e demonstração de acesso permitido e negado ao detalhe (E4).
+- [ ] Validar base legal da LGPD, retenção, o limiar de pequenos grupos e os ataques por diferença; guardar evidências reais (E4).
 - [ ] Implementar e demonstrar o caminho de ETL reverso com seu consumidor (E4).
 - [ ] Atualizar diários e registro de IA conforme as atividades da E4 ocorrerem; não antecipar evidências de execução futura.
