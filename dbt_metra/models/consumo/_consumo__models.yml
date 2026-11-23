@@ -41,14 +41,27 @@ models:
             expression: "qtd_salarios_admissao is null or qtd_salarios_admissao >= {{ var('metra_limite_publicacao') }}"
     columns:
       - name: competencia
+        description: "Primeiro dia do mês de ocorrência da movimentação (DATE)."
         data_tests: [not_null]
       - name: sigla_uf
+        description: "Sigla da Unidade da Federação no Centro-Oeste (DF, GO, MT ou MS)."
         data_tests:
           - accepted_values:
               arguments:
                 values: [DF, GO, MT, MS]
       - name: codigo_secao
+        description: "Código da seção da CNAE 2.0 (A–U ou Z para não identificada)."
         data_tests: [not_null]
+      - name: admissoes
+        description: "Total de admissões do grupo (publicado somente quando admissoes + desligamentos >= 5)."
+      - name: desligamentos
+        description: "Total de desligamentos do grupo (publicado somente quando admissoes + desligamentos >= 5)."
+      - name: saldo
+        description: "Saldo líquido de vínculos no grupo (admissoes - desligamentos)."
+      - name: soma_salarios_admissao
+        description: "Soma em R$ nominais dos salários válidos de admissão; NULL quando qtd_salarios_admissao < 5."
+      - name: qtd_salarios_admissao
+        description: "Denominador de admissões com salário válido; NULL quando menor que 5 observações."
 
   - name: geografia_mensal
     description: >
@@ -74,14 +87,27 @@ models:
       - *salario_publicavel
     columns:
       - name: competencia
+        description: "Primeiro dia do mês de ocorrência da movimentação (DATE)."
         data_tests: [not_null]
       - name: sigla_uf
+        description: "Sigla da Unidade da Federação no Centro-Oeste (DF, GO, MT ou MS)."
         data_tests:
           - accepted_values:
               arguments:
                 values: [DF, GO, MT, MS]
       - name: is_capital
+        description: "Verdadeiro para as capitais (Brasília, Goiânia, Cuiabá e Campo Grande); falso para municípios do interior."
         data_tests: [not_null]
+      - name: admissoes
+        description: "Total de admissões do grupo (publicado somente quando admissoes + desligamentos >= 5)."
+      - name: desligamentos
+        description: "Total de desligamentos do grupo (publicado somente quando admissoes + desligamentos >= 5)."
+      - name: saldo
+        description: "Saldo líquido de vínculos no grupo (admissoes - desligamentos)."
+      - name: soma_salarios_admissao
+        description: "Soma em R$ nominais dos salários válidos de admissão; NULL quando qtd_salarios_admissao < 5."
+      - name: qtd_salarios_admissao
+        description: "Denominador de admissões com salário válido; NULL quando menor que 5 observações."
 
   - name: perfil_mensal
     description: >
@@ -111,15 +137,36 @@ models:
       - *salario_suprimido_junto
       - *salario_publicavel
     columns:
+      - name: competencia
+        description: "Primeiro dia do mês de ocorrência da movimentação (DATE)."
+      - name: sigla_uf
+        description: "Sigla da Unidade da Federação no Centro-Oeste (DF, GO, MT ou MS)."
+      - name: is_capital
+        description: "Verdadeiro para capital e falso para interior."
+      - name: codigo_secao
+        description: "Código da seção da CNAE 2.0 (A–U ou Z)."
       - name: eixo
+        description: "Dimensão sociodemográfica avaliada isoladamente (sexo, raca_cor, escolaridade ou faixa_etaria)."
         data_tests:
           - accepted_values:
               arguments:
                 values: [sexo, raca_cor, escolaridade, faixa_etaria]
       - name: codigo_categoria
+        description: "Código inteiro da categoria demográfica dentro do eixo correspondente."
         data_tests: [not_null]
       - name: categoria
+        description: "Rótulo textual da categoria demográfica (ex.: Mulher, Parda, Superior Completo)."
         data_tests: [not_null]
+      - name: admissoes
+        description: "Total de admissões da categoria (publicado somente quando admissoes + desligamentos >= 5)."
+      - name: desligamentos
+        description: "Total de desligamentos da categoria (publicado somente quando admissoes + desligamentos >= 5)."
+      - name: saldo
+        description: "Saldo líquido de vínculos na categoria (admissoes - desligamentos)."
+      - name: soma_salarios_admissao
+        description: "Soma em R$ nominais dos salários válidos de admissão; NULL quando qtd_salarios_admissao < 5."
+      - name: qtd_salarios_admissao
+        description: "Denominador de admissões com salário válido; NULL quando menor que 5 observações."
 
   - name: calendario
     description: >
@@ -133,6 +180,8 @@ models:
               tem_dados: BOOLEAN
     columns:
       - name: competencia
+        description: "Primeiro dia do mês no intervalo contínuo observado na base (DATE)."
         data_tests: [unique, not_null]
       - name: tem_dados
+        description: "Verdadeiro quando a competência possui movimentações registradas na origem Silver."
         data_tests: [not_null]
