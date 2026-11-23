@@ -26,6 +26,7 @@ from src.app.banco_analitico import (
     obter_caminho_duckdb,
 )
 from src.app.busca_cbo import IndiceVetorialCBO, consultar_indicadores_cbo
+from src.metricas.camada_semantica import expressao as _m, recorte_padrao
 from src.app.text_to_sql import (
     SECOES_CNAE_VALIDAS,
     AssistenteTextToSQL,
@@ -184,18 +185,18 @@ def obter_conexao_cached(caminho_str: str) -> duckdb.DuckDBPyConnection:
 def carregar_recursos_analiticos(caminho_str: str) -> tuple[IndiceVetorialCBO, AssistenteTextToSQL, dict[str, Any]]:
     conn = obter_conexao_cached(caminho_str)
     indice = IndiceVetorialCBO.de_conexao_duckdb(conn)
-    row = conn.execute("""
+    # Métricas e recorte vêm da camada semântica única (metricas.yml).
+    row = conn.execute(f"""
         SELECT
             COUNT(*) AS total_mov,
-            COUNT(*) FILTER (WHERE saldo_movimentacao = 1) AS admissoes,
-            COUNT(*) FILTER (WHERE saldo_movimentacao = -1) AS desligamentos,
-            COALESCE(SUM(saldo_movimentacao), 0) AS saldo,
-            SUM(CASE WHEN saldo_movimentacao = 1 AND salario_valido THEN salario_mensal ELSE 0 END)
-                / NULLIF(COUNT(*) FILTER (WHERE saldo_movimentacao = 1 AND salario_valido), 0) AS sal_medio,
+            {_m('admissoes', 'evento')} AS admissoes,
+            {_m('desligamentos', 'evento')} AS desligamentos,
+            COALESCE({_m('saldo', 'evento')}, 0) AS saldo,
+            {_m('salario_medio_admissao', 'evento')} AS sal_medio,
             MIN(competencia)::VARCHAR AS comp_min,
             MAX(competencia)::VARCHAR AS comp_max
         FROM gold.fct_movimentacao
-        WHERE is_identificado AND is_centro_oeste AND ano BETWEEN 2023 AND 2026
+        WHERE {recorte_padrao()}
     """).fetchone()
 
     resumo = {
@@ -312,11 +313,11 @@ def consultar_kpis_recorte_cached(
     row = conn.execute(f"""
         WITH base AS ({corpo_base})
         SELECT
-            COALESCE(SUM(admissoes), 0) AS admissoes,
-            COALESCE(SUM(desligamentos), 0) AS desligamentos,
-            COALESCE(SUM(saldo), 0) AS saldo,
-            SUM(soma_salarios_admissao) / NULLIF(SUM(qtd_salarios_admissao), 0) AS salario_medio,
-            COALESCE(SUM(qtd_salarios_admissao), 0) AS qtd_salarios
+            COALESCE({_m('admissoes', 'agregado')}, 0) AS admissoes,
+            COALESCE({_m('desligamentos', 'agregado')}, 0) AS desligamentos,
+            COALESCE({_m('saldo', 'agregado')}, 0) AS saldo,
+            {_m('salario_medio_admissao', 'agregado')} AS salario_medio,
+            COALESCE({_m('qtd_salarios_admissao', 'agregado')}, 0) AS qtd_salarios
         FROM base
     """).fetchone()
 
@@ -810,6 +811,46 @@ def render_p4_rotatividade(
         st.dataframe(df_tab, hide_index=True, height=300)
 
 
+def consolidar_eixo_p5(df_eixo: pd.DataFrame) -> tuple[pd.DataFrame, float]:
+    """Consolida a P5 por categoria com as métricas da camada semântica (sem fórmula em pandas).
+
+    Retorna o consolidado por categoria e a média salarial ponderada do eixo (NaN sem salário válido).
+    """
+    medidas = ["admissoes", "desligamentos", "saldo", "soma_salarios_admissao", "qtd_salarios_admissao"]
+    base = df_eixo[["codigo_categoria", "categoria", *medidas]].copy()
+    for col in medidas:
+        base[col] = pd.to_numeric(base[col], errors="coerce")
+    # Mesmo recorte do groupby anterior do pandas: chaves nulas ficam de fora.
+    filtro = "where codigo_categoria is not null and categoria is not null"
+    with duckdb.connect() as conn:
+        conn.register("eixo_bruto", base)
+        # Salários voltam a DECIMAL (centavos exatos, como na Gold) antes de somar.
+        conn.execute("""
+            create temp table eixo as
+            select * replace (round(soma_salarios_admissao, 2)::decimal(38, 2) as soma_salarios_admissao)
+            from eixo_bruto
+        """)
+        consolidado = conn.execute(f"""
+            select codigo_categoria, categoria,
+                   {_m('admissoes', 'agregado')}::bigint as admissoes,
+                   {_m('desligamentos', 'agregado')}::bigint as desligamentos,
+                   {_m('saldo', 'agregado')}::bigint as saldo,
+                   {_m('soma_salarios_admissao', 'agregado')}::double as soma_sal,
+                   {_m('qtd_salarios_admissao', 'agregado')}::bigint as qtd_sal,
+                   ({_m('salario_medio_admissao', 'agregado')})::double as salario_medio
+            from eixo {filtro}
+            group by codigo_categoria, categoria
+            order by codigo_categoria, categoria
+        """).df()
+        media = conn.execute(
+            f"select ({_m('salario_medio_admissao', 'agregado')})::double from eixo {filtro}"
+        ).fetchone()[0]
+    consolidado["salario_medio"] = consolidado["salario_medio"].astype(object).where(
+        consolidado["salario_medio"].notna(), None
+    )
+    return consolidado, (float(media) if media is not None else float("nan"))
+
+
 def render_p5_sociodemografico(
     df_bruto: pd.DataFrame,
     filtros: dict[str, Any],
@@ -860,25 +901,9 @@ def render_p5_sociodemografico(
         st.info("Sem registros para a dimensão selecionada neste recorte.")
         return resposta_efetiva
 
-    consolidado = (
-        df_eixo.groupby(["codigo_categoria", "categoria"], as_index=False)
-        .agg(
-            admissoes=("admissoes", "sum"),
-            desligamentos=("desligamentos", "sum"),
-            saldo=("saldo", "sum"),
-            soma_sal=("soma_salarios_admissao", "sum"),
-            qtd_sal=("qtd_salarios_admissao", "sum"),
-        )
-    )
+    consolidado, media_geral = consolidar_eixo_p5(df_eixo)
     total_adm = int(consolidado["admissoes"].sum())
-    soma_sal = float(consolidado["soma_sal"].sum())
     qtd_sal = int(consolidado["qtd_sal"].sum())
-    media_geral = (soma_sal / qtd_sal) if qtd_sal > 0 else float("nan")
-
-    consolidado["salario_medio"] = consolidado.apply(
-        lambda r: (float(r["soma_sal"]) / int(r["qtd_sal"])) if int(r["qtd_sal"]) > 0 else None,
-        axis=1,
-    )
     consolidado["participacao_pct"] = consolidado["admissoes"].map(
         lambda a: (100.0 * float(a) / total_adm) if total_adm > 0 else 0.0
     )

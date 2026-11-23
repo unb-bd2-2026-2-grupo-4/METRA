@@ -136,6 +136,8 @@ services:
       # Somente leitura: o painel nunca cria, altera ou apaga o banco analítico.
       - ./data:/app/data:ro
       - ./src:/app/src:ro
+      # Camada semântica: mesma definição de métricas usada pelo dbt.
+      - ./dbt_metra/models/semantic:/app/dbt_metra/models/semantic:ro
 
   # O mesmo painel no perfil completo: só sobe se o pipeline terminar com sucesso.
   painel-completo:

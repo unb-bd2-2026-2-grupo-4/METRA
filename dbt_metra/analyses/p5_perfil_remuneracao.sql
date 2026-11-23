@@ -17,17 +17,17 @@ with base as (
         ('faixa_etaria', b.codigo_faixa_etaria, b.faixa_etaria)
     ) e(eixo, codigo_categoria, categoria)
 ), grupos as (
+    -- Métricas recompostas das medidas aditivas pela camada semântica (metricas.yml).
     select sigla_uf, is_capital, codigo_secao, eixo, codigo_categoria, categoria,
-           sum(admissoes) as admissoes, sum(desligamentos) as desligamentos,
-           sum(saldo) as saldo,
-           sum(soma_salarios_admissao) as soma_salarios_admissao,
-           sum(qtd_salarios_admissao) as qtd_salarios_admissao
+           {%- for m in ['admissoes', 'desligamentos', 'saldo', 'soma_salarios_admissao',
+                         'qtd_salarios_admissao', 'salario_medio_admissao'] %}
+           {{ metrica(m, 'agregado') }} as {{ m }}{{ ',' if not loop.last }}
+           {%- endfor %}
     from eixos group by sigla_uf, is_capital, codigo_secao, eixo, codigo_categoria, categoria
 ), referencias as (
-    select *, soma_salarios_admissao / nullif(qtd_salarios_admissao, 0) as salario_medio_admissao,
-           sum(admissoes) over recorte as admissoes_recorte,
-           sum(soma_salarios_admissao) over recorte
-               / nullif(sum(qtd_salarios_admissao) over recorte, 0) as salario_medio_recorte
+    select *,
+           {{ metrica('admissoes', 'agregado', janela='recorte') }} as admissoes_recorte,
+           {{ metrica('salario_medio_admissao', 'agregado', janela='recorte') }} as salario_medio_recorte
     from grupos
     window recorte as (partition by sigla_uf, is_capital, codigo_secao, eixo)
 )

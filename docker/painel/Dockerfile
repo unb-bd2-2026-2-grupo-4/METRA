@@ -6,6 +6,8 @@ COPY requirements-pipeline.txt .
 RUN pip install --no-cache-dir -r requirements-pipeline.txt
 
 COPY src/ src/
+# Camada semântica: definição única das métricas lida pelo painel e pelo assistente.
+COPY dbt_metra/models/semantic/ dbt_metra/models/semantic/
 
 ENV PYTHONPATH=/app
 # Banco analítico gerado pelo dbt/Dagster; o painel apenas lê este arquivo.

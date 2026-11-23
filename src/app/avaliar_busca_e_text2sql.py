@@ -27,7 +27,6 @@ import hashlib
 import json
 from pathlib import Path
 import platform
-import re
 import statistics
 import sys
 import tempfile
@@ -97,10 +96,23 @@ CODIGOS_EXATOS_TESTE: tuple[str, ...] = (
 
 
 def _carregar_sql_analise_dbt(nome_analise: str) -> str:
-    """Lê o arquivo SQL canônico em `dbt_metra/analyses/<nome>.sql` e resolve `{{ ref('...') }}`."""
+    """Lê o SQL canônico em `dbt_metra/analyses/<nome>.sql` e renderiza o seu Jinja.
+
+    Resolve `{{ ref('...') }}` para `gold.<modelo>` e `{{ metrica(...) }}` com o compilador
+    Python da camada semântica, que gera o mesmo SQL do macro dbt (conferido em
+    tests/test_camada_semantica.py). Não depende de arquivos compilados em target/.
+    """
+    from jinja2 import Environment, StrictUndefined
+
+    from src.metricas.camada_semantica import expressao
+
     caminho = DBT_PROJECT_DIR / "analyses" / f"{nome_analise}.sql"
     conteudo = caminho.read_text(encoding="utf-8")
-    return re.sub(r"\{\{\s*ref\(\s*'([^']+)'\s*\)\s*\}\}", r"gold.\1", conteudo)
+    ambiente = Environment(undefined=StrictUndefined, keep_trailing_newline=True)
+    return ambiente.from_string(conteudo).render(
+        ref=lambda modelo: f"gold.{modelo}",
+        metrica=lambda nome, origem="evento", janela=None: expressao(nome, origem, janela),
+    )
 
 
 # SQLs de referência escritos à mão (independentes do gerador em text_to_sql.py) para consultas com filtros
