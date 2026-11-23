@@ -102,6 +102,55 @@ class GoldIntegracaoTest(unittest.TestCase):
              "id_perfil_demografico"),
         )
 
+    def test_camada_semantica_mesmo_valor_em_eventos_e_marts(self):
+        # Uma métrica, um valor: recompor a partir dos eventos ou de cada mart dá o mesmo número.
+        from src.metricas.camada_semantica import montar_consulta
+
+        metricas = ["admissoes", "desligamentos", "saldo", "qtd_salarios_admissao",
+                    "salario_medio_admissao", "indice_fluxos_pareados_pct"]
+        casos = [
+            ("gold.fct_setor_mensal", ["ano", "sigla_uf", "codigo_secao"]),
+            ("gold.fct_geografia_mensal", ["ano", "sigla_uf", "is_capital"]),
+            ("gold.fct_perfil_mensal", ["sigla_uf", "is_capital"]),
+            ("gold.fct_setor_mensal", []),
+        ]
+        for tabela, dimensoes in casos:
+            eventos = self.conn.execute(
+                montar_consulta(metricas, dimensoes, tabela="gold.fct_movimentacao")).fetchall()
+            agregado = self.conn.execute(montar_consulta(metricas, dimensoes, tabela=tabela)).fetchall()
+            with self.subTest(tabela=tabela, dimensoes=dimensoes):
+                self.assertTrue(eventos, "A Gold real não retornou dados.")
+                self.assertEqual(len(eventos), len(agregado))
+                for linha_e, linha_a in zip(eventos, agregado):
+                    for valor_e, valor_a in zip(linha_e, linha_a):
+                        if isinstance(valor_e, float) or isinstance(valor_a, float):
+                            self.assertAlmostEqual(float(valor_e), float(valor_a), places=7)
+                        else:
+                            self.assertEqual(valor_e, valor_a)
+
+    def test_kpis_do_painel_vem_da_camada_semantica(self):
+        from src.app import dashboard
+        from src.metricas.camada_semantica import montar_consulta
+
+        consultar_kpis = getattr(dashboard.consultar_kpis_recorte_cached, "__wrapped__",
+                                 dashboard.consultar_kpis_recorte_cached)
+        banco = os.environ.get("METRA_DUCKDB", str(ROOT / "data" / "metra_analitico.duckdb"))
+        for uf, ano in [(None, None), ("GO", 2025), ("DF", None)]:
+            filtros = {k: v for k, v in {"sigla_uf": uf, "ano": ano}.items() if v is not None}
+            esperado = self.conn.execute(montar_consulta(
+                ["admissoes", "desligamentos", "saldo", "salario_medio_admissao",
+                 "qtd_salarios_admissao"], filtros=filtros)).fetchone()
+            kpis = consultar_kpis(banco, uf, ano, None, None)
+            with self.subTest(uf=uf, ano=ano):
+                self.assertEqual(kpis["admissoes"], int(esperado[0] or 0))
+                self.assertEqual(kpis["desligamentos"], int(esperado[1] or 0))
+                self.assertEqual(kpis["saldo"], int(esperado[2] or 0))
+                self.assertEqual(kpis["qtd_salarios"], int(esperado[4] or 0))
+                if esperado[3] is None:
+                    self.assertIsNone(kpis["salario_medio"])
+                else:
+                    self.assertAlmostEqual(kpis["salario_medio"], float(esperado[3]), places=7)
+
     def test_agregados_excluem_municipio_sentinela(self):
         self.assertEqual(self.conn.execute("""
             select id_municipio from gold.dim_municipio

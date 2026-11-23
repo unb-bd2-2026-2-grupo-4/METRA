@@ -204,5 +204,33 @@ class DbtQualityTest(unittest.TestCase):
             sec.write_bytes(backup_sec)
 
 
+    def test_camada_semantica_dbt_igual_ao_compilador_python(self):
+        """O macro metrica() e src.metricas.camada_semantica geram o mesmo SQL."""
+        import re
+        from src.app.avaliar_busca_e_text2sql import _carregar_sql_analise_dbt
+        from src.metricas.camada_semantica import expressao
+
+        # A validação do semantic manifest ocorre no parse do build da classe.
+        self.assertIn('semantic_model.metra.movimentacao', self.manifest['semantic_models'])
+        self.assertIn('metric.metra.salario_medio_admissao', self.manifest['metrics'])
+
+        compilados = self.project / 'target' / 'compiled' / 'metra'
+        for mart in ['fct_setor_mensal', 'fct_geografia_mensal', 'fct_perfil_mensal']:
+            sql = (compilados / 'models' / 'marts' / f'{mart}.sql').read_text()
+            for metrica in ['admissoes', 'desligamentos', 'saldo', 'soma_salarios_admissao',
+                            'qtd_salarios_admissao', 'salario_medio_admissao']:
+                with self.subTest(mart=mart, metrica=metrica):
+                    self.assertIn(f"{expressao(metrica, 'evento')} as {metrica}", sql)
+
+        resultado = self.run_dbt('compile', '--select', 'path:analyses')
+        self.assertEqual(resultado.returncode, 0, resultado.stdout)
+        for analise in ['p1_setores_df', 'p2_sazonalidade', 'p3_capitais_interior',
+                        'p4_fluxos_salarios', 'p5_perfil_remuneracao']:
+            dbt_sql = (compilados / 'analyses' / f'{analise}.sql').read_text()
+            dbt_sql = re.sub(r'"[^"]+"\."gold"\."(\w+)"', r'gold.\1', dbt_sql)
+            with self.subTest(analise=analise):
+                self.assertEqual(dbt_sql.strip(), _carregar_sql_analise_dbt(analise).strip())
+
+
 if __name__ == '__main__':
     unittest.main()
