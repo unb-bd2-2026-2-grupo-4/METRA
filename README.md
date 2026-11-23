@@ -170,10 +170,11 @@ E4            | Análises e Visualizações  |
 ├── dbt_metra/              # Projeto dbt-duckdb da camada analítica (E3)
 │   ├── dbt_project.yml     # Camadas: staging -> schema silver; marts -> schema gold
 │   ├── profiles.yml        # Alvo DuckDB local (data/metra_analitico.duckdb), sem credenciais
-│   ├── macros/             # generate_schema_name: schemas "silver" e "gold" sem prefixo
+│   ├── macros/             # generate_schema_name e metrica(): SQL das métricas compilado da camada semântica
 │   └── models/
 │       ├── staging/        # Silver: fontes Parquet e modelos stg_movimentacao, stg_municipio, stg_cbo, stg_cnae
-│       └── marts/          # Gold: dimensões e fatos do Star Schema
+│       ├── marts/          # Gold: dimensões e fatos do Star Schema
+│       └── semantic/       # Camada semântica: metricas.yml (definição única das métricas) e time spine
 ├── tests/
 │   └── test_cdc_replay.py  # Testes unitários de replay idempotente, transações incompletas e dados atrasados
 ├── data/                   # Diretório de dados (inclui amostra versionada de 2.8 MB)
@@ -375,6 +376,14 @@ O mesmo `dbt build` também reconstrói o schema `gold`, usando `ref()` sobre a 
 - `fct_perfil_mensal`: competência × UF × capital/interior × seção CNAE × perfil (P5).
 
 Os agregados usam municípios identificados do Centro-Oeste entre 2023 e 2026. Preservam somas e denominadores salariais para recalcular médias em qualquer agrupamento. As tabelas são reconstruídas integralmente, incluindo competências antigas que recebam dados atrasados.
+
+#### Camada semântica única de métricas (E4)
+
+Cada métrica (admissões, desligamentos, saldo, salário médio de admissão e índice de fluxos pareados) é definida **uma única vez** em [`dbt_metra/models/semantic/metricas.yml`](dbt_metra/models/semantic/metricas.yml), no formato de `semantic_models`/`metrics` do dbt, que o próprio dbt valida. Os marts e as análises compilam o SQL pelo macro `metrica()`. O painel, a busca CBO e o assistente Text-to-SQL compilam pelo módulo [`src/metricas/camada_semantica.py`](src/metricas/camada_semantica.py). Os dois caminhos geram SQL idêntico, e um teste falha se alguém reescrever uma fórmula à mão. Detalhes em [Consumo e governança](docs/consumo-e-governanca.md#camada-semantica-catalogo-unico-de-metricas).
+
+```bash
+python -m unittest tests.test_camada_semantica -v   # definição, SQL compilado e guarda anti-duplicação
+```
 
 As cinco consultas de referência estão em [`dbt_metra/analyses/`](./dbt_metra/analyses/README.md). P2 trata sazonalidade; P3 compara capitais e interior. P4 usa explicitamente a proxy `200 × min(admissões, desligamentos) / (admissões + desligamentos)`, que mede equilíbrio dos fluxos e não a taxa convencional de turnover sobre estoque. P5 descreve salários e movimentações, sem estimar chances individuais de recolocação. Os resultados se referem aos dados carregados, não a totais populacionais ou ao saldo oficial ajustado do CAGED.
 

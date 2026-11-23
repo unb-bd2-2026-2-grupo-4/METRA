@@ -328,3 +328,37 @@ Abaixo constam os registros de todas as atividades:
 - **O que foi aproveitado:** Classe de 12 testes que abre o DuckDB somente para leitura e pula apenas se o arquivo não existir; comparação por todas as dimensões dos agregados; conciliação com o OLTP usando conexão somente para leitura e variáveis `PG*`; respostas do assistente usado pelo painel comparadas aos SQLs canônicos de `analyses/`; recomposição sem `9999999`, médias e calendário conferidos. Workflow em push, pull request e execução manual com `metra-do-zero.sh --sim`, exigência do banco gerado, suíte completa no Dagster, logs de falha e limpeza dos serviços. Documentação dos comandos, pré-requisitos e limites dessas verificações.
 - **Como foi verificado:** Os 12 testes de integração passaram sobre os bancos reais existentes; a suíte completa executou 72 testes em 241,641 segundos na imagem Python 3.12 do Dagster, sem falhas. A imagem foi reconstruída porque a versão local anterior não incluía NumPy, necessário ao assistente. O comportamento de pular sem DuckDB foi conferido, assim como a sintaxe YAML do workflow e `git diff --check`. A documentação passou em `mkdocs build --strict` na imagem Docker de docs, com saída temporária no contêiner. A execução local sem `PGHOST` evidenciou a tentativa de conexão por socket, e os comandos documentados usam as variáveis fornecidas pelo Compose.
 - **Quem revisou:** Davi Camilo
+
+### 22/11/2026 - Auditoria das entregas contra o plano de ensino e planejamento da E4
+
+- **Ferramenta:** Claude Code (Anthropic).
+- **Onde:** `PLANEJAMENTO-E4.md` (não versionado na criação) e mensagem de pendências enviada ao grupo.
+- **O que foi pedido:** Ler o plano de ensino publicado (projeto, E1–E4, avaliação, guia de ADR, cronograma, uso de IA, seminários e materiais), comparar com a `main` do METRA, listar o que falta para a nota máxima, incluindo o ponto extra pedido pela professora (JSON versionado, dashboard no GitHub Pages e agente com barra de pesquisa), e montar um planejamento de execução.
+- **O que foi aproveitado:** Checklist de E3 e E4 com o estado de cada item, divisão do trabalho em nove frentes com critérios de aceite, dependências e cronograma até 24/11, e o texto da mensagem ao grupo. A auditoria apontou como pendentes, na `main` em `bb7e82e`, a camada semântica versionada, o ETL reverso, o controle de acesso por linha ou coluna, a análise de LGPD, o catálogo e linhagem completos, o ADR de disponibilização, os diários das semanas 12 a 16 e o ponto extra.
+- **Como foi verificado:** Cada pendência foi conferida por busca no código e nos documentos da `main` (`git grep`, leitura de `docs/consumo-e-governanca.md`, `dagster_metra/` e `dbt_metra/`). O plano de ensino foi lido tanto na cópia local do repositório do site quanto nas páginas publicadas. Não foi encontrada no plano de ensino uma etapa formal de ponto extra; esse item vem da orientação dada em sala.
+- **Quem revisou:** Euller Júlio.
+
+### 22/11/2026 - Camada semântica única de métricas (E4, frente F1)
+
+- **Ferramenta:** Claude Code (Anthropic).
+- **Onde:** `dbt_metra/models/semantic/` (`metricas.yml`, `metricflow_time_spine.sql`, `_time_spine.yml`), `dbt_metra/macros/metricas.sql`, `dbt_metra/macros/metricas_movimentacao.sql`, `dbt_metra/analyses/p1`, `p3`, `p4` e `p5`, `src/metricas/camada_semantica.py`, `src/app/dashboard.py`, `src/app/text_to_sql.py`, `src/app/busca_cbo.py`, `src/app/avaliar_busca_e_text2sql.py`, `docker/painel/Dockerfile`, `docker-compose.yml`, `tests/test_camada_semantica.py`, `tests/test_dbt_quality.py`, `tests/test_gold_integracao.py`, `README.md`, `docs/consumo-e-governanca.md`, `docs/camada-analitica-dbt.md` e este registro.
+- **O que foi pedido:** Planejar e implementar a camada semântica exigida pela E4, com cada métrica definida uma única vez e consumida por dbt, painel, assistente Text-to-SQL e, depois, pelo ETL reverso e pelo JSON do GitHub Pages, sem mudar nenhum número publicado.
+- **O que foi aproveitado:** O plano, o código, os testes e a documentação foram gerados pela IA, a partir da abordagem escolhida pelo usuário entre três opções (especificação de métricas do dbt com compilador Python, MetricFlow completo ou YAML próprio):
+  - **Definição:** `semantic_model` sobre `gold.fct_movimentacao` com cinco medidas aditivas e sete métricas (simples, razão e derivada), validadas pelo próprio dbt.
+  - **Macro dbt:** `metrica()` lê `graph.semantic_models` e `graph.metrics` e gera o SQL dos marts e das análises.
+  - **Compilador Python:** gera o mesmo SQL para o painel, a busca CBO e o assistente, com filtros em lista branca e a função `consultar()` para as frentes F2 e F6.
+  - **Testes:** guarda que falha se uma fórmula de métrica for reescrita à mão.
+  - **Textos de auditoria:** passaram a ser gerados a partir da definição; o texto anterior da consulta por CBO descrevia o salário médio de forma incorreta.
+- **Problemas encontrados na execução e como foram resolvidos:**
+  - O validador de segurança do Text-to-SQL leu o `from` de `is not distinct from` como se fosse uma tabela. Em vez de afrouxar o validador, a camada ganhou o parâmetro `janela`, e a P5 manteve a estrutura original com `window`.
+  - A consolidação da P5 em DuckDB somava salários em `double` e divergia na 9ª casa decimal. A soma passou a ser feita em `DECIMAL`, e o valor novo foi conferido contra a soma exata da Gold.
+  - O carregador das análises usado nos testes resolvia só `ref()` e passou a renderizar o Jinja completo.
+- **Como foi verificado:**
+  - **Lake sintético com 20 mil eventos, `dbt build` da `main` e da branch:** os três marts deram linhas e tipos idênticos, e as cinco análises deram os mesmos valores e a mesma ordem de colunas.
+  - **Geradores antigo e novo do Text-to-SQL:** 132 consultas com resultados iguais, todas aprovadas pelo validador.
+  - **Busca CBO, KPIs e consolidação da P5:** 28 comparações equivalentes.
+  - **`metra-do-zero.sh` com a amostra real:** seis camadas conciliadas, 49.178 movimentações, saldo +1.472, painel `healthy`. Foi preciso usar `POSTGRES_PORT=55432` porque a porta 5432 da máquina estava ocupada.
+  - **Suíte completa na imagem do Dagster, com o comando do CI:** 87 testes aprovados e nenhum pulado. Entram aí a igualdade entre o SQL do macro dbt e o do compilador Python, a mesma métrica com o mesmo valor em eventos e marts na Gold real, e os KPIs do painel conferidos com a camada.
+  - **Documentação:** passou em `mkdocs build --strict` na imagem Docker de docs, com saída temporária no contêiner.
+  - **Não executados nesta etapa:** inspeção manual do painel no navegador e o workflow do GitHub Actions.
+- **Quem revisou:** Euller Júlio.

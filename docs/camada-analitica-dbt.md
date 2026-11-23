@@ -15,6 +15,8 @@ flowchart LR
 
 As fontes são `movimentacao`, `municipio`, `cbo_2002`, `cnae_subclasse` e `cnae_secao`. O caminho é `data/lake/parquet/<tabela>/**/*.parquet`, com `hive_partitioning=false`; não é um único conjunto plano de arquivos. A transformação Silver normaliza nomes, acrescenta flags e mantém os códigos como texto. O join entre subclasse e seção CNAE produz `stg_cnae`.
 
+As métricas dos marts e das análises não são escritas à mão: o macro `metrica()` compila o SQL a partir da camada semântica em `models/semantic/metricas.yml`, a mesma definição lida pelo painel e pelo assistente. O time spine (`metricflow_time_spine`) existe para a validação dessa camada pelo dbt. Ver [Consumo e governança](consumo-e-governanca.md#camada-semantica-catalogo-unico-de-metricas).
+
 O destino padrão é **`data/metra_analitico.duckdb`** (schemas `silver`, `gold` e `snapshots`), compartilhado entre o dbt, o Dagster e o painel Streamlit via `METRA_DUCKDB`. `data/metra.duckdb` permanece restrito ao script standalone `src/analise.py` da E2. Execuções de escrita são coordenadas pelo orquestrador, enquanto o painel abre o banco exclusivamente em modo `READ_ONLY`.
 
 ---

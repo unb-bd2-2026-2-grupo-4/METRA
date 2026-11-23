@@ -1,24 +1,49 @@
 # Consumo e governança
 
-**Documento de integração atualizado em 10/11/2026.** O repositório já contém ingestão, OLTP, exportação Parquet/Delta, camadas Silver e Gold com 176 testes dbt de qualidade, SCD tipo 2 da CBO (`gold.dim_cbo_historico`), orquestração Dagster (com retry, schedule e backfill) e a integração da Busca Semântica CBO + Assistente Text-to-SQL Governado no painel Streamlit (`src/app/dashboard.py`), validada na [ADR-0007](adr/0007-busca-semantica-e-consumo.md). Os pontos de controle de acesso formal, LGPD institucional e ETL reverso seguem em consolidação para o fechamento da E4.
+**Documento de integração atualizado em 22/11/2026.** O repositório já contém ingestão, OLTP, exportação Parquet/Delta, camadas Silver e Gold com 176 testes dbt de qualidade, SCD tipo 2 da CBO (`gold.dim_cbo_historico`), orquestração Dagster (com retry, schedule e backfill) e a integração da Busca Semântica CBO + Assistente Text-to-SQL Governado no painel Streamlit (`src/app/dashboard.py`), validada na [ADR-0007](adr/0007-busca-semantica-e-consumo.md), e a camada semântica única de métricas (`dbt_metra/models/semantic/metricas.yml`), consumida por dbt, painel e assistente. Os pontos de controle de acesso formal, LGPD institucional e ETL reverso seguem em consolidação para o fechamento da E4.
 
-## Catálogo de métricas da camada Gold
+## Camada semântica: catálogo único de métricas
 
-As definições partem de `silver.stg_movimentacao` e estão materializadas de forma centralizada no schema `gold` (`gold.fct_movimentacao`, `gold.fct_setor_mensal`, `gold.fct_geografia_mensal`, `gold.fct_perfil_mensal` e dimensões `gold.dim_*`). O painel Streamlit e o assistente Text-to-SQL consomem diretamente essa implementação única, sem duplicar fórmulas em Python.
+Cada métrica tem **uma única definição versionada**, em [`dbt_metra/models/semantic/metricas.yml`](https://github.com/unb-bd2-2026-2-grupo-4/METRA/blob/main/dbt_metra/models/semantic/metricas.yml), no formato de `semantic_models` e `metrics` do dbt. O dbt valida esse arquivo a cada `parse`/`build`, e ele aparece no `manifest.json` e no `dbt docs`. Todos os pontos de consumo compilam o SQL da métrica a partir dele, sem fórmula própria:
 
-| Métrica | Definição no conjunto filtrado | Unidade e ressalva |
-|---|---|---|
-| Admissões | `count(*) filter (where saldo_movimentacao = 1)` | Movimentações, não pessoas distintas |
-| Desligamentos | `count(*) filter (where saldo_movimentacao = -1)` | Movimentações |
-| Saldo líquido | `sum(saldo_movimentacao)` = admissões − desligamentos | Movimentações líquidas; não é estoque de vínculos |
-| Salário médio de admissão | `avg(salario_mensal) filter (where saldo_movimentacao = 1 and salario_valido)` | R$ nominais; nulo quando não há observação elegível |
-| Quantidade salarial válida | `count(*) filter (where saldo_movimentacao = 1 and salario_valido)` | Denominador da média; deve acompanhar o valor exibido |
-| Série mensal | Mesmas métricas agrupadas por `competencia` | Mês da movimentação; distinguir mês ausente de zero observado |
-| Capital/interior | Métricas por `is_capital`, somente municípios identificados do recorte | Sentinela não deve ser classificada como interior |
-| Disparidade salarial | Comparar salário médio e quantidade válida por sexo, raça/cor, escolaridade e faixa etária | Associação descritiva, sem inferir causalidade ou probabilidade individual de recolocação |
-| Turnover setorial (proxy de fluxos) | `200.0 * least(admissoes, desligamentos) / nullif(admissoes + desligamentos, 0)` ([ADR-0007](adr/0007-busca-semantica-e-consumo.md)) | Índice de equilíbrio de fluxos pareados (0 a 100%) usado como aproximação; não é taxa sobre estoque de vínculos (indisponível no CAGED) |
+| Consumidor | Como lê a definição |
+|---|---|
+| Marts da Gold (`fct_setor_mensal`, `fct_geografia_mensal`, `fct_perfil_mensal`) e análises `p1`–`p5` | Macro dbt `metrica(nome, origem)` (`dbt_metra/macros/metricas.sql`), que lê o grafo do dbt |
+| Painel Streamlit, busca CBO e assistente Text-to-SQL | `src.metricas.camada_semantica.expressao()` / `montar_consulta()` |
+| Exportação JSON e ETL reverso (E4) | `src.metricas.camada_semantica.consultar()` |
 
-Agregados guardam soma salarial (`soma_salarios_admissao`) e quantidade válida (`qtd_salarios_admissao`) para recompor médias ponderadas exatas. Não calcular média simples de médias municipais. Categorias não informadas permanecem identificadas; não atribuir valores demográficos ausentes.
+Medidas aditivas, com o mesmo nome das colunas dos marts, sobre `gold.fct_movimentacao` (uma linha por movimentação, recorte `is_identificado and is_centro_oeste and ano between 2023 and 2026`):
+
+| Medida | Agregação sobre os eventos |
+|---|---|
+| `admissoes` | `count` de `saldo_movimentacao = 1` |
+| `desligamentos` | `count` de `saldo_movimentacao = -1` |
+| `saldo` | `sum(saldo_movimentacao)` |
+| `soma_salarios_admissao` | `sum` do salário das admissões com `salario_valido` |
+| `qtd_salarios_admissao` | `count` das admissões com `salario_valido` |
+
+Métricas publicadas:
+
+| Métrica | Tipo | Definição | Unidade e ressalva |
+|---|---|---|---|
+| Admissões | simples | medida `admissoes` | Movimentações, não pessoas distintas |
+| Desligamentos | simples | medida `desligamentos` | Movimentações |
+| Saldo líquido | simples | medida `saldo` (admissões − desligamentos) | Fluxo líquido; não é estoque de vínculos |
+| Admissões com salário válido | simples | medida `qtd_salarios_admissao` | Denominador da média; deve acompanhar o valor exibido |
+| Salário médio de admissão | razão | `soma_salarios_admissao` / `qtd_salarios_admissao` | R$ nominais; nulo quando não há admissão com salário válido |
+| Índice de fluxos pareados (turnover proxy) | derivada | `200 × least(admissoes, desligamentos) / (admissoes + desligamentos)` ([ADR-0007](adr/0007-busca-semantica-e-consumo.md)) | 0 a 100%; não é taxa sobre estoque de vínculos (indisponível no CAGED) |
+
+A métrica tem duas origens. Sobre **eventos** (`gold.fct_movimentacao`), cada medida aplica sua agregação. Sobre **agregados** (marts ou CTEs que já trazem as medidas), a recomposição é sempre `sum(<medida>)`. Por isso o salário médio é sempre a razão das somas, e nunca a média simples de médias. Com `janela=`, a mesma métrica é recomposta sobre uma janela nomeada; a P5 usa isso para a média do recorte.
+
+Recortes analíticos (série mensal, capital/interior, disparidade por sexo, raça/cor, escolaridade e faixa etária) são as mesmas métricas agrupadas por dimensão. Categorias não informadas permanecem identificadas; não se atribuem valores demográficos ausentes. A disparidade é uma associação descritiva, sem inferir causalidade nem probabilidade individual de recolocação.
+
+**Garantias testadas:**
+
+- `tests/test_camada_semantica.py` confere a definição, o SQL compilado e os valores calculados à mão. Também **falha se algum consumidor voltar a escrever uma fórmula de métrica à mão**.
+- `tests/test_dbt_quality.py` confere que o macro dbt e o compilador Python geram **SQL idêntico** nos marts e nas cinco análises.
+- `tests/test_gold_integracao.py` confere na Gold real que a mesma métrica dá o mesmo valor a partir dos eventos e de cada mart, e que os KPIs do painel batem com a camada semântica.
+
+Ficam de fora da regra, de propósito, os gabaritos independentes: os scripts de medição em `src/qualidade/`, o avaliador da ADR-0007 e as referências dos testes de conciliação. Eles recalculam os números por conta própria justamente para conferir a camada semântica.
 
 ### Correspondência com as perguntas publicadas
 
@@ -70,6 +95,7 @@ Um caminho possível é exportar um resumo mensal validado de saldo e remuneraç
 ## Checklist para fechar com a equipe
 
 - [x] Publicar Gold, dicionário e métricas com nomes definitivos e testes de reconciliação (176 testes dbt).
+- [x] Centralizar a definição de cada métrica na camada semântica (`metricas.yml`), com marts, análises, painel, busca CBO e assistente compilando dela e teste que impede fórmula duplicada (E4).
 - [x] Integrar painel Streamlit (`src/app/dashboard.py`), busca semântica CBO e consulta em linguagem natural conforme [ADR-0007](adr/0007-busca-semantica-e-consumo.md).
 - [x] Demonstrar SCD tipo 2 (`snp_cbo` / `gold.dim_cbo_historico`), retry, schedule mensal e backfill no Dagster, com consumo em modo somente leitura após materialização da Gold.
 - [ ] Validar base legal da LGPD, retenção, pequenos grupos e controle de acesso (além de `read_only`); guardar evidências reais (E4).
