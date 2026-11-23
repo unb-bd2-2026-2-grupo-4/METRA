@@ -1,0 +1,14 @@
+version: 2
+
+models:
+  - name: metricflow_time_spine
+    description: "Uma linha por dia de 2023-01-01 a 2026-12-31; time spine da camada semântica."
+    time_spine:
+      standard_granularity_column: date_day
+    columns:
+      - name: date_day
+        description: "Dia do calendário."
+        granularity: day
+        data_tests:
+          - unique
+          - not_null

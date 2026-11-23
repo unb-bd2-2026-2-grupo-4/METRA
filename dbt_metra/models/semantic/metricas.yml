@@ -1,0 +1,175 @@
+version: 2
+
+# Camada semântica do METRA (E4): definição única e versionada das métricas.
+#
+# Este arquivo é a fonte de verdade de todas as métricas de movimentação. Ele é
+# validado pelo dbt (dbt parse/build) e lido por:
+#   - macros dbt (macros/metricas.sql), que materializam os marts da Gold;
+#   - src/metricas/camada_semantica.py, que compila o SQL usado pelo painel,
+#     pelo assistente Text-to-SQL, pela exportação JSON e pelo ETL reverso.
+# Nenhum consumidor deve reescrever as fórmulas abaixo (tests/test_camada_semantica.py
+# falha se encontrar fórmula duplicada).
+#
+# Medidas têm o mesmo nome das colunas dos marts (fct_setor_mensal,
+# fct_geografia_mensal, fct_perfil_mensal). Todas são aditivas: sobre eventos usam
+# o agg declarado; sobre agregados, a recomposição é sempre sum(<medida>).
+
+semantic_models:
+  - name: movimentacao
+    description: >-
+      Uma linha por movimentação formal do Novo CAGED (admissão ou desligamento),
+      com as chaves das dimensões da Gold. É o grão a partir do qual todas as
+      métricas são definidas.
+    model: ref('fct_movimentacao')
+    defaults:
+      agg_time_dimension: competencia
+    entities:
+      - name: movimentacao
+        type: primary
+        expr: id_movimentacao
+      - name: municipio
+        type: foreign
+        expr: id_municipio
+      - name: cnae
+        type: foreign
+        expr: codigo_cnae_subclasse
+      - name: cbo
+        type: foreign
+        expr: codigo_cbo
+      - name: perfil_demografico
+        type: foreign
+        expr: id_perfil_demografico
+    dimensions:
+      - name: competencia
+        type: time
+        description: "Primeiro dia do mês de ocorrência do evento."
+        type_params:
+          time_granularity: month
+      - name: sigla_uf
+        type: categorical
+        description: "UF do município do estabelecimento."
+      - name: is_capital
+        type: categorical
+        description: "Município é capital da UF (Brasília, Goiânia, Cuiabá ou Campo Grande)."
+      - name: codigo_secao
+        type: categorical
+        description: "Seção CNAE 2.0 da atividade econômica."
+    measures:
+      - name: admissoes
+        description: "Movimentações de admissão (saldo_movimentacao = 1)."
+        agg: count
+        expr: "case when saldo_movimentacao = 1 then 1 end"
+      - name: desligamentos
+        description: "Movimentações de desligamento (saldo_movimentacao = -1)."
+        agg: count
+        expr: "case when saldo_movimentacao = -1 then 1 end"
+      - name: saldo
+        description: "Soma de saldo_movimentacao (+1 admissão, -1 desligamento)."
+        agg: sum
+        expr: saldo_movimentacao
+      - name: soma_salarios_admissao
+        description: "Soma dos salários mensais válidos das admissões; numerador da média."
+        agg: sum
+        expr: "case when saldo_movimentacao = 1 and salario_valido then salario_mensal else 0 end"
+      - name: qtd_salarios_admissao
+        description: "Quantidade de admissões com salário válido; denominador da média."
+        agg: count
+        expr: "case when saldo_movimentacao = 1 and salario_valido then 1 end"
+    config:
+      meta:
+        # Recorte de negócio comum aos marts e a todas as respostas publicadas.
+        recorte_padrao: "is_identificado and is_centro_oeste and ano between 2023 and 2026"
+
+metrics:
+  - name: admissoes
+    label: "Admissões"
+    description: "Total de movimentações de admissão no recorte. Conta movimentações, não pessoas distintas."
+    type: simple
+    type_params:
+      measure: admissoes
+    config:
+      meta:
+        unidade: "movimentações"
+        formato: "inteiro"
+        ressalva: "Movimentações, não pessoas distintas."
+
+  - name: desligamentos
+    label: "Desligamentos"
+    description: "Total de movimentações de desligamento no recorte."
+    type: simple
+    type_params:
+      measure: desligamentos
+    config:
+      meta:
+        unidade: "movimentações"
+        formato: "inteiro"
+        ressalva: "Movimentações, não pessoas distintas."
+
+  - name: saldo
+    label: "Saldo líquido"
+    description: "Admissões menos desligamentos no recorte."
+    type: simple
+    type_params:
+      measure: saldo
+    config:
+      meta:
+        unidade: "movimentações líquidas"
+        formato: "inteiro"
+        ressalva: "Fluxo líquido do período; não é estoque de vínculos."
+
+  - name: qtd_salarios_admissao
+    label: "Admissões com salário válido"
+    description: "Quantidade de admissões com salário válido; deve acompanhar a média exibida."
+    type: simple
+    type_params:
+      measure: qtd_salarios_admissao
+    config:
+      meta:
+        unidade: "movimentações"
+        formato: "inteiro"
+        ressalva: "Denominador do salário médio de admissão."
+
+  - name: salario_medio_admissao
+    label: "Salário médio de admissão"
+    description: >-
+      Média ponderada dos salários mensais válidos das admissões: soma dos salários
+      dividida pela quantidade válida, sempre recomposta a partir das medidas aditivas
+      (nunca média simples de médias).
+    type: ratio
+    type_params:
+      numerator: soma_salarios_admissao
+      denominator: qtd_salarios_admissao
+    config:
+      meta:
+        unidade: "R$ nominais"
+        formato: "moeda"
+        ressalva: "Nulo quando não há admissão com salário válido no recorte."
+
+  - name: soma_salarios_admissao
+    label: "Soma dos salários de admissão"
+    description: "Soma dos salários mensais válidos das admissões (numerador do salário médio)."
+    type: simple
+    type_params:
+      measure: soma_salarios_admissao
+    config:
+      meta:
+        unidade: "R$ nominais"
+        formato: "moeda"
+        ressalva: "Uso técnico para recompor médias; não exibir isoladamente."
+
+  - name: indice_fluxos_pareados_pct
+    label: "Índice de fluxos pareados"
+    description: >-
+      Proxy de rotatividade setorial (ADR-0007): 200 x min(admissões, desligamentos)
+      / (admissões + desligamentos), de 0 a 100%.
+    type: derived
+    type_params:
+      expr: "200.0 * least(admissoes, desligamentos) / nullif(admissoes + desligamentos, 0)"
+      metrics:
+        - name: admissoes
+        - name: desligamentos
+    config:
+      meta:
+        unidade: "%"
+        formato: "percentual"
+        ressalva: "Aproximação por fluxos; não é taxa sobre estoque de vínculos (indisponível no CAGED)."
