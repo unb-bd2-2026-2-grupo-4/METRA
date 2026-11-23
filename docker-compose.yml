@@ -72,8 +72,10 @@ services:
       PGPASSWORD: ${POSTGRES_PASSWORD:-metra}
       METRA_LAKE_PARQUET: /app/data/lake/parquet
       METRA_DUCKDB: /app/data/metra_analitico.duckdb
+      METRA_JSON_DESTINO: /app/publicacao/metra.json
     volumes:
       - ./data:/app/data
+      - ./docs/assets/dados:/app/publicacao
       - dagster_home:/opt/dagster/dagster_home
 
   dagster-daemon:
@@ -94,9 +96,11 @@ services:
       PGPASSWORD: ${POSTGRES_PASSWORD:-metra}
       METRA_LAKE_PARQUET: /app/data/lake/parquet
       METRA_DUCKDB: /app/data/metra_analitico.duckdb
+      METRA_JSON_DESTINO: /app/publicacao/metra.json
     command: ["dagster-daemon", "run", "-w", "workspace.yaml"]
     volumes:
       - ./data:/app/data
+      - ./docs/assets/dados:/app/publicacao
       - dagster_home:/opt/dagster/dagster_home
 
   # Fluxo completo em um comando: Bronze -> OLTP -> Parquet/Delta -> dbt Silver/Gold/consumo,
@@ -120,6 +124,7 @@ services:
         && python -m src.acesso.demonstrar_acesso
     volumes:
       - ./data:/app/data
+      - ./docs/assets/dados:/app/publicacao
       - dagster_home:/opt/dagster/dagster_home
 
   # Painel Streamlit (E4): lê a Gold gerada pelo dbt/Dagster, sem escrever no banco.

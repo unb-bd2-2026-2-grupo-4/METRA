@@ -41,6 +41,8 @@ dagster_home/
 
 # MkDocs Artefatos de Build
 site/
+docs/assets/dados/*.lock
+docs/assets/dados/.metra-*
 
 # Variáveis de Ambiente e Segredos
 .env

@@ -371,3 +371,13 @@ Abaixo constam os registros de todas as atividades:
 - **O que foi aproveitado:** Views `consumo.setor_mensal`, `consumo.geografia_mensal`, `consumo.perfil_mensal` (um eixo demográfico por vez) e `consumo.calendario`, com a macro `publicar_grupos` recompondo as medidas pela camada semântica e aplicando a supressão; contratos dbt de colunas, tipos, limite e supressão salarial e teste singular contra a Gold; base `data/metra_consumo.duckdb` publicada pelo asset `base_consumo`, aberta pelo consumidor somente para leitura, sem acesso externo e com a configuração travada; demonstração com resultado esperado por tentativa, executada ao fim do fluxo completo. Duas correções durante a revisão: a demonstração imprimia um registro individual do analista e passou a usar uma contagem; `metra_not_empty` nas views quebrava as fixtures pequenas e foi removido, pois publicar nada é o resultado correto quando tudo é suprimido.
 - **Como foi verificado:** O exportador do PR #20, executado a partir da branch de Tiago, validou as quatro views e gerou o JSON (1.681 setores, 259 geografias, 11.326 perfis e 37 competências); removida a supressão da macro, três testes dbt falharam (739 grupos pequenos em setores e 29.775 em perfis); fluxo do zero em projeto Compose isolado com `PASS=233` no dbt, camadas conciliadas, nove tentativas da demonstração conforme o esperado e painel `healthy`; 96 testes de `tests/` e `mkdocs build --strict`. A análise de ataques por diferença entre recortes e a validação do limiar ficam com a frente de LGPD.
 - **Quem revisou:** Lucas Alves.
+
+### 23/11/2026 - ETL reverso para JSON público (E4, frente do Tiago)
+
+- **Ferramenta:** Antigravity.
+- **Onde:** `src/consumo/`, assets e jobs do Dagster, Compose, CI, consumidor JavaScript no MkDocs e testes de exportação/consumo.
+- **O que foi pedido:** Implementar o plano de ETL reverso com métricas da camada semântica, chave idempotente, retry, publicação manual por PR e uma página mínima que lê o JSON. 
+- **O que foi aproveitado:** Exportador que lê somente `consumo.*` em transação de leitura, valida o contrato e recompõe métricas pelo compilador semântico; arquivo determinístico substituído atomicamente sob lock; asset no pipeline mensal e job isolado; metadados com hash e cobertura; montagem do destino público no Compose; página sem backend, chaves ou dependências novas; contrato de integração e procedimento de revisão/publicação.
+- **Como foi verificado:** Testes com DuckDB temporário para conciliação, limites de supressão, calendário, chaves, idempotência e correção histórica. Grafo e jobs validados; a suíte Python executou 82 testes sem falhas, com uma classe de integração pulada por ausência do banco real. 
+
+- **Quem revisou:** Tiago Antunes

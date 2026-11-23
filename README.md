@@ -381,6 +381,31 @@ O mesmo `dbt build` também reconstrói o schema `gold`, usando `ref()` sobre a 
 
 Os agregados usam municípios identificados do Centro-Oeste entre 2023 e 2026. Preservam somas e denominadores salariais para recalcular médias em qualquer agrupamento. As tabelas são reconstruídas integralmente, incluindo competências antigas que recebam dados atrasados.
 
+#### ETL reverso e resumo público (E4)
+
+O asset `exportar_json_consumo`, incluído no job `pipeline_metra` e no seu schedule
+mensal, exporta as views públicas `consumo.*` para `docs/assets/dados/metra.json`.
+O JSON fornece séries mensais de setor, geografia, perfis e calendário para P1–P5.
+As fórmulas vêm da camada semântica; a publicação é atômica e idempotente, com o
+retry compartilhado do Dagster. Uma página mínima no MkDocs lê o arquivo por
+JavaScript. O merge do PR com o JSON revisado aciona o deploy existente do Pages.
+
+**Dependência de integração:** as views públicas são entregues pela frente de
+controle de acesso. Sem elas, o exportador e o pipeline completo falham, mantendo
+o JSON anterior. Não há fallback para a Gold nem JSON fictício de produção.
+
+Para regenerar somente a publicação, depois de materializar as views:
+
+```bash
+docker compose --profile dagster run --build --rm dagster-webserver \
+  dagster job execute -m dagster_metra.definitions -j exportar_json_consumo_job
+```
+
+Contrato, supressão, comandos e procedimento de publicação em
+[Consumo e governança](docs/consumo-e-governanca.md#etl-reverso-json-publico).
+O [resumo mensal](docs/consumo-json.md) exibe apenas os grupos publicados; seus
+totais podem ser parciais por causa das supressões.
+
 #### Camada semântica única de métricas (E4)
 
 Cada métrica (admissões, desligamentos, saldo, salário médio de admissão e índice de fluxos pareados) é definida **uma única vez** em [`dbt_metra/models/semantic/metricas.yml`](dbt_metra/models/semantic/metricas.yml), no formato de `semantic_models`/`metrics` do dbt, que o próprio dbt valida. Os marts e as análises compilam o SQL pelo macro `metrica()`. O painel, a busca CBO e o assistente Text-to-SQL compilam pelo módulo [`src/metricas/camada_semantica.py`](src/metricas/camada_semantica.py). Os dois caminhos geram SQL idêntico, e um teste falha se alguém reescrever uma fórmula à mão. Detalhes em [Consumo e governança](docs/consumo-e-governanca.md#camada-semantica-catalogo-unico-de-metricas).

@@ -19,12 +19,23 @@ jobs:
       - name: Conferir Docker Compose
         run: docker compose version
 
+      - name: Preparar Node para testar o consumidor estático
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Testar leitura e filtros do JSON público
+        run: node --test tests/test_consumo_js.cjs
+
       - name: Gerar a base do zero e iniciar o painel
         run: sh scripts/metra-do-zero.sh --sim
 
       # Os testes locais pulam sem o banco. Na CI, sua ausência é uma falha.
       - name: Exigir o banco analítico gerado
         run: test -s data/metra_analitico.duckdb
+
+      - name: Exigir o JSON público gerado pelo pipeline
+        run: test -s docs/assets/dados/metra.json
 
       - name: Executar todos os testes na imagem do Dagster
         run: >-

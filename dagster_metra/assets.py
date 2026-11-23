@@ -28,6 +28,7 @@ from src.acesso.base_consumo import RELACOES_CONSUMO, caminho_base_consumo, publ
 from src.extracao.exportar_parquet import exportar
 from src.extracao.materializar_delta import materializar
 from src.ingestao.executar_pipeline import main as executar_pipeline_main
+from src.consumo.exportar_json import DESTINO_PADRAO, exportar as exportar_json
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
@@ -107,6 +108,23 @@ def caminho_banco_analitico() -> Path:
         return PROJECT_ROOT / "data" / "metra_analitico.duckdb"
     caminho = Path(valor)
     return caminho if caminho.is_absolute() else (PROJECT_ROOT / "dbt_metra" / caminho).resolve()
+
+
+@asset(
+    name="exportar_json_consumo",
+    deps=[AssetKey(["consumo", view]) for view in (
+        "setor_mensal", "geografia_mensal", "perfil_mensal", "calendario",
+    )],
+    group_name="consumo",
+    description="Publica o snapshot JSON das views agregadas para o GitHub Pages, sem acesso ao detalhe.",
+    kinds={"python", "duckdb", "json"},
+    retry_policy=POLITICA_RETRY,
+)
+def exportar_json_consumo_asset(context: AssetExecutionContext) -> MaterializeResult:
+    destino = Path(os.environ.get("METRA_JSON_DESTINO", DESTINO_PADRAO))
+    metadados = exportar_json(caminho_banco_analitico(), destino)
+    context.log.info("JSON de consumo validado: %s (%s bytes)", destino, metadados["bytes"])
+    return MaterializeResult(metadata=metadados)
 
 
 def competencias_da_janela(inicio: date, fim: date) -> list[date]:
