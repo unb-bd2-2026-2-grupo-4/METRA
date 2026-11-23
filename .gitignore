@@ -43,6 +43,7 @@ dagster_home/
 site/
 docs/assets/dados/*.lock
 docs/assets/dados/.metra-*
+docs/assets/dbt-docs/index.html
 
 # Variáveis de Ambiente e Segredos
 .env

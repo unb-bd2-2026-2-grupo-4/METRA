@@ -26,7 +26,10 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: pip install -r requirements-docs.txt
+        run: pip install -r requirements-docs.txt dbt-core==1.12.6 dbt-duckdb==1.11.1
+
+      - name: Generate static dbt docs catalog for GitHub Pages
+        run: python -m src.catalogo.gerar_dbt_docs
 
       - name: Deploy documentation to GitHub Pages
         run: mkdocs gh-deploy --force

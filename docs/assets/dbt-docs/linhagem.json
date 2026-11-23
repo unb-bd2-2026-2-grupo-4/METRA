@@ -1,0 +1,1583 @@
+{
+  "projeto": "metra",
+  "versao_dbt": "1.12.6",
+  "resumo_quantitativo": {
+    "fontes_parquet": 5,
+    "modelos_e_snapshots": 20,
+    "metricas_camada_semantica": 7,
+    "analises_p1_a_p5": 5,
+    "exposures_consumo_final": 4,
+    "testes_declarativos_dbt": 210
+  },
+  "linhagem_camadas_ponta_a_ponta": [
+    {
+      "ordem": 1,
+      "camada": "Fontes Públicas Oficiais",
+      "tecnologia": "CSV / APIs REST HTTPS",
+      "objetos": [
+        "Novo CAGED / MTE (data/caged_centro_oeste_amostra.csv ou CSVs brutos 2023–2026)",
+        "API IBGE Localidades (/api/v1/localidades/municipios)",
+        "API IBGE CNAE 2.0 (/api/v2/cnae/subclasses)",
+        "Catálogo Oficial CBO 2002 (MTE)"
+      ],
+      "responsavel_codigo": "src/ingestao/carga_bronze.py, carga_ibge.py, carga_cbo.py"
+    },
+    {
+      "ordem": 2,
+      "camada": "Camada Bronze (Staging Bruto e Linhagem de Lote)",
+      "tecnologia": "PostgreSQL 16 (schema bronze)",
+      "objetos": [
+        "bronze.arquivos_ingeridos",
+        "bronze.caged_movimentacao",
+        "bronze.ibge_municipio",
+        "bronze.ibge_cnae_subclasse",
+        "bronze.cbo_ocupacao"
+      ],
+      "responsavel_codigo": "src/db/migracoes/0001_camada_bronze.sql, 0002_camada_bronze_referencias.sql"
+    },
+    {
+      "ordem": 3,
+      "camada": "Origem Transacional OLTP (3FN Insert-Only e CDC)",
+      "tecnologia": "PostgreSQL 16 (schema oltp + WAL lógico)",
+      "objetos": [
+        "oltp.movimentacao",
+        "oltp.municipio",
+        "oltp.cbo_2002",
+        "oltp.cnae_secao",
+        "oltp.cnae_subclasse",
+        "oltp.cdc_probe (slot lógico metra_cdc_slot -> data/cdc/eventos.log -> replay.sqlite3)"
+      ],
+      "responsavel_codigo": "src/ingestao/carga_oltp.py, src/cdc/01..04"
+    },
+    {
+      "ordem": 4,
+      "camada": "Armazenamento Colunar Aberto (Lake Parquet e Delta Lake)",
+      "tecnologia": "Apache Parquet (Snappy) + Delta Lake (delta-rs)",
+      "objetos": [
+        "source.metra.lake.movimentacao (data/lake/parquet/movimentacao/ano=AAAA/*.parquet)",
+        "source.metra.lake.municipio (data/lake/parquet/municipio/*.parquet)",
+        "source.metra.lake.cbo_2002 (data/lake/parquet/cbo_2002/*.parquet)",
+        "source.metra.lake.cnae_subclasse (data/lake/parquet/cnae_subclasse/*.parquet)",
+        "source.metra.lake.cnae_secao (data/lake/parquet/cnae_secao/*.parquet)",
+        "data/lake/delta/movimentacao/ (_delta_log/)"
+      ],
+      "responsavel_codigo": "src/extracao/exportar_parquet.py, src/extracao/materializar_delta.py"
+    },
+    {
+      "ordem": 5,
+      "camada": "Camada Silver (Padronização, Tipagem e Guardas de Qualidade)",
+      "tecnologia": "DuckDB + dbt-duckdb (schema silver em data/metra_analitico.duckdb)",
+      "objetos": [
+        "silver.stg_movimentacao",
+        "silver.stg_municipio",
+        "silver.stg_cbo",
+        "silver.stg_cnae"
+      ],
+      "responsavel_codigo": "dbt_metra/models/staging/"
+    },
+    {
+      "ordem": 6,
+      "camada": "Camada Gold, Histórico SCD2 e Camada Semântica Única",
+      "tecnologia": "DuckDB + dbt-duckdb (schemas snapshots e gold + semantic_models/metrics)",
+      "objetos": [
+        "snapshots.snp_cbo -> gold.dim_cbo_historico (SCD Tipo 2)",
+        "gold.dim_competencia",
+        "gold.dim_municipio",
+        "gold.dim_cbo",
+        "gold.dim_cnae",
+        "gold.dim_perfil_demografico",
+        "gold.fct_movimentacao",
+        "gold.fct_setor_mensal",
+        "gold.fct_geografia_mensal",
+        "gold.fct_perfil_mensal",
+        "gold.metricflow_time_spine",
+        "dbt_metra/models/semantic/metricas.yml (7 métricas compiladas por dbt e Python)"
+      ],
+      "responsavel_codigo": "dbt_metra/models/marts/, dbt_metra/snapshots/, dbt_metra/models/semantic/, src/metricas/camada_semantica.py"
+    },
+    {
+      "ordem": 7,
+      "camada": "Camada de Controle de Acesso e Supressão LGPD (k >= 5)",
+      "tecnologia": "Views dbt (schema consumo) + Base DuckDB Isolada (data/metra_consumo.duckdb)",
+      "objetos": [
+        "consumo.setor_mensal",
+        "consumo.geografia_mensal",
+        "consumo.perfil_mensal",
+        "consumo.calendario",
+        "data/metra_consumo.duckdb (somente leitura, enable_external_access = false)"
+      ],
+      "responsavel_codigo": "dbt_metra/models/consumo/, src/acesso/base_consumo.py"
+    },
+    {
+      "ordem": 8,
+      "camada": "Consumo Final: Painel Streamlit, Agente Text-to-SQL/CBO e ETL Reverso JSON",
+      "tecnologia": "Streamlit (Docker porta 8501) + Índice Vetorial 384d + JSON estático no GitHub Pages",
+      "objetos": [
+        "exposure.metra.painel_streamlit (src/app/dashboard.py)",
+        "exposure.metra.assistente_text_to_sql_e_busca_cbo (src/app/busca_cbo.py, src/app/text_to_sql.py)",
+        "exposure.metra.base_consumo_isolada (src/acesso/base_consumo.py)",
+        "exposure.metra.etl_reverso_json_publico (src/consumo/exportar_json.py -> docs/assets/dados/metra.json -> docs/consumo-json.md)"
+      ],
+      "responsavel_codigo": "src/app/, src/consumo/exportar_json.py, docs/consumo-json.md"
+    }
+  ],
+  "fontes": [
+    {
+      "unique_id": "source.metra.lake.cbo_2002",
+      "nome": "lake.cbo_2002",
+      "descricao": "Ocupações da CBO 2002 (oltp.cbo_2002).",
+      "colunas_documentadas": 1,
+      "colunas": [
+        {
+          "nome": "codigo",
+          "tipo": "VARCHAR",
+          "descricao": ""
+        }
+      ]
+    },
+    {
+      "unique_id": "source.metra.lake.cnae_secao",
+      "nome": "lake.cnae_secao",
+      "descricao": "Seções da CNAE 2.0 (oltp.cnae_secao).",
+      "colunas_documentadas": 1,
+      "colunas": [
+        {
+          "nome": "codigo",
+          "tipo": "VARCHAR",
+          "descricao": ""
+        }
+      ]
+    },
+    {
+      "unique_id": "source.metra.lake.cnae_subclasse",
+      "nome": "lake.cnae_subclasse",
+      "descricao": "Subclasses da CNAE 2.0 (oltp.cnae_subclasse).",
+      "colunas_documentadas": 2,
+      "colunas": [
+        {
+          "nome": "codigo",
+          "tipo": "VARCHAR",
+          "descricao": ""
+        },
+        {
+          "nome": "codigo_secao",
+          "tipo": "VARCHAR",
+          "descricao": ""
+        }
+      ]
+    },
+    {
+      "unique_id": "source.metra.lake.movimentacao",
+      "nome": "lake.movimentacao",
+      "descricao": "Movimentações de admissão e desligamento do Novo CAGED (oltp.movimentacao).",
+      "colunas_documentadas": 7,
+      "colunas": [
+        {
+          "nome": "id_movimentacao",
+          "tipo": "VARCHAR",
+          "descricao": ""
+        },
+        {
+          "nome": "id_municipio",
+          "tipo": "VARCHAR",
+          "descricao": ""
+        },
+        {
+          "nome": "cbo_2002",
+          "tipo": "VARCHAR",
+          "descricao": ""
+        },
+        {
+          "nome": "cnae_2_subclasse",
+          "tipo": "VARCHAR",
+          "descricao": ""
+        },
+        {
+          "nome": "ano",
+          "tipo": "VARCHAR",
+          "descricao": ""
+        },
+        {
+          "nome": "mes",
+          "tipo": "VARCHAR",
+          "descricao": ""
+        },
+        {
+          "nome": "saldo_movimentacao",
+          "tipo": "VARCHAR",
+          "descricao": ""
+        }
+      ]
+    },
+    {
+      "unique_id": "source.metra.lake.municipio",
+      "nome": "lake.municipio",
+      "descricao": "Municípios do IBGE, com o sentinela 9999999 para município não identificado (oltp.municipio).",
+      "colunas_documentadas": 1,
+      "colunas": [
+        {
+          "nome": "id_municipio",
+          "tipo": "VARCHAR",
+          "descricao": ""
+        }
+      ]
+    }
+  ],
+  "modelos": [
+    {
+      "unique_id": "model.metra.calendario",
+      "nome": "calendario",
+      "schema": "consumo",
+      "materializacao": "view",
+      "descricao": "Competências contínuas do período; tem_dados indica movimentação na origem, independentemente da supressão.",
+      "depende_de": [
+        "model.metra.dim_competencia"
+      ],
+      "quantidade_colunas": 2,
+      "quantidade_testes_dbt": 4,
+      "colunas": [
+        {
+          "nome": "competencia",
+          "tipo": "DATE",
+          "descricao": "Primeiro dia do mês no intervalo contínuo observado na base (DATE)."
+        },
+        {
+          "nome": "tem_dados",
+          "tipo": "BOOLEAN",
+          "descricao": "Verdadeiro quando a competência possui movimentações registradas na origem Silver."
+        }
+      ]
+    },
+    {
+      "unique_id": "model.metra.dim_cbo",
+      "nome": "dim_cbo",
+      "schema": "gold",
+      "materializacao": "table",
+      "descricao": "Uma linha por ocupação CBO 2002, inclusive títulos genéricos da origem.",
+      "depende_de": [
+        "model.metra.stg_cbo"
+      ],
+      "quantidade_colunas": 4,
+      "quantidade_testes_dbt": 4,
+      "colunas": [
+        {
+          "nome": "codigo_cbo",
+          "tipo": "VARCHAR",
+          "descricao": "Chave natural textual com 6 dígitos."
+        },
+        {
+          "nome": "titulo_ocupacao",
+          "tipo": "VARCHAR",
+          "descricao": "Título da ocupação."
+        },
+        {
+          "nome": "codigo_grande_grupo",
+          "tipo": "VARCHAR",
+          "descricao": "Primeiro dígito do código CBO."
+        },
+        {
+          "nome": "is_cadastro_oficial",
+          "tipo": "BOOLEAN",
+          "descricao": "Falso para códigos sem título encontrado na fonte oficial."
+        }
+      ]
+    },
+    {
+      "unique_id": "model.metra.dim_cbo_historico",
+      "nome": "dim_cbo_historico",
+      "schema": "gold",
+      "materializacao": "table",
+      "descricao": "SCD tipo 2 da CBO a partir do snapshot snp_cbo: uma linha por versão de cada ocupação, com período de validade.",
+      "depende_de": [
+        "snapshot.metra.snp_cbo"
+      ],
+      "quantidade_colunas": 8,
+      "quantidade_testes_dbt": 7,
+      "colunas": [
+        {
+          "nome": "id_versao_cbo",
+          "tipo": "VARCHAR",
+          "descricao": "Chave substituta da versão (dbt_scd_id)."
+        },
+        {
+          "nome": "codigo_cbo",
+          "tipo": "VARCHAR",
+          "descricao": "Chave natural textual com 6 dígitos; repete-se entre versões."
+        },
+        {
+          "nome": "titulo_ocupacao",
+          "tipo": "VARCHAR",
+          "descricao": "Título da ocupação observado no período."
+        },
+        {
+          "nome": "codigo_grande_grupo",
+          "tipo": "VARCHAR",
+          "descricao": "Primeiro dígito do código CBO."
+        },
+        {
+          "nome": "is_cadastro_oficial",
+          "tipo": "BOOLEAN",
+          "descricao": "Falso para códigos sem título encontrado na fonte oficial."
+        },
+        {
+          "nome": "observado_desde",
+          "tipo": "TIMESTAMP",
+          "descricao": "Momento da execução do dbt que observou a versão pela primeira vez; não é vigência oficial da CBO."
+        },
+        {
+          "nome": "observado_ate",
+          "tipo": "TIMESTAMP",
+          "descricao": "Momento em que uma versão diferente foi observada (intervalo semiaberto); nulo na versão vigente."
+        },
+        {
+          "nome": "is_versao_vigente",
+          "tipo": "BOOLEAN",
+          "descricao": "Verdadeiro para a versão atual de cada ocupação."
+        }
+      ]
+    },
+    {
+      "unique_id": "model.metra.dim_cnae",
+      "nome": "dim_cnae",
+      "schema": "gold",
+      "materializacao": "table",
+      "descricao": "Uma linha por subclasse CNAE; hierarquia de seção incorporada à dimensão.",
+      "depende_de": [
+        "model.metra.stg_cnae"
+      ],
+      "quantidade_colunas": 5,
+      "quantidade_testes_dbt": 6,
+      "colunas": [
+        {
+          "nome": "codigo_cnae_subclasse",
+          "tipo": "VARCHAR",
+          "descricao": "Chave natural textual com 7 dígitos."
+        },
+        {
+          "nome": "descricao_subclasse",
+          "tipo": "VARCHAR",
+          "descricao": "Descrição da subclasse, inclusive cadastros administrativos."
+        },
+        {
+          "nome": "codigo_secao",
+          "tipo": "VARCHAR",
+          "descricao": "Seção CNAE; Z permanece nos agregados e é excluída dos rankings e da correlação."
+        },
+        {
+          "nome": "descricao_secao",
+          "tipo": "VARCHAR",
+          "descricao": "Descrição da seção econômica."
+        },
+        {
+          "nome": "is_cadastro_oficial",
+          "tipo": "BOOLEAN",
+          "descricao": "Falso para sentinela e cadastros administrativos."
+        }
+      ]
+    },
+    {
+      "unique_id": "model.metra.dim_competencia",
+      "nome": "dim_competencia",
+      "schema": "gold",
+      "materializacao": "table",
+      "descricao": "Uma linha por mês entre o mínimo e o máximo da Silver; presença de registros não certifica completude da fonte.",
+      "depende_de": [
+        "model.metra.stg_movimentacao"
+      ],
+      "quantidade_colunas": 5,
+      "quantidade_testes_dbt": 8,
+      "colunas": [
+        {
+          "nome": "competencia",
+          "tipo": "DATE",
+          "descricao": "Primeiro dia do mês de ocorrência do evento (DATE)."
+        },
+        {
+          "nome": "ano",
+          "tipo": "INTEGER",
+          "descricao": "Ano da competência."
+        },
+        {
+          "nome": "mes",
+          "tipo": "INTEGER",
+          "descricao": "Número do mês, de 1 a 12."
+        },
+        {
+          "nome": "trimestre",
+          "tipo": "INTEGER",
+          "descricao": "Número do trimestre, de 1 a 4."
+        },
+        {
+          "nome": "tem_dados",
+          "tipo": "BOOLEAN",
+          "descricao": "Existe ao menos uma movimentação Silver nesta competência, incluindo registros fora do recorte dos agregados."
+        }
+      ]
+    },
+    {
+      "unique_id": "model.metra.dim_municipio",
+      "nome": "dim_municipio",
+      "schema": "gold",
+      "materializacao": "table",
+      "descricao": "Uma linha por código municipal; preserva os atributos e sentinelas da Silver.",
+      "depende_de": [
+        "model.metra.stg_municipio"
+      ],
+      "quantidade_colunas": 8,
+      "quantidade_testes_dbt": 4,
+      "colunas": [
+        {
+          "nome": "id_municipio",
+          "tipo": "VARCHAR",
+          "descricao": "Chave natural textual IBGE, 7 dígitos; 9999999 é o sentinela."
+        },
+        {
+          "nome": "nome_municipio",
+          "tipo": "VARCHAR",
+          "descricao": "Nome do município."
+        },
+        {
+          "nome": "sigla_uf",
+          "tipo": "VARCHAR",
+          "descricao": "Sigla da UF; NI no sentinela. Os agregados restringem DF, GO, MT e MS."
+        },
+        {
+          "nome": "nome_uf",
+          "tipo": "VARCHAR",
+          "descricao": "Nome da UF."
+        },
+        {
+          "nome": "regiao",
+          "tipo": "VARCHAR",
+          "descricao": "Grande região do IBGE."
+        },
+        {
+          "nome": "is_capital",
+          "tipo": "BOOLEAN",
+          "descricao": "Verdadeiro para Brasília, Goiânia, Cuiabá ou Campo Grande; DF não possui interior."
+        },
+        {
+          "nome": "is_identificado",
+          "tipo": "BOOLEAN",
+          "descricao": "Falso para o município sentinela."
+        },
+        {
+          "nome": "is_centro_oeste",
+          "tipo": "BOOLEAN",
+          "descricao": "UF pertence a DF, GO, MT ou MS."
+        }
+      ]
+    },
+    {
+      "unique_id": "model.metra.dim_perfil_demografico",
+      "nome": "dim_perfil_demografico",
+      "schema": "gold",
+      "materializacao": "table",
+      "descricao": "Uma linha por combinação observada dos códigos de sexo, raça/cor, escolaridade e faixa etária; não representa uma pessoa.",
+      "depende_de": [
+        "model.metra.stg_movimentacao"
+      ],
+      "quantidade_colunas": 9,
+      "quantidade_testes_dbt": 4,
+      "colunas": [
+        {
+          "nome": "id_perfil_demografico",
+          "tipo": "VARCHAR",
+          "descricao": "Chave natural composta: sexo|raca_cor|grau_instrucao|faixa_etaria."
+        },
+        {
+          "nome": "codigo_sexo",
+          "tipo": "INTEGER",
+          "descricao": "Código do sexo registrado na origem; não mede identidade de gênero."
+        },
+        {
+          "nome": "sexo",
+          "tipo": "VARCHAR",
+          "descricao": "1 Homem, 3 Mulher, 9 Não identificado; demais códigos não mapeados."
+        },
+        {
+          "nome": "codigo_raca_cor",
+          "tipo": "INTEGER",
+          "descricao": "Código de raça/cor preservado da Silver."
+        },
+        {
+          "nome": "raca_cor",
+          "tipo": "VARCHAR",
+          "descricao": "1 Branca, 2 Preta, 3 Parda, 4 Amarela, 5 Indígena, 6 Não informada, 9 Não identificada."
+        },
+        {
+          "nome": "codigo_grau_instrucao",
+          "tipo": "INTEGER",
+          "descricao": "Código de escolaridade, preservando inclusive valores não mapeados."
+        },
+        {
+          "nome": "escolaridade",
+          "tipo": "VARCHAR",
+          "descricao": "Descrição dos códigos 1–11, 80 (Pós-graduação completa) e 99; demais códigos não mapeados."
+        },
+        {
+          "nome": "codigo_faixa_etaria",
+          "tipo": "INTEGER",
+          "descricao": "0 não informada; 1 até 17; 2 18–24; 3 25–29; 4 30–39; 5 40–49; 6 50–64; 7 65 ou mais."
+        },
+        {
+          "nome": "faixa_etaria",
+          "tipo": "VARCHAR",
+          "descricao": "Rótulo da faixa etária, com limites inclusivos."
+        }
+      ]
+    },
+    {
+      "unique_id": "model.metra.fct_geografia_mensal",
+      "nome": "fct_geografia_mensal",
+      "schema": "gold",
+      "materializacao": "table",
+      "descricao": "Uma linha por competência × UF × capital/interior no recorte identificado do Centro-Oeste de 2023–2026. Atende P3; ausência de grupo não gera linha artificial.",
+      "depende_de": [
+        "model.metra.fct_movimentacao"
+      ],
+      "quantidade_colunas": 9,
+      "quantidade_testes_dbt": 6,
+      "colunas": [
+        {
+          "nome": "competencia",
+          "tipo": "DATE",
+          "descricao": "Primeiro dia do mês de ocorrência do evento (DATE)."
+        },
+        {
+          "nome": "sigla_uf",
+          "tipo": "VARCHAR",
+          "descricao": "Sigla da UF; NI no sentinela. Os agregados restringem DF, GO, MT e MS."
+        },
+        {
+          "nome": "is_capital",
+          "tipo": "BOOLEAN",
+          "descricao": "Verdadeiro para Brasília, Goiânia, Cuiabá ou Campo Grande; DF não possui interior."
+        },
+        {
+          "nome": "admissoes",
+          "tipo": "BIGINT",
+          "descricao": "Quantidade de eventos com saldo_movimentacao = 1."
+        },
+        {
+          "nome": "desligamentos",
+          "tipo": "BIGINT",
+          "descricao": "Quantidade de eventos com saldo_movimentacao = -1."
+        },
+        {
+          "nome": "saldo",
+          "tipo": "HUGEINT",
+          "descricao": "Soma de saldo_movimentacao; admissoes menos desligamentos."
+        },
+        {
+          "nome": "soma_salarios_admissao",
+          "tipo": "DECIMAL(38,2)",
+          "descricao": "Soma em R$ nominais dos salários positivos de admissão; zero para eventos inelegíveis."
+        },
+        {
+          "nome": "qtd_salarios_admissao",
+          "tipo": "BIGINT",
+          "descricao": "Quantidade de admissões com salário positivo; denominador da média."
+        },
+        {
+          "nome": "salario_medio_admissao",
+          "tipo": "DOUBLE",
+          "descricao": "Soma salarial dividida pelo denominador; NULL sem salários elegíveis. Recalcular após reagrupar."
+        }
+      ]
+    },
+    {
+      "unique_id": "model.metra.fct_movimentacao",
+      "nome": "fct_movimentacao",
+      "schema": "gold",
+      "materializacao": "table",
+      "descricao": "Uma linha por id_movimentacao da Silver, sem filtro regional e sem perda de eventos; dimensões ligadas por LEFT JOIN.",
+      "depende_de": [
+        "model.metra.dim_cbo",
+        "model.metra.dim_cnae",
+        "model.metra.dim_competencia",
+        "model.metra.dim_municipio",
+        "model.metra.dim_perfil_demografico",
+        "model.metra.stg_movimentacao"
+      ],
+      "quantidade_colunas": 29,
+      "quantidade_testes_dbt": 15,
+      "colunas": [
+        {
+          "nome": "id_movimentacao",
+          "tipo": "BIGINT",
+          "descricao": "Chave da movimentação na origem."
+        },
+        {
+          "nome": "ano",
+          "tipo": "INTEGER",
+          "descricao": "Ano do evento."
+        },
+        {
+          "nome": "mes",
+          "tipo": "INTEGER",
+          "descricao": "Mês do evento."
+        },
+        {
+          "nome": "competencia",
+          "tipo": "DATE",
+          "descricao": "Primeiro dia do mês de ocorrência do evento (DATE)."
+        },
+        {
+          "nome": "id_municipio",
+          "tipo": "VARCHAR",
+          "descricao": "FK natural para dim_municipio; preserva o sentinela."
+        },
+        {
+          "nome": "codigo_cnae_subclasse",
+          "tipo": "VARCHAR",
+          "descricao": "FK natural textual para dim_cnae."
+        },
+        {
+          "nome": "codigo_cbo",
+          "tipo": "VARCHAR",
+          "descricao": "FK natural textual para dim_cbo."
+        },
+        {
+          "nome": "codigo_sexo",
+          "tipo": "INTEGER",
+          "descricao": "Código do sexo registrado na origem."
+        },
+        {
+          "nome": "codigo_raca_cor",
+          "tipo": "INTEGER",
+          "descricao": "Código de raça/cor da origem."
+        },
+        {
+          "nome": "idade",
+          "tipo": "INTEGER",
+          "descricao": "Idade em anos, nula quando ausente ou inválida na origem."
+        },
+        {
+          "nome": "codigo_grau_instrucao",
+          "tipo": "INTEGER",
+          "descricao": "Código da escolaridade na origem."
+        },
+        {
+          "nome": "codigo_tipo_movimentacao",
+          "tipo": "INTEGER",
+          "descricao": "Tipo de movimentação cadastrado no CAGED."
+        },
+        {
+          "nome": "saldo_movimentacao",
+          "tipo": "INTEGER",
+          "descricao": "1 admissão, -1 desligamento; sinal usado nas métricas."
+        },
+        {
+          "nome": "tipo_evento",
+          "tipo": "VARCHAR",
+          "descricao": "admissao ou desligamento, conforme o sinal."
+        },
+        {
+          "nome": "salario_mensal",
+          "tipo": "DECIMAL(16,2)",
+          "descricao": "Salário mensal nominal em R$ da Silver; a E1 substitui ausentes e negativos por zero."
+        },
+        {
+          "nome": "salario_valido",
+          "tipo": "BOOLEAN",
+          "descricao": "Verdadeiro para salário positivo; elegibilidade da média exige também admissão."
+        },
+        {
+          "nome": "horas_contratuais",
+          "tipo": "DECIMAL(5,2)",
+          "descricao": "Horas semanais da origem."
+        },
+        {
+          "nome": "id_ingestao",
+          "tipo": "BIGINT",
+          "descricao": "Identificação do lote Bronze."
+        },
+        {
+          "nome": "numero_linha",
+          "tipo": "BIGINT",
+          "descricao": "Linha no arquivo do lote Bronze."
+        },
+        {
+          "nome": "registrado_em",
+          "tipo": "TIMESTAMP WITH TIME ZONE",
+          "descricao": "Momento do registro transacional; não define competência."
+        },
+        {
+          "nome": "codigo_faixa_etaria",
+          "tipo": "INTEGER",
+          "descricao": "Faixa calculada a partir da idade; mesma regra da dimensão de perfil."
+        },
+        {
+          "nome": "id_perfil_demografico",
+          "tipo": "VARCHAR",
+          "descricao": "FK para a combinação observada em dim_perfil_demografico."
+        },
+        {
+          "nome": "sigla_uf",
+          "tipo": "VARCHAR",
+          "descricao": "Sigla da UF; NI no sentinela. Os agregados restringem DF, GO, MT e MS."
+        },
+        {
+          "nome": "is_capital",
+          "tipo": "BOOLEAN",
+          "descricao": "Verdadeiro para Brasília, Goiânia, Cuiabá ou Campo Grande; DF não possui interior."
+        },
+        {
+          "nome": "is_identificado",
+          "tipo": "BOOLEAN",
+          "descricao": "Indicador geográfico da dimensão municipal."
+        },
+        {
+          "nome": "is_centro_oeste",
+          "tipo": "BOOLEAN",
+          "descricao": "Indicador geográfico da dimensão municipal."
+        },
+        {
+          "nome": "codigo_secao",
+          "tipo": "VARCHAR",
+          "descricao": "Seção CNAE; Z permanece nos agregados e é excluída dos rankings e da correlação."
+        },
+        {
+          "nome": "codigo_grande_grupo",
+          "tipo": "VARCHAR",
+          "descricao": "Grande grupo da dimensão CBO."
+        },
+        {
+          "nome": "competencia_tem_dados",
+          "tipo": "BOOLEAN",
+          "descricao": "Indicador da dimensão de competência."
+        }
+      ]
+    },
+    {
+      "unique_id": "model.metra.fct_perfil_mensal",
+      "nome": "fct_perfil_mensal",
+      "schema": "gold",
+      "materializacao": "table",
+      "descricao": "Uma linha por competência × UF × capital/interior × seção CNAE × perfil no recorte identificado do Centro-Oeste de 2023–2026. Atende P5.",
+      "depende_de": [
+        "model.metra.fct_movimentacao"
+      ],
+      "quantidade_colunas": 11,
+      "quantidade_testes_dbt": 7,
+      "colunas": [
+        {
+          "nome": "competencia",
+          "tipo": "DATE",
+          "descricao": "Primeiro dia do mês de ocorrência do evento (DATE)."
+        },
+        {
+          "nome": "sigla_uf",
+          "tipo": "VARCHAR",
+          "descricao": "Sigla da UF; NI no sentinela. Os agregados restringem DF, GO, MT e MS."
+        },
+        {
+          "nome": "is_capital",
+          "tipo": "BOOLEAN",
+          "descricao": "Verdadeiro para Brasília, Goiânia, Cuiabá ou Campo Grande; DF não possui interior."
+        },
+        {
+          "nome": "codigo_secao",
+          "tipo": "VARCHAR",
+          "descricao": "Seção CNAE; Z permanece nos agregados e é excluída dos rankings e da correlação."
+        },
+        {
+          "nome": "id_perfil_demografico",
+          "tipo": "VARCHAR",
+          "descricao": "FK para dim_perfil_demografico; permite recortes demográficos cruzados."
+        },
+        {
+          "nome": "admissoes",
+          "tipo": "BIGINT",
+          "descricao": "Quantidade de eventos com saldo_movimentacao = 1."
+        },
+        {
+          "nome": "desligamentos",
+          "tipo": "BIGINT",
+          "descricao": "Quantidade de eventos com saldo_movimentacao = -1."
+        },
+        {
+          "nome": "saldo",
+          "tipo": "HUGEINT",
+          "descricao": "Soma de saldo_movimentacao; admissoes menos desligamentos."
+        },
+        {
+          "nome": "soma_salarios_admissao",
+          "tipo": "DECIMAL(38,2)",
+          "descricao": "Soma em R$ nominais dos salários positivos de admissão; zero para eventos inelegíveis."
+        },
+        {
+          "nome": "qtd_salarios_admissao",
+          "tipo": "BIGINT",
+          "descricao": "Quantidade de admissões com salário positivo; denominador da média."
+        },
+        {
+          "nome": "salario_medio_admissao",
+          "tipo": "DOUBLE",
+          "descricao": "Soma salarial dividida pelo denominador; NULL sem salários elegíveis. Recalcular após reagrupar."
+        }
+      ]
+    },
+    {
+      "unique_id": "model.metra.fct_setor_mensal",
+      "nome": "fct_setor_mensal",
+      "schema": "gold",
+      "materializacao": "table",
+      "descricao": "Uma linha por competência × UF × seção CNAE no recorte identificado do Centro-Oeste de 2023–2026. Atende P1, P2 e P4.",
+      "depende_de": [
+        "model.metra.fct_movimentacao"
+      ],
+      "quantidade_colunas": 9,
+      "quantidade_testes_dbt": 7,
+      "colunas": [
+        {
+          "nome": "competencia",
+          "tipo": "DATE",
+          "descricao": "Primeiro dia do mês de ocorrência do evento (DATE)."
+        },
+        {
+          "nome": "sigla_uf",
+          "tipo": "VARCHAR",
+          "descricao": "Sigla da UF; NI no sentinela. Os agregados restringem DF, GO, MT e MS."
+        },
+        {
+          "nome": "codigo_secao",
+          "tipo": "VARCHAR",
+          "descricao": "Seção CNAE; Z permanece nos agregados e é excluída dos rankings e da correlação."
+        },
+        {
+          "nome": "admissoes",
+          "tipo": "BIGINT",
+          "descricao": "Quantidade de eventos com saldo_movimentacao = 1."
+        },
+        {
+          "nome": "desligamentos",
+          "tipo": "BIGINT",
+          "descricao": "Quantidade de eventos com saldo_movimentacao = -1."
+        },
+        {
+          "nome": "saldo",
+          "tipo": "HUGEINT",
+          "descricao": "Soma de saldo_movimentacao; admissoes menos desligamentos."
+        },
+        {
+          "nome": "soma_salarios_admissao",
+          "tipo": "DECIMAL(38,2)",
+          "descricao": "Soma em R$ nominais dos salários positivos de admissão; zero para eventos inelegíveis."
+        },
+        {
+          "nome": "qtd_salarios_admissao",
+          "tipo": "BIGINT",
+          "descricao": "Quantidade de admissões com salário positivo; denominador da média."
+        },
+        {
+          "nome": "salario_medio_admissao",
+          "tipo": "DOUBLE",
+          "descricao": "Soma salarial dividida pelo denominador; NULL sem salários elegíveis. Recalcular após reagrupar."
+        }
+      ]
+    },
+    {
+      "unique_id": "model.metra.geografia_mensal",
+      "nome": "geografia_mensal",
+      "schema": "consumo",
+      "materializacao": "view",
+      "descricao": "Fluxos por competência, UF e capital/interior (P3), com a mesma supressão.",
+      "depende_de": [
+        "model.metra.fct_geografia_mensal"
+      ],
+      "quantidade_colunas": 8,
+      "quantidade_testes_dbt": 10,
+      "colunas": [
+        {
+          "nome": "competencia",
+          "tipo": "DATE",
+          "descricao": "Primeiro dia do mês de ocorrência da movimentação (DATE)."
+        },
+        {
+          "nome": "sigla_uf",
+          "tipo": "VARCHAR",
+          "descricao": "Sigla da Unidade da Federação no Centro-Oeste (DF, GO, MT ou MS)."
+        },
+        {
+          "nome": "is_capital",
+          "tipo": "BOOLEAN",
+          "descricao": "Verdadeiro para as capitais (Brasília, Goiânia, Cuiabá e Campo Grande); falso para municípios do interior."
+        },
+        {
+          "nome": "admissoes",
+          "tipo": "HUGEINT",
+          "descricao": "Total de admissões do grupo (publicado somente quando admissoes + desligamentos >= 5)."
+        },
+        {
+          "nome": "desligamentos",
+          "tipo": "HUGEINT",
+          "descricao": "Total de desligamentos do grupo (publicado somente quando admissoes + desligamentos >= 5)."
+        },
+        {
+          "nome": "saldo",
+          "tipo": "HUGEINT",
+          "descricao": "Saldo líquido de vínculos no grupo (admissoes - desligamentos)."
+        },
+        {
+          "nome": "soma_salarios_admissao",
+          "tipo": "DECIMAL(38,2)",
+          "descricao": "Soma em R$ nominais dos salários válidos de admissão; NULL quando qtd_salarios_admissao < 5."
+        },
+        {
+          "nome": "qtd_salarios_admissao",
+          "tipo": "HUGEINT",
+          "descricao": "Denominador de admissões com salário válido; NULL quando menor que 5 observações."
+        }
+      ]
+    },
+    {
+      "unique_id": "model.metra.metricflow_time_spine",
+      "nome": "metricflow_time_spine",
+      "schema": "main",
+      "materializacao": "view",
+      "descricao": "Uma linha por dia de 2023-01-01 a 2026-12-31; time spine da camada semântica.",
+      "depende_de": [],
+      "quantidade_colunas": 1,
+      "quantidade_testes_dbt": 2,
+      "colunas": [
+        {
+          "nome": "date_day",
+          "tipo": "DATE",
+          "descricao": "Dia do calendário."
+        }
+      ]
+    },
+    {
+      "unique_id": "model.metra.perfil_mensal",
+      "nome": "perfil_mensal",
+      "schema": "consumo",
+      "materializacao": "view",
+      "descricao": "Fluxos por competência, UF, capital/interior, seção CNAE e categoria de um eixo demográfico por vez (P5), com a mesma supressão. Os eixos não se cruzam.",
+      "depende_de": [
+        "model.metra.dim_perfil_demografico",
+        "model.metra.fct_perfil_mensal"
+      ],
+      "quantidade_colunas": 12,
+      "quantidade_testes_dbt": 9,
+      "colunas": [
+        {
+          "nome": "competencia",
+          "tipo": "DATE",
+          "descricao": "Primeiro dia do mês de ocorrência da movimentação (DATE)."
+        },
+        {
+          "nome": "sigla_uf",
+          "tipo": "VARCHAR",
+          "descricao": "Sigla da Unidade da Federação no Centro-Oeste (DF, GO, MT ou MS)."
+        },
+        {
+          "nome": "is_capital",
+          "tipo": "BOOLEAN",
+          "descricao": "Verdadeiro para capital e falso para interior."
+        },
+        {
+          "nome": "codigo_secao",
+          "tipo": "VARCHAR",
+          "descricao": "Código da seção da CNAE 2.0 (A–U ou Z)."
+        },
+        {
+          "nome": "eixo",
+          "tipo": "VARCHAR",
+          "descricao": "Dimensão sociodemográfica avaliada isoladamente (sexo, raca_cor, escolaridade ou faixa_etaria)."
+        },
+        {
+          "nome": "codigo_categoria",
+          "tipo": "INTEGER",
+          "descricao": "Código inteiro da categoria demográfica dentro do eixo correspondente."
+        },
+        {
+          "nome": "categoria",
+          "tipo": "VARCHAR",
+          "descricao": "Rótulo textual da categoria demográfica (ex.: Mulher, Parda, Superior Completo)."
+        },
+        {
+          "nome": "admissoes",
+          "tipo": "HUGEINT",
+          "descricao": "Total de admissões da categoria (publicado somente quando admissoes + desligamentos >= 5)."
+        },
+        {
+          "nome": "desligamentos",
+          "tipo": "HUGEINT",
+          "descricao": "Total de desligamentos da categoria (publicado somente quando admissoes + desligamentos >= 5)."
+        },
+        {
+          "nome": "saldo",
+          "tipo": "HUGEINT",
+          "descricao": "Saldo líquido de vínculos na categoria (admissoes - desligamentos)."
+        },
+        {
+          "nome": "soma_salarios_admissao",
+          "tipo": "DECIMAL(38,2)",
+          "descricao": "Soma em R$ nominais dos salários válidos de admissão; NULL quando qtd_salarios_admissao < 5."
+        },
+        {
+          "nome": "qtd_salarios_admissao",
+          "tipo": "HUGEINT",
+          "descricao": "Denominador de admissões com salário válido; NULL quando menor que 5 observações."
+        }
+      ]
+    },
+    {
+      "unique_id": "model.metra.setor_mensal",
+      "nome": "setor_mensal",
+      "schema": "consumo",
+      "materializacao": "view",
+      "descricao": "Fluxos por competência, UF e seção CNAE (P1, P2 e P4). Só grupos com pelo menos 5 movimentações; medidas salariais nulas com menos de 5 salários válidos.",
+      "depende_de": [
+        "model.metra.fct_setor_mensal"
+      ],
+      "quantidade_colunas": 8,
+      "quantidade_testes_dbt": 10,
+      "colunas": [
+        {
+          "nome": "competencia",
+          "tipo": "DATE",
+          "descricao": "Primeiro dia do mês de ocorrência da movimentação (DATE)."
+        },
+        {
+          "nome": "sigla_uf",
+          "tipo": "VARCHAR",
+          "descricao": "Sigla da Unidade da Federação no Centro-Oeste (DF, GO, MT ou MS)."
+        },
+        {
+          "nome": "codigo_secao",
+          "tipo": "VARCHAR",
+          "descricao": "Código da seção da CNAE 2.0 (A–U ou Z para não identificada)."
+        },
+        {
+          "nome": "admissoes",
+          "tipo": "HUGEINT",
+          "descricao": "Total de admissões do grupo (publicado somente quando admissoes + desligamentos >= 5)."
+        },
+        {
+          "nome": "desligamentos",
+          "tipo": "HUGEINT",
+          "descricao": "Total de desligamentos do grupo (publicado somente quando admissoes + desligamentos >= 5)."
+        },
+        {
+          "nome": "saldo",
+          "tipo": "HUGEINT",
+          "descricao": "Saldo líquido de vínculos no grupo (admissoes - desligamentos)."
+        },
+        {
+          "nome": "soma_salarios_admissao",
+          "tipo": "DECIMAL(38,2)",
+          "descricao": "Soma em R$ nominais dos salários válidos de admissão; NULL quando qtd_salarios_admissao < 5."
+        },
+        {
+          "nome": "qtd_salarios_admissao",
+          "tipo": "HUGEINT",
+          "descricao": "Denominador de admissões com salário válido; NULL quando menor que 5 observações."
+        }
+      ]
+    },
+    {
+      "unique_id": "model.metra.stg_cbo",
+      "nome": "stg_cbo",
+      "schema": "silver",
+      "materializacao": "table",
+      "descricao": "Ocupações da CBO 2002.",
+      "depende_de": [
+        "source.metra.lake.cbo_2002"
+      ],
+      "quantidade_colunas": 4,
+      "quantidade_testes_dbt": 13,
+      "colunas": [
+        {
+          "nome": "codigo_cbo",
+          "tipo": "VARCHAR",
+          "descricao": "Código da ocupação com 6 dígitos."
+        },
+        {
+          "nome": "titulo_ocupacao",
+          "tipo": "VARCHAR",
+          "descricao": "Título da ocupação."
+        },
+        {
+          "nome": "codigo_grande_grupo",
+          "tipo": "VARCHAR",
+          "descricao": "Grande grupo ocupacional (primeiro dígito do código)."
+        },
+        {
+          "nome": "is_cadastro_oficial",
+          "tipo": "BOOLEAN",
+          "descricao": "Falso para ocupações criadas pela carga a partir de códigos ausentes da base oficial."
+        }
+      ]
+    },
+    {
+      "unique_id": "model.metra.stg_cnae",
+      "nome": "stg_cnae",
+      "schema": "silver",
+      "materializacao": "table",
+      "descricao": "Subclasses da CNAE 2.0 com a seção correspondente.",
+      "depende_de": [
+        "source.metra.lake.cnae_secao",
+        "source.metra.lake.cnae_subclasse"
+      ],
+      "quantidade_colunas": 5,
+      "quantidade_testes_dbt": 16,
+      "colunas": [
+        {
+          "nome": "codigo_cnae_subclasse",
+          "tipo": "VARCHAR",
+          "descricao": "Código da subclasse com 7 dígitos."
+        },
+        {
+          "nome": "descricao_subclasse",
+          "tipo": "VARCHAR",
+          "descricao": "Descrição da subclasse."
+        },
+        {
+          "nome": "codigo_secao",
+          "tipo": "VARCHAR",
+          "descricao": "Letra da seção CNAE; Z para atividades não identificadas."
+        },
+        {
+          "nome": "descricao_secao",
+          "tipo": "VARCHAR",
+          "descricao": "Descrição da seção."
+        },
+        {
+          "nome": "is_cadastro_oficial",
+          "tipo": "BOOLEAN",
+          "descricao": "Falso para o sentinela 9999999 e para subclasses administrativas criadas pela carga."
+        }
+      ]
+    },
+    {
+      "unique_id": "model.metra.stg_movimentacao",
+      "nome": "stg_movimentacao",
+      "schema": "silver",
+      "materializacao": "table",
+      "descricao": "Movimentações de admissão e desligamento do Novo CAGED, uma linha por movimentação da origem.",
+      "depende_de": [
+        "source.metra.lake.movimentacao"
+      ],
+      "quantidade_colunas": 20,
+      "quantidade_testes_dbt": 45,
+      "colunas": [
+        {
+          "nome": "id_movimentacao",
+          "tipo": "BIGINT",
+          "descricao": "Chave da movimentação na origem (oltp.movimentacao)."
+        },
+        {
+          "nome": "ano",
+          "tipo": "INTEGER",
+          "descricao": "Ano da competência."
+        },
+        {
+          "nome": "mes",
+          "tipo": "INTEGER",
+          "descricao": "Mês da competência (1 a 12)."
+        },
+        {
+          "nome": "competencia",
+          "tipo": "DATE",
+          "descricao": "Primeiro dia do mês da competência."
+        },
+        {
+          "nome": "id_municipio",
+          "tipo": "VARCHAR",
+          "descricao": "Código IBGE de 7 dígitos; 9999999 quando não identificado. Liga a stg_municipio."
+        },
+        {
+          "nome": "codigo_cnae_subclasse",
+          "tipo": "VARCHAR",
+          "descricao": "Subclasse CNAE 2.0 de 7 dígitos; 9999999 quando não identificada. Liga a stg_cnae."
+        },
+        {
+          "nome": "codigo_cbo",
+          "tipo": "VARCHAR",
+          "descricao": "Ocupação CBO 2002 de 6 dígitos. Liga a stg_cbo."
+        },
+        {
+          "nome": "codigo_sexo",
+          "tipo": "INTEGER",
+          "descricao": "Código do CAGED (1 homem, 3 mulher, 9 não identificado)."
+        },
+        {
+          "nome": "codigo_raca_cor",
+          "tipo": "INTEGER",
+          "descricao": "Código do CAGED (1 branca, 2 preta, 3 parda, 4 amarela, 5 indígena, 6 não informada, 9 não identificado)."
+        },
+        {
+          "nome": "idade",
+          "tipo": "INTEGER",
+          "descricao": "Idade em anos; nula quando ausente ou fora de 10 a 120."
+        },
+        {
+          "nome": "codigo_grau_instrucao",
+          "tipo": "INTEGER",
+          "descricao": "Código de escolaridade do CAGED."
+        },
+        {
+          "nome": "codigo_tipo_movimentacao",
+          "tipo": "INTEGER",
+          "descricao": "Código do tipo de movimentação do CAGED (admissão, demissão, aposentadoria etc.)."
+        },
+        {
+          "nome": "saldo_movimentacao",
+          "tipo": "INTEGER",
+          "descricao": "1 para admissão e -1 para desligamento; a soma é o saldo de empregos."
+        },
+        {
+          "nome": "tipo_evento",
+          "tipo": "VARCHAR",
+          "descricao": "'admissao' ou 'desligamento', derivado de saldo_movimentacao."
+        },
+        {
+          "nome": "salario_mensal",
+          "tipo": "DECIMAL(16,2)",
+          "descricao": "Salário mensal nominal em R$; zero quando ausente ou negativo na fonte."
+        },
+        {
+          "nome": "salario_valido",
+          "tipo": "BOOLEAN",
+          "descricao": "Verdadeiro quando salario_mensal > 0; critério para entrar em médias salariais."
+        },
+        {
+          "nome": "horas_contratuais",
+          "tipo": "DECIMAL(5,2)",
+          "descricao": "Horas semanais contratadas; zero quando ausentes ou negativas na fonte."
+        },
+        {
+          "nome": "id_ingestao",
+          "tipo": "BIGINT",
+          "descricao": "Lote de ingestão na camada bronze (linhagem)."
+        },
+        {
+          "nome": "numero_linha",
+          "tipo": "BIGINT",
+          "descricao": "Linha do arquivo de origem no lote (linhagem)."
+        },
+        {
+          "nome": "registrado_em",
+          "tipo": "TIMESTAMP WITH TIME ZONE",
+          "descricao": "Momento do registro na origem transacional."
+        }
+      ]
+    },
+    {
+      "unique_id": "model.metra.stg_municipio",
+      "nome": "stg_municipio",
+      "schema": "silver",
+      "materializacao": "table",
+      "descricao": "Municípios oficiais do IBGE, incluindo o sentinela 9999999.",
+      "depende_de": [
+        "source.metra.lake.municipio"
+      ],
+      "quantidade_colunas": 8,
+      "quantidade_testes_dbt": 22,
+      "colunas": [
+        {
+          "nome": "id_municipio",
+          "tipo": "VARCHAR",
+          "descricao": "Código IBGE de 7 dígitos."
+        },
+        {
+          "nome": "nome_municipio",
+          "tipo": "VARCHAR",
+          "descricao": "Nome oficial do município."
+        },
+        {
+          "nome": "sigla_uf",
+          "tipo": "VARCHAR",
+          "descricao": "Sigla da UF; NI para o sentinela."
+        },
+        {
+          "nome": "nome_uf",
+          "tipo": "VARCHAR",
+          "descricao": "Nome da UF."
+        },
+        {
+          "nome": "regiao",
+          "tipo": "VARCHAR",
+          "descricao": "Grande região do IBGE."
+        },
+        {
+          "nome": "is_capital",
+          "tipo": "BOOLEAN",
+          "descricao": "Verdadeiro para as capitais do Centro-Oeste (Brasília, Goiânia, Cuiabá e Campo Grande)."
+        },
+        {
+          "nome": "is_identificado",
+          "tipo": "BOOLEAN",
+          "descricao": "Falso apenas para o sentinela 9999999."
+        },
+        {
+          "nome": "is_centro_oeste",
+          "tipo": "BOOLEAN",
+          "descricao": "Verdadeiro para municípios de DF, GO, MT e MS."
+        }
+      ]
+    },
+    {
+      "unique_id": "snapshot.metra.snp_cbo",
+      "nome": "snp_cbo",
+      "schema": "snapshots",
+      "materializacao": "snapshot",
+      "descricao": "Histórico de versões das ocupações CBO 2002 capturado a cada execução do dbt.",
+      "depende_de": [
+        "model.metra.stg_cbo"
+      ],
+      "quantidade_colunas": 8,
+      "quantidade_testes_dbt": 0,
+      "colunas": [
+        {
+          "nome": "codigo_cbo",
+          "tipo": "VARCHAR",
+          "descricao": ""
+        },
+        {
+          "nome": "titulo_ocupacao",
+          "tipo": "VARCHAR",
+          "descricao": ""
+        },
+        {
+          "nome": "codigo_grande_grupo",
+          "tipo": "VARCHAR",
+          "descricao": ""
+        },
+        {
+          "nome": "is_cadastro_oficial",
+          "tipo": "BOOLEAN",
+          "descricao": ""
+        },
+        {
+          "nome": "dbt_scd_id",
+          "tipo": "VARCHAR",
+          "descricao": ""
+        },
+        {
+          "nome": "dbt_updated_at",
+          "tipo": "TIMESTAMP",
+          "descricao": ""
+        },
+        {
+          "nome": "dbt_valid_from",
+          "tipo": "TIMESTAMP",
+          "descricao": ""
+        },
+        {
+          "nome": "dbt_valid_to",
+          "tipo": "TIMESTAMP",
+          "descricao": ""
+        }
+      ]
+    }
+  ],
+  "metricas": [
+    {
+      "unique_id": "metric.metra.admissoes",
+      "nome": "admissoes",
+      "label": "Admissões",
+      "tipo": "simple",
+      "descricao": "Total de movimentações de admissão no recorte. Conta movimentações, não pessoas distintas.",
+      "depende_de": [
+        "semantic_model.metra.movimentacao"
+      ]
+    },
+    {
+      "unique_id": "metric.metra.desligamentos",
+      "nome": "desligamentos",
+      "label": "Desligamentos",
+      "tipo": "simple",
+      "descricao": "Total de movimentações de desligamento no recorte.",
+      "depende_de": [
+        "semantic_model.metra.movimentacao"
+      ]
+    },
+    {
+      "unique_id": "metric.metra.indice_fluxos_pareados_pct",
+      "nome": "indice_fluxos_pareados_pct",
+      "label": "Índice de fluxos pareados",
+      "tipo": "derived",
+      "descricao": "Proxy de rotatividade setorial (ADR-0007): 200 x min(admissões, desligamentos) / (admissões + desligamentos), de 0 a 100%.",
+      "depende_de": [
+        "metric.metra.admissoes",
+        "metric.metra.desligamentos"
+      ]
+    },
+    {
+      "unique_id": "metric.metra.qtd_salarios_admissao",
+      "nome": "qtd_salarios_admissao",
+      "label": "Admissões com salário válido",
+      "tipo": "simple",
+      "descricao": "Quantidade de admissões com salário válido; deve acompanhar a média exibida.",
+      "depende_de": [
+        "semantic_model.metra.movimentacao"
+      ]
+    },
+    {
+      "unique_id": "metric.metra.salario_medio_admissao",
+      "nome": "salario_medio_admissao",
+      "label": "Salário médio de admissão",
+      "tipo": "ratio",
+      "descricao": "Média ponderada dos salários mensais válidos das admissões: soma dos salários dividida pela quantidade válida, sempre recomposta a partir das medidas aditivas (nunca média simples de médias).",
+      "depende_de": [
+        "metric.metra.qtd_salarios_admissao",
+        "metric.metra.soma_salarios_admissao"
+      ]
+    },
+    {
+      "unique_id": "metric.metra.saldo",
+      "nome": "saldo",
+      "label": "Saldo líquido",
+      "tipo": "simple",
+      "descricao": "Admissões menos desligamentos no recorte.",
+      "depende_de": [
+        "semantic_model.metra.movimentacao"
+      ]
+    },
+    {
+      "unique_id": "metric.metra.soma_salarios_admissao",
+      "nome": "soma_salarios_admissao",
+      "label": "Soma dos salários de admissão",
+      "tipo": "simple",
+      "descricao": "Soma dos salários mensais válidos das admissões (numerador do salário médio).",
+      "depende_de": [
+        "semantic_model.metra.movimentacao"
+      ]
+    }
+  ],
+  "analises": [
+    {
+      "unique_id": "analysis.metra.p1_setores_df",
+      "nome": "p1_setores_df",
+      "caminho": "analyses\\p1_setores_df.sql",
+      "depende_de": [
+        "model.metra.dim_cnae",
+        "model.metra.fct_setor_mensal"
+      ]
+    },
+    {
+      "unique_id": "analysis.metra.p2_sazonalidade",
+      "nome": "p2_sazonalidade",
+      "caminho": "analyses\\p2_sazonalidade.sql",
+      "depende_de": [
+        "model.metra.dim_competencia",
+        "model.metra.fct_setor_mensal"
+      ]
+    },
+    {
+      "unique_id": "analysis.metra.p3_capitais_interior",
+      "nome": "p3_capitais_interior",
+      "caminho": "analyses\\p3_capitais_interior.sql",
+      "depende_de": [
+        "model.metra.fct_geografia_mensal"
+      ]
+    },
+    {
+      "unique_id": "analysis.metra.p4_fluxos_salarios",
+      "nome": "p4_fluxos_salarios",
+      "caminho": "analyses\\p4_fluxos_salarios.sql",
+      "depende_de": [
+        "model.metra.fct_setor_mensal"
+      ]
+    },
+    {
+      "unique_id": "analysis.metra.p5_perfil_remuneracao",
+      "nome": "p5_perfil_remuneracao",
+      "caminho": "analyses\\p5_perfil_remuneracao.sql",
+      "depende_de": [
+        "model.metra.dim_perfil_demografico",
+        "model.metra.fct_perfil_mensal"
+      ]
+    }
+  ],
+  "exposures": [
+    {
+      "unique_id": "exposure.metra.assistente_text_to_sql_e_busca_cbo",
+      "nome": "assistente_text_to_sql_e_busca_cbo",
+      "label": "Busca Vetorial CBO 384d e Assistente Text-to-SQL (ADR 0007)",
+      "tipo": "application",
+      "url": "https://unb-bd2-2026-2-grupo-4.github.io/METRA/adr/0007-busca-semantica-e-consumo/",
+      "descricao": "Índice vetorial semântico de 384 dimensões sobre `gold.dim_cbo` (`src/app/busca_cbo.py`) e tradutor Text-to-SQL governado pelo catálogo (`src/app/text_to_sql.py`), com validação sintática `validar_sql_seguro` e bloqueio de leitura externa e de linhas individuais de `gold.fct_movimentacao`.",
+      "depende_de": [
+        "metric.metra.admissoes",
+        "metric.metra.desligamentos",
+        "metric.metra.indice_fluxos_pareados_pct",
+        "metric.metra.qtd_salarios_admissao",
+        "metric.metra.salario_medio_admissao",
+        "metric.metra.saldo",
+        "model.metra.dim_cbo",
+        "model.metra.dim_cnae",
+        "model.metra.dim_competencia",
+        "model.metra.dim_perfil_demografico",
+        "model.metra.fct_geografia_mensal",
+        "model.metra.fct_movimentacao",
+        "model.metra.fct_perfil_mensal",
+        "model.metra.fct_setor_mensal"
+      ]
+    },
+    {
+      "unique_id": "exposure.metra.base_consumo_isolada",
+      "nome": "base_consumo_isolada",
+      "label": "Base de Consumo Isolada (data/metra_consumo.duckdb)",
+      "tipo": "application",
+      "url": "https://unb-bd2-2026-2-grupo-4.github.io/METRA/consumo-e-governanca/#controle-de-acesso",
+      "descricao": "Banco DuckDB isolado publicado atomicamente por `src/acesso/base_consumo.py` (asset `base_consumo` no Dagster), contendo exclusivamente cópias físicas das quatro views `consumo.*` com supressão de pequenos grupos (k >= 5) e conexão travada sem acesso externo.",
+      "depende_de": [
+        "model.metra.calendario",
+        "model.metra.geografia_mensal",
+        "model.metra.perfil_mensal",
+        "model.metra.setor_mensal"
+      ]
+    },
+    {
+      "unique_id": "exposure.metra.etl_reverso_json_publico",
+      "nome": "etl_reverso_json_publico",
+      "label": "ETL Reverso: Snapshot JSON Público e Resumo Mensal (docs/assets/dados/metra.json)",
+      "tipo": "application",
+      "url": "https://unb-bd2-2026-2-grupo-4.github.io/METRA/consumo-json/",
+      "descricao": "Exportador `src/consumo/exportar_json.py` (asset `exportar_json_consumo` no Dagster) que lê exclusivamente as views `consumo.*`, recompõe as métricas pela camada semântica e publica `docs/assets/dados/metra.json` para consumo pelo resumo interativo no GitHub Pages.",
+      "depende_de": [
+        "metric.metra.admissoes",
+        "metric.metra.desligamentos",
+        "metric.metra.indice_fluxos_pareados_pct",
+        "metric.metra.qtd_salarios_admissao",
+        "metric.metra.salario_medio_admissao",
+        "metric.metra.saldo",
+        "model.metra.calendario",
+        "model.metra.geografia_mensal",
+        "model.metra.perfil_mensal",
+        "model.metra.setor_mensal"
+      ]
+    },
+    {
+      "unique_id": "exposure.metra.painel_streamlit",
+      "nome": "painel_streamlit",
+      "label": "Painel Analítico Streamlit (src/app/dashboard.py)",
+      "tipo": "dashboard",
+      "url": "http://localhost:8501",
+      "descricao": "Painel executivo interativo (serviço Docker `painel`, porta 8501) que consome o schema `gold` em modo somente leitura (`READ_ONLY`) e compila todas as métricas pela camada semântica (`src/metricas/camada_semantica.py`), apresentando as cinco perguntas de gestão (P1 a P5) com filtros por UF, Ano, Seção CNAE e Ocupação CBO.",
+      "depende_de": [
+        "metric.metra.admissoes",
+        "metric.metra.desligamentos",
+        "metric.metra.indice_fluxos_pareados_pct",
+        "metric.metra.qtd_salarios_admissao",
+        "metric.metra.salario_medio_admissao",
+        "metric.metra.saldo",
+        "model.metra.dim_cbo",
+        "model.metra.dim_cbo_historico",
+        "model.metra.dim_cnae",
+        "model.metra.dim_competencia",
+        "model.metra.dim_municipio",
+        "model.metra.dim_perfil_demografico",
+        "model.metra.fct_geografia_mensal",
+        "model.metra.fct_movimentacao",
+        "model.metra.fct_perfil_mensal",
+        "model.metra.fct_setor_mensal"
+      ]
+    }
+  ]
+}
