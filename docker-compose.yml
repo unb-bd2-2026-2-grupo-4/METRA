@@ -99,8 +99,8 @@ services:
       - ./data:/app/data
       - dagster_home:/opt/dagster/dagster_home
 
-  # Fluxo completo em um comando: Bronze -> OLTP -> Parquet/Delta -> dbt Silver/Gold,
-  # conciliação entre as camadas e, só depois do sucesso, o painel.
+  # Fluxo completo em um comando: Bronze -> OLTP -> Parquet/Delta -> dbt Silver/Gold/consumo,
+  # conciliação entre as camadas, demonstração do controle de acesso e, só depois do sucesso, o painel.
   #   docker compose --profile completo up --build -d painel-completo
   pipeline:
     build:
@@ -114,7 +114,10 @@ services:
     command:
       - sh
       - -c
-      - dagster job execute -m dagster_metra.definitions -j pipeline_metra && python -m src.qualidade.verificar_fluxo
+      - >-
+        dagster job execute -m dagster_metra.definitions -j pipeline_metra
+        && python -m src.qualidade.verificar_fluxo
+        && python -m src.acesso.demonstrar_acesso
     volumes:
       - ./data:/app/data
       - dagster_home:/opt/dagster/dagster_home
