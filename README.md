@@ -521,6 +521,17 @@ python -m unittest discover -s tests -p 'test_lgpd_descarte.py' -v
 
 Enquadramento completo, tabela de retenção e evidências em [Consumo e governança](docs/consumo-e-governanca.md#privacidade-e-governanca-lgpd-dados-tratados-base-legal-retencao-e-descarte) e [`docs/adr/evidencias/0008-lgpd-descarte.json`](docs/adr/evidencias/0008-lgpd-descarte.json).
 
+### Catálogo de Dados (`dbt docs` no GitHub Pages) e Linhagem Ponta a Ponta (E4)
+
+O dicionário de dados completo dos modelos (`silver`, `gold`, `snapshots` e `consumo`), das 5 fontes Parquet, das 7 métricas da camada semântica e dos 4 consumidores finais (`exposures`: Painel Streamlit, Busca Vetorial CBO / Text-to-SQL, Base de Consumo Isolada e ETL Reverso JSON Público) é compilado em um portal estático (`dbt docs generate --static`) por [`src/catalogo/gerar_dbt_docs.py`](src/catalogo/gerar_dbt_docs.py) e publicado automaticamente no GitHub Pages em `assets/dbt-docs/index.html` pelo workflow [`.github/workflows/deploy-docs.yml`](.github/workflows/deploy-docs.yml), acompanhado do manifesto versionado [`docs/assets/dbt-docs/linhagem.json`](docs/assets/dbt-docs/linhagem.json).
+
+```bash
+python -m src.catalogo.gerar_dbt_docs
+python -m unittest discover -s tests -p 'test_catalogo_linhagem.py' -v
+```
+
+Grafo completo e matriz de linhagem da fonte até o painel e o ETL reverso em [Consumo e governança](docs/consumo-e-governanca.md#catalogo-de-dados-dbt-docs-no-pages-e-linhagem-da-fonte-ao-painel-e-ao-etl-reverso).
+
 ---
 
 ## Governança, Transparência e Evolução do Projeto
