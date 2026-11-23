@@ -88,9 +88,142 @@ O modelo atual não contém CPF ou nome do trabalhador, mas combina município, 
 
 O destino configurável deve ser compartilhado por dbt, Dagster e consumidores; hoje o padrão dbt é `data/metra_analitico.duckdb`. O consumo só deve apontar para uma execução validada. SLA inicialmente proposto: até 24 horas entre conclusão da extração e publicação validada do mesmo lote. Ver [camada analítica](camada-analitica-dbt.md#freshness-e-proximos-criterios-de-aceite) para separar atraso de processamento de cobertura temporal da fonte.
 
-## ETL reverso: proposta a definir com a equipe
+## ETL reverso: JSON público
 
-Um caminho possível é exportar um resumo mensal validado de saldo e remuneração por setor/UF para um arquivo que um processo de acompanhamento do gestor consuma. Ainda faltam consumidor real, ação tomada, formato, chave idempotente, frequência e tratamento de falhas. Apenas gravar mais uma tabela ou CSV sem consumo não conclui ETL reverso. A escolha e a demonstração são necessárias na [E4](https://unb-bd2.github.io/PlanoEnsino/projeto/e4/).
+O asset `exportar_json_consumo` publica um snapshot do histórico disponível para
+o [resumo mensal](consumo-json.md). Esse consumidor permite inspecionar contratação,
+saldo e remuneração por recorte e apoiar a escolha de setores para acompanhamento.
+O dashboard e o agente de Arthur poderão usar o mesmo contrato. A página mínima
+exibe registros; não implementa o agente nem recalcula as respostas P1–P5.
+
+**Estado:** exportador, asset e consumidor implementados. A publicação de dados
+reais depende das views de acesso de Lucas, da revisão com Yan e de um PR com o
+JSON gerado. Não apresentar a demonstração de produção como concluída antes disso.
+
+### Contrato de entrada com a frente de acesso
+
+Os nomes abaixo são o contrato proposto para integração com Lucas, ainda sujeito à
+validação pela equipe. As views devem ser modelos dbt no schema `consumo`, com
+os mesmos nomes usados no grafo Dagster. O exportador não cria essas views e não
+consulta tabelas da Gold. Views ausentes ou incompatíveis fazem a execução falhar.
+
+| View | Chave única / dimensões |
+|---|---|
+| `consumo.setor_mensal` | `competencia`, `sigla_uf`, `codigo_secao` |
+| `consumo.geografia_mensal` | `competencia`, `sigla_uf`, `is_capital` |
+| `consumo.perfil_mensal` | `competencia`, `sigla_uf`, `is_capital`, `codigo_secao`, `eixo`, `codigo_categoria` |
+| `consumo.calendario` | `competencia` |
+
+Tipos: `competencia` é `DATE`, primeiro dia do mês, entre 2023 e 2026;
+`sigla_uf` é DF/GO/MT/MS; `codigo_secao` é A–U ou Z; `is_capital` é `BOOLEAN`.
+Na view de perfis, `eixo` é `sexo`, `raca_cor`, `escolaridade` ou `faixa_etaria`,
+`codigo_categoria` é inteiro e `categoria` é seu rótulo textual não nulo. Os eixos
+seguem a P5 e não representam filtros demográficos combinados.
+
+As três views de indicadores fornecem `admissoes`, `desligamentos`, `saldo`,
+`soma_salarios_admissao` (decimal) e `qtd_salarios_admissao`. Essas medidas têm os
+nomes da camada semântica e devem ser produzidas pelas suas macros. Cada grupo
+ocorre uma vez; códigos não informados permanecem categorias explícitas.
+
+Na origem, omitir grupos com `admissoes + desligamentos < 5`. Para menos de cinco
+salários válidos, incluindo zero, tornar **ambas** as medidas salariais nulas,
+mantendo os fluxos. O exportador verifica esse contrato e recusa grupos inseguros;
+não executa uma segunda política de supressão e não usa a Gold como alternativa.
+O índice de fluxos é calculado pela camada semântica, não pela regra de supressão.
+
+O calendário fornece `competencia` e `tem_dados` booleano, sem lacunas entre seus
+meses inicial e final e com pelo menos um mês observado. `tem_dados` indica dados
+na origem, independentemente da supressão. Meses sem dados permanecem no calendário;
+não inventar linhas de indicadores com zero para preencher ausências.
+
+### Contrato JSON v1 com o consumidor
+
+Destino versionado: `docs/assets/dados/metra.json`. O objeto contém:
+
+- `versao_schema`: inteiro `1`;
+- `recorte`: anos, UFs e ressalva sobre cobertura e supressão;
+- `metricas`: metadados do catálogo semântico, indexados pelo nome da métrica;
+- `setores`, `geografia`, `perfis`: listas de registros, com as dimensões da tabela
+  acima; perfis incluem também `categoria`;
+- `calendario`: lista de objetos com `competencia` e `tem_dados`.
+
+Cada registro de indicadores expõe somente `admissoes`, `desligamentos`, `saldo`,
+`qtd_salarios_admissao`, `salario_medio_admissao` e `indice_fluxos_pareados_pct`, além
+das dimensões. Datas são strings `YYYY-MM-DD`; contagens são inteiros; médias e
+índices são números, ou `null` para o salário suprimido. O índice já está na escala
+0–100. Não publicar o numerador salarial, identificadores individuais ou outros
+campos, mesmo que existam na view. Não converter `null` ou ausência de grupo em zero.
+
+Os cálculos usam `colunas_select()` da camada semântica, sobre as medidas da view.
+O JSON mantém a precisão numérica do resultado; arredondamento visual é tarefa do
+consumidor. As coleções cobrem os recortes de P1–P5 no universo publicado. Supressões
+podem tornar os totais parciais e as comparações diferentes das análises internas.
+Não somar diferentes coleções ou eixos. Não inferir valores suprimidos por diferença.
+
+### Execução, idempotência e falhas
+
+O job `pipeline_metra` inclui o exportador, com dependências nas quatro views de
+consumo. O schedule existente roda no dia 5, às 6h em `America/Sao_Paulo`; o daemon
+precisa estar ativo e o schedule habilitado. Para executar só a exportação:
+
+```bash
+docker compose --profile dagster run --build --rm dagster-webserver \
+  dagster job execute -m dagster_metra.definitions -j exportar_json_consumo_job
+```
+
+Alternativa local, no ambiente Python do pipeline:
+
+```bash
+python -m src.consumo.exportar_json
+python -m src.consumo.exportar_json --banco /caminho/analitico.duckdb --destino /tmp/metra.json
+```
+
+O banco respeita `METRA_DUCKDB` (relativo a `dbt_metra/`); o destino respeita
+`METRA_JSON_DESTINO` (relativo ao diretório de execução, quando não absoluto).
+No Compose o destino é `/app/publicacao/metra.json`, montado no diretório versionado.
+O banco é aberto somente para leitura, numa transação, com acesso externo desabilitado.
+Essa restrição do exportador não substitui o controle de acesso da frente de Lucas.
+
+A chave idempotente é a combinação das dimensões de cada coleção. Toda execução
+reconstrói o histórico completo e substitui o snapshot, incorporando correções de
+meses antigos sem duplicar linhas. Mesmo conteúdo gera bytes e SHA-256 iguais;
+o horário da execução fica só nos metadados do Dagster, junto com contagens,
+competências, destino e tamanho. O horário não representa a data de atualização
+da fonte nem o instante da publicação no Pages.
+
+Um lock serializa exportações ao mesmo destino. A escrita usa temporário no mesmo
+diretório e substituição atômica após validação, preservando a versão anterior em
+caso de falha. O Dagster reutiliza a política de três retries com espera inicial de
+10 segundos, backoff exponencial e jitter. Erros não são engolidos; esgotadas as
+tentativas, o run falha e precisa ser inspecionado. A execução direta pela CLI não
+faz retry por conta própria. Banco ocupado também segue o retry do asset.
+
+### Revisão e publicação
+
+1. Integrar as views do Lucas, validar o acesso e revisar a publicação com Yan.
+2. Materializar as views e executar o exportador. Conferir materialização e hash.
+3. Revisar o JSON gerado e incluí-lo no PR, com evidência da conciliação e do consumo.
+4. Exigir a CI verde. O fluxo de integração exige o JSON produzido pelo pipeline.
+5. Após revisão e merge na `main`, o workflow `deploy-docs.yml` publica pelo MkDocs.
+6. Abrir o resumo no Pages e conferir os filtros e a cobertura publicada.
+
+Não há commit, push ou credencial GitHub dentro do asset. O schedule atualiza o
+arquivo local; a publicação pública só muda após o PR. O SLA proposto de 24 horas
+até publicação depende também dessa etapa manual. O repositório preserva versões
+anteriores; remover o JSON atual não elimina dados do histórico Git.
+
+Verificar localmente com:
+
+```bash
+python -m unittest discover -s tests -p 'test_exportar_json.py' -v
+python -m unittest discover -s tests -p 'test_orquestracao.py' -v
+node --test tests/test_consumo_js.cjs
+mkdocs build --strict
+```
+
+As fixtures das views existem apenas nos testes. Nunca usar o JSON sintético como
+artefato público real. O consumidor mostra indisponibilidade enquanto a primeira
+publicação revisada não existir.
 
 ## Checklist para fechar com a equipe
 
