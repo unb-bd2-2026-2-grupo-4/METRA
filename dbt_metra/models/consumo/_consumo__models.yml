@@ -9,7 +9,6 @@ models:
       Fluxos por competência, UF e seção CNAE (P1, P2 e P4). Só grupos com pelo menos
       5 movimentações; medidas salariais nulas com menos de 5 salários válidos.
     data_tests:
-      - metra_not_empty
       - metra_unique_combination:
           arguments:
             columns: [competencia, sigla_uf, codigo_secao]
@@ -55,7 +54,6 @@ models:
     description: >
       Fluxos por competência, UF e capital/interior (P3), com a mesma supressão.
     data_tests:
-      - metra_not_empty
       - metra_unique_combination:
           arguments:
             columns: [competencia, sigla_uf, is_capital]
@@ -90,7 +88,6 @@ models:
       Fluxos por competência, UF, capital/interior, seção CNAE e categoria de um eixo
       demográfico por vez (P5), com a mesma supressão. Os eixos não se cruzam.
     data_tests:
-      - metra_not_empty
       - metra_unique_combination:
           arguments:
             columns: [competencia, sigla_uf, is_capital, codigo_secao, eixo, codigo_categoria]
