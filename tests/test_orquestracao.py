@@ -50,6 +50,19 @@ class OrquestracaoTest(unittest.TestCase):
             {dep.to_user_string() for dep in delta.asset_deps[delta.key]}, {"exportar_parquet"}
         )
 
+    def test_base_consumo_depende_das_views_e_roda_no_pipeline(self):
+        base = self.defs.resolve_assets_def("base_consumo")
+        self.assertEqual(
+            {dep.to_user_string() for dep in base.asset_deps[base.key]},
+            {"consumo/setor_mensal", "consumo/geografia_mensal",
+             "consumo/perfil_mensal", "consumo/calendario"},
+        )
+        # As dependências precisam existir no grafo: são os modelos dbt do schema consumo.
+        for dep in base.asset_deps[base.key]:
+            self.assertIn(dep, self.grafo.get_all_asset_keys())
+        job = self.defs.resolve_job_def("pipeline_metra")
+        self.assertIn(base.key, job.asset_layer.selected_asset_keys)
+
     def test_schedules_mensais(self):
         schedules = {s.name: s for s in self.defs.schedules}
         pipeline = schedules["pipeline_metra_mensal"]

@@ -1,0 +1,138 @@
+version: 2
+
+# Contratos das views públicas. metra_column_types fixa as colunas expostas: uma
+# coluna nova (por exemplo, um identificador da movimentação) faz o teste falhar.
+
+models:
+  - name: setor_mensal
+    description: >
+      Fluxos por competência, UF e seção CNAE (P1, P2 e P4). Só grupos com pelo menos
+      5 movimentações; medidas salariais nulas com menos de 5 salários válidos.
+    data_tests:
+      - metra_unique_combination:
+          arguments:
+            columns: [competencia, sigla_uf, codigo_secao]
+      - metra_column_types:
+          arguments:
+            expected:
+              competencia: DATE
+              sigla_uf: VARCHAR
+              codigo_secao: VARCHAR
+              admissoes: HUGEINT
+              desligamentos: HUGEINT
+              saldo: HUGEINT
+              soma_salarios_admissao: DECIMAL(38,2)
+              qtd_salarios_admissao: HUGEINT
+      - &grupo_publicavel
+        metra_expression:
+          arguments:
+            expression: "admissoes + desligamentos >= {{ var('metra_limite_publicacao') }}"
+      - &saldo_consistente
+        metra_expression:
+          arguments:
+            expression: "saldo = admissoes - desligamentos"
+      - &salario_suprimido_junto
+        metra_expression:
+          arguments:
+            expression: "(qtd_salarios_admissao is null) = (soma_salarios_admissao is null)"
+      - &salario_publicavel
+        metra_expression:
+          arguments:
+            expression: "qtd_salarios_admissao is null or qtd_salarios_admissao >= {{ var('metra_limite_publicacao') }}"
+    columns:
+      - name: competencia
+        data_tests: [not_null]
+      - name: sigla_uf
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [DF, GO, MT, MS]
+      - name: codigo_secao
+        data_tests: [not_null]
+
+  - name: geografia_mensal
+    description: >
+      Fluxos por competência, UF e capital/interior (P3), com a mesma supressão.
+    data_tests:
+      - metra_unique_combination:
+          arguments:
+            columns: [competencia, sigla_uf, is_capital]
+      - metra_column_types:
+          arguments:
+            expected:
+              competencia: DATE
+              sigla_uf: VARCHAR
+              is_capital: BOOLEAN
+              admissoes: HUGEINT
+              desligamentos: HUGEINT
+              saldo: HUGEINT
+              soma_salarios_admissao: DECIMAL(38,2)
+              qtd_salarios_admissao: HUGEINT
+      - *grupo_publicavel
+      - *saldo_consistente
+      - *salario_suprimido_junto
+      - *salario_publicavel
+    columns:
+      - name: competencia
+        data_tests: [not_null]
+      - name: sigla_uf
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [DF, GO, MT, MS]
+      - name: is_capital
+        data_tests: [not_null]
+
+  - name: perfil_mensal
+    description: >
+      Fluxos por competência, UF, capital/interior, seção CNAE e categoria de um eixo
+      demográfico por vez (P5), com a mesma supressão. Os eixos não se cruzam.
+    data_tests:
+      - metra_unique_combination:
+          arguments:
+            columns: [competencia, sigla_uf, is_capital, codigo_secao, eixo, codigo_categoria]
+      - metra_column_types:
+          arguments:
+            expected:
+              competencia: DATE
+              sigla_uf: VARCHAR
+              is_capital: BOOLEAN
+              codigo_secao: VARCHAR
+              eixo: VARCHAR
+              codigo_categoria: INTEGER
+              categoria: VARCHAR
+              admissoes: HUGEINT
+              desligamentos: HUGEINT
+              saldo: HUGEINT
+              soma_salarios_admissao: DECIMAL(38,2)
+              qtd_salarios_admissao: HUGEINT
+      - *grupo_publicavel
+      - *saldo_consistente
+      - *salario_suprimido_junto
+      - *salario_publicavel
+    columns:
+      - name: eixo
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [sexo, raca_cor, escolaridade, faixa_etaria]
+      - name: codigo_categoria
+        data_tests: [not_null]
+      - name: categoria
+        data_tests: [not_null]
+
+  - name: calendario
+    description: >
+      Competências contínuas do período; tem_dados indica movimentação na origem,
+      independentemente da supressão.
+    data_tests:
+      - metra_column_types:
+          arguments:
+            expected:
+              competencia: DATE
+              tem_dados: BOOLEAN
+    columns:
+      - name: competencia
+        data_tests: [unique, not_null]
+      - name: tem_dados
+        data_tests: [not_null]

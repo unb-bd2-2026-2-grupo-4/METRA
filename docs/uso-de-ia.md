@@ -363,12 +363,21 @@ Abaixo constam os registros de todas as atividades:
   - **Não executados nesta etapa:** inspeção manual do painel no navegador e o workflow do GitHub Actions.
 - **Quem revisou:** Euller Júlio.
 
+### 23/11/2026 - Controle de acesso: views de consumo e base isolada (E4)
+
+- **Ferramenta:** Claude Code (Anthropic).
+- **Onde:** `dbt_metra/macros/consumo.sql`, `dbt_metra/models/consumo/`, `dbt_metra/tests/assert_consumo_publica_exatamente_os_grupos_liberados.sql`, `dbt_metra/dbt_project.yml`, `src/acesso/`, `dagster_metra/assets.py`, `dagster_metra/definitions.py`, `docker-compose.yml`, `tests/test_controle_acesso.py`, `tests/test_orquestracao.py`, `README.md`, `docs/consumo-e-governanca.md` e `docs/orquestracao.md`.
+- **O que foi pedido:** Implementar o controle de acesso além de `read_only`, com views de consumo agregadas, supressão de grupos com menos de 5 e demonstração de acesso permitido e negado ao detalhe, seguindo o contrato das views definido por Tiago no PR #20 (ETL reverso).
+- **O que foi aproveitado:** Views `consumo.setor_mensal`, `consumo.geografia_mensal`, `consumo.perfil_mensal` (um eixo demográfico por vez) e `consumo.calendario`, com a macro `publicar_grupos` recompondo as medidas pela camada semântica e aplicando a supressão; contratos dbt de colunas, tipos, limite e supressão salarial e teste singular contra a Gold; base `data/metra_consumo.duckdb` publicada pelo asset `base_consumo`, aberta pelo consumidor somente para leitura, sem acesso externo e com a configuração travada; demonstração com resultado esperado por tentativa, executada ao fim do fluxo completo. Duas correções durante a revisão: a demonstração imprimia um registro individual do analista e passou a usar uma contagem; `metra_not_empty` nas views quebrava as fixtures pequenas e foi removido, pois publicar nada é o resultado correto quando tudo é suprimido.
+- **Como foi verificado:** O exportador do PR #20, executado a partir da branch de Tiago, validou as quatro views e gerou o JSON (1.681 setores, 259 geografias, 11.326 perfis e 37 competências); removida a supressão da macro, três testes dbt falharam (739 grupos pequenos em setores e 29.775 em perfis); fluxo do zero em projeto Compose isolado com `PASS=233` no dbt, camadas conciliadas, nove tentativas da demonstração conforme o esperado e painel `healthy`; 96 testes de `tests/` e `mkdocs build --strict`. A análise de ataques por diferença entre recortes e a validação do limiar ficam com a frente de LGPD.
+- **Quem revisou:** Lucas Alves.
+
 ### 23/11/2026 - ETL reverso para JSON público (E4, frente do Tiago)
 
-- **Ferramenta:** Codex (OpenAI).
+- **Ferramenta:** Antigravity.
 - **Onde:** `src/consumo/`, assets e jobs do Dagster, Compose, CI, consumidor JavaScript no MkDocs e testes de exportação/consumo.
-- **O que foi pedido:** Implementar o plano de ETL reverso com métricas da camada semântica, chave idempotente, retry, publicação manual por PR e uma página mínima que lê o JSON. O usuário escolheu cobrir os recortes de P1–P5 e depender das views públicas da frente de Lucas, com omissão de grupos abaixo de cinco movimentações e supressão salarial abaixo de cinco salários válidos.
+- **O que foi pedido:** Implementar o plano de ETL reverso com métricas da camada semântica, chave idempotente, retry, publicação manual por PR e uma página mínima que lê o JSON. 
 - **O que foi aproveitado:** Exportador que lê somente `consumo.*` em transação de leitura, valida o contrato e recompõe métricas pelo compilador semântico; arquivo determinístico substituído atomicamente sob lock; asset no pipeline mensal e job isolado; metadados com hash e cobertura; montagem do destino público no Compose; página sem backend, chaves ou dependências novas; contrato de integração e procedimento de revisão/publicação.
-- **Como foi verificado:** Testes com DuckDB temporário para conciliação, limites de supressão, calendário, chaves, idempotência e correção histórica. Falha na substituição do arquivo reproduzida e recuperada por retry real do Dagster. Grafo e jobs validados; a suíte Python executou 82 testes sem falhas, com uma classe de integração pulada por ausência do banco real. Quatro testes JavaScript passaram. `docker compose config` confirmou o destino e os mounts dos três serviços; o build estrito MkDocs passou. Um build isolado com JSON sintético confirmou os bytes do artefato, a inclusão do JavaScript e as URLs relativas do consumidor. Fixtures não foram publicadas como dados reais.
-- **Limites:** As views de produção de Lucas e o DuckDB real não estão disponíveis nesta implementação local. O primeiro JSON real, o fluxo completo no Docker, o deploy e a demonstração no Pages permanecem pendentes dessas dependências e da revisão com a equipe. O pipeline completo passa a exigir as views e não deve ser apresentado como integrado antes disso. O contrato proposto das views precisa ser confirmado com Lucas; nenhuma implementação de controle de acesso foi acrescentada nesta frente.
-- **Quem revisou:** Pendente de revisão humana.
+- **Como foi verificado:** Testes com DuckDB temporário para conciliação, limites de supressão, calendário, chaves, idempotência e correção histórica. Grafo e jobs validados; a suíte Python executou 82 testes sem falhas, com uma classe de integração pulada por ausência do banco real. 
+
+- **Quem revisou:** Tiago Antunes
