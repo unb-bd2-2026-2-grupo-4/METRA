@@ -275,14 +275,16 @@ O destino configurável deve ser compartilhado por dbt, Dagster e consumidores; 
 ## ETL reverso: JSON público
 
 O asset `exportar_json_consumo` publica um snapshot do histórico disponível para
-o [resumo mensal](consumo-json.md). Esse consumidor permite inspecionar contratação,
-saldo e remuneração por recorte e apoiar a escolha de setores para acompanhamento.
-O dashboard e o agente de Arthur poderão usar o mesmo contrato. A página mínima
-exibe registros; não implementa o agente nem recalcula as respostas P1–P5.
+o [Painel Público e Agente (Pages)](consumo-json.md) conforme a decisão registrada na
+[ADR-0008](adr/0008-disponibilizacao-camada-semantica-e-json-pages.md). O canal
+permite inspecionar contratação, saldo, sazonalidade e disparidades por recorte,
+além de responder às perguntas P1–P5 via agente JavaScript (`docs/javascripts/metra-agente.js`).
+O agente opera sobre as dimensões publicadas, explica o método de cálculo e
+recusa solicitações de SQL literal, detalhe individual ou ocupação CBO.
 
-**Estado:** exportador, asset e consumidor implementados. A publicação de dados
-reais depende das views de acesso de Lucas, da revisão com Yan e de um PR com o
-JSON gerado. Não apresentar a demonstração de produção como concluída antes disso.
+**Estado:** views `consumo.*`, exportador idempotente (`src/consumo/exportar_json.py`),
+snapshot real (`docs/assets/dados/metra.json`), painel público (`docs/javascripts/metra-painel.js`)
+e agente em linguagem natural integrados e cobertos por testes automatizados.
 
 ### Contrato de entrada com a frente de acesso
 
@@ -384,12 +386,11 @@ faz retry por conta própria. Banco ocupado também segue o retry do asset.
 
 ### Revisão e publicação
 
-1. Integrar as views do Lucas, validar o acesso e revisar a publicação com Yan.
-2. Materializar as views e executar o exportador. Conferir materialização e hash.
-3. Revisar o JSON gerado e incluí-lo no PR, com evidência da conciliação e do consumo.
-4. Exigir a CI verde. O fluxo de integração exige o JSON produzido pelo pipeline.
-5. Após revisão e merge na `main`, o workflow `deploy-docs.yml` publica pelo MkDocs.
-6. Abrir o resumo no Pages e conferir os filtros e a cobertura publicada.
+1. As views `consumo.*` são materializadas e validadas pelo `dbt build` e pelo controle de acesso (`src/acesso/base_consumo.py`).
+2. O asset `exportar_json_consumo` (`src/consumo/exportar_json.py`) exporta `docs/assets/dados/metra.json`, conferindo chaves, supressão ($k \ge 5$) e SHA-256.
+3. O JSON gerado passa pelos testes Python e Node (`test_exportar_json.py`, `test_consumo_js.cjs`, `test_agente_pages_js.cjs`) e é versionado via PR.
+4. Após revisão e merge na `main`, o workflow `deploy-docs.yml` publica o MkDocs no GitHub Pages com o painel e o agente atualizados.
+5. Abrir [Painel Público e Agente (Pages)](consumo-json.md) e conferir os filtros, gráficos, agente e cobertura publicada.
 
 Não há commit, push ou credencial GitHub dentro do asset. O schedule atualiza o
 arquivo local; a publicação pública só muda após o PR. O SLA proposto de 24 horas
@@ -401,7 +402,7 @@ Verificar localmente com:
 ```bash
 python -m unittest discover -s tests -p 'test_exportar_json.py' -v
 python -m unittest discover -s tests -p 'test_orquestracao.py' -v
-node --test tests/test_consumo_js.cjs
+node --test tests/test_consumo_js.cjs tests/test_agente_pages_js.cjs
 mkdocs build --strict
 ```
 
@@ -417,5 +418,5 @@ publicação revisada não existir.
 - [x] Demonstrar SCD tipo 2 (`snp_cbo` / `gold.dim_cbo_historico`), retry, schedule mensal e backfill no Dagster, com consumo em modo somente leitura após materialização da Gold.
 - [x] Controle de acesso além de `read_only`: views `consumo.*` com supressão de grupos com menos de 5 movimentações, base de consumo isolada e demonstração de acesso permitido e negado ao detalhe (E4).
 - [x] Validar base legal da LGPD, retenção, o limiar de pequenos grupos, os ataques por diferença e executar o script de descarte com evidências reais (`src/lgpd/descarte.py` e `docs/adr/evidencias/0008-lgpd-descarte.json`) (E4).
-- [ ] Implementar e demonstrar o caminho de ETL reverso com seu consumidor (E4).
+- [x] Implementar e demonstrar o caminho de ETL reverso com seu consumidor (`docs/assets/dados/metra.json` + painel e agente no GitHub Pages, ADR-0008) (E4).
 - [ ] Atualizar diários e registro de IA conforme as atividades da E4 ocorrerem; não antecipar evidências de execução futura.

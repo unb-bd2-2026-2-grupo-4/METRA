@@ -1,4 +1,4 @@
-# 0004 - Adoção de pg_recvlogical com test_decoding para CDC por decodificação lógica
+# 0004 - Adotar pg_recvlogical com test_decoding para captura CDC por decodificação lógica
 
 - **Status:** Aceito
 - **Data:** 17/10/2026
@@ -20,7 +20,7 @@ A escolha deve preservar a simplicidade operacional da ADR 0002. A proposta prio
 
 ## 2. Alternativas consideradas
 
-### Situação atual: manter apenas a extração em lote
+### Situação atual (opção nula): manter apenas a extração em lote
 
 É a opção de menor esforço imediato e permanece útil para a carga inicial. Porém, não atende ao objetivo desta decisão de capturar continuamente alterações por decodificação lógica. Por isso, é registrada como referência e não integra as três alternativas de CDC abaixo.
 
@@ -80,7 +80,7 @@ A média por competência descreve o volume histórico de negócios, não a taxa
 
 ### Tempos de processamento
 
-Calculamos `tempo (s) = quantidade de alterações / vazão`. Consideramos backlog de alterações já confirmadas, processos aquecidos, uma alteração de linha por evento e saída em arquivo local com a mesma exigência de durabilidade. Excluímos snapshot, inicialização, duplicatas e aplicação na camada analítica. Assim, comparamos tempo de escoamento da captura, não latência p95 nem tempo completo até o DuckDB.
+Calculamos `tempo (s) = quantidade de alterações / vazão`, assumindo vazões nominais de **5.000 eventos/s (A)**, **8.000 eventos/s (B)** e **10.000 eventos/s (C)** para backlog de alterações já confirmadas, processos aquecidos, uma alteração de linha por evento e saída em arquivo local com a mesma exigência de durabilidade. Excluímos snapshot, inicialização, duplicatas e aplicação na camada analítica. Assim, comparamos tempo de escoamento da captura, não latência p95 nem tempo completo até o DuckDB.
 
 | Cenário | Alterações de linha | A. Debezium + pgoutput: tempo simulado | B. Consumidor + wal2json: tempo simulado | C. pg_recvlogical + test_decoding: tempo simulado |
 |---|---|---|---|---|
@@ -90,6 +90,13 @@ Calculamos `tempo (s) = quantidade de alterações / vazão`. Consideramos backl
 | Replay de carga equivalente ao recorte completo | 14.700.000 | 2940,00 s | 1837,50 s | 1470,00 s |
 
 Nesse cenário, a captura dos 14,7 milhões de eventos levou aproximadamente **49 minutos em A, 30,6 minutos em B e 24,5 minutos em C**. Esses tempos representam replay de alterações novas; o conteúdo anterior à criação do slot continua exigindo carga inicial.
+
+Reprodução do protótipo de captura real e da suíte de replay idempotente na raiz do repositório:
+
+```bash
+sh src/cdc/03_testar.sh
+python -m unittest tests.test_cdc_replay -v
+```
 
 ---
 
@@ -139,9 +146,14 @@ A escolha é reversível, mas remover slots ou perder o estado de consumo pode e
 
 Revisar a decisão se:
 
-- O protótipo exceder o orçamento de recursos ou a latência aceitável, ainda a definir.
-- Os testes de interrupção e retomada indicarem perda de eventos ou duplicatas sem tratamento no destino.
-- A interpretação textual não atender aos tipos de dados ou às mudanças de esquema do projeto.
-- A necessidade de snapshot coordenado e recuperação tornar um conector como Debezium mais simples de manter.
+- O protótipo exceder **15 minutos de atraso (*lag*)** na captura do lote mensal do CAGED ou consumir **mais de 2 GB de retenção de WAL** no PostgreSQL;
+- Os testes de interrupção e retomada indicarem perda de eventos ou duplicatas sem tratamento no destino;
+- A interpretação textual não atender aos tipos de dados ou às mudanças de esquema do projeto;
+- A necessidade de snapshot coordenado e recuperação tornar um conector como Debezium mais simples de manter;
 - O destino escolhido exigir uma infraestrutura incompatível com a simplificação definida na ADR 0002.
-- A retenção de WAL durante indisponibilidade do consumidor ultrapassar o orçamento de disco definido para o ambiente.
+
+---
+
+## 7. Revisão E4 (23/11/2026)
+
+Na E4, o mecanismo de CDC com `pg_recvlogical` e replay idempotente (`src/cdc/04_reprocessar.py`, validado por `tests/test_cdc_replay.py`) permaneceu funcional e intencionalmente desacoplado do pipeline em lote mensal da Silver, conforme documentado na matriz de linhagem de [Consumo e Governança](../consumo-e-governanca.md). Os gatilhos de revisão não dispararam.

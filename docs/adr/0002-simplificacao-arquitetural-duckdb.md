@@ -1,4 +1,4 @@
-# 0002 - Simplificação Arquitetural da Plataforma: Adoção do DuckDB e Conciliação entre Ementa e Execução Pragmática
+# 0002 - Adotar arquitetura híbrida com PostgreSQL OLTP e DuckDB como motor analítico
 
 - **Status:** Aceito
 - **Data:** 05/10/2026
@@ -37,8 +37,8 @@ A concepção inicial da plataforma METRA projetou um pipeline corporativo multi
 ## 2. Alternativas Consideradas
 
 ### A. Opção Nula: Manutenção Estrita da Arquitetura Prescrita no Plano de Ensino
-- **O que oferece:** Implementação integral de todas as tecnologias citadas no roteiro preliminar (PostgreSQL + MinIO + Debezium/WAL CDC + dbt + DuckDB + Metabase + ETL Reverso).
-- **Por que é inviável:** Gera atrito operacional severo. A equipe despenderia a maior parte da carga horária resolvendo problemas de rede bridge do Docker, orquestração de subida de containers, conexões JDBC do Metabase e replicação assíncrona de WAL, em vez de refinar a qualidade dos dados e responder à pergunta de gestão. Além disso, ignora o direcionamento direto da professora para simplificar o desenho técnico.
+- **O que oferece:** Implementação integral de todas as tecnologias citadas no roteiro preliminar (PostgreSQL + MinIO + Debezium/WAL CDC + dbt + DuckDB + Metabase + ETL Reverso), garantindo paridade com pipelines corporativos em nuvem (S3 real, BI com controle de sessão e interface pronta para usuários não técnicos).
+- **Por que é inviável neste projeto:** Gera atrito operacional severo para o escopo acadêmico. A equipe despenderia a maior parte da carga horária resolvendo problemas de rede bridge do Docker, orquestração de subida de containers (~2,8 GB de RAM), conexões JDBC do Metabase e replicação assíncrona de WAL, em vez de refinar a qualidade dos dados e responder à pergunta de gestão. Além disso, ignora o direcionamento direto da professora para simplificar o desenho técnico.
 
 ### B. Migração Radical para DuckDB Exclusivo (Eliminação Total do PostgreSQL)
 - **O que oferece:** Uso único e exclusivo do DuckDB em memória ou arquivo local (`.duckdb`), consultando arquivos CSV/Parquet diretamente sem qualquer container Docker ativo.
@@ -97,6 +97,7 @@ Esta decisão concilia de forma harmoniosa o que está formalmente estipulado no
 
 ### O que se torna irreversível ou restringe o sistema futuro
 - O DuckDB é consagrado como o motor analítico oficial do projeto para as entregas E2, E3 e E4. Qualquer futura interface de visualização ou camada de IA consumirá os dados prioritariamente a partir do DuckDB ou de arquivos colunares Parquet por ele gerados.
+- Migrar o motor analítico de volta para um cluster distribuído ou retornar ao Metabase + MinIO exigiria ~3 a 5 dias de engenharia para adaptar o dialeto SQL do `dbt_metra/`, reconfigurar conexões do painel/consumo e provisionar infraestrutura adicional.
 
 ---
 
@@ -105,3 +106,9 @@ Esta decisão concilia de forma harmoniosa o que está formalmente estipulado no
 Esta decisão será formalmente revista se:
 1. O volume de dados analíticos ativos no projeto superar **100 milhões de registros**, exigindo um cluster analítico distribuído (como Trino ou ClickHouse); ou
 2. A banca avaliadora da disciplina exigir de forma mandatória e documentada a presença de um servidor de S3 local (MinIO) ativo no manifesto do Docker Compose como pré-requisito eliminatório para a Entrega E2.
+
+---
+
+## 7. Revisão E4 (23/11/2026)
+
+Conciliação com o ciclo final da E4: nenhum dos dois gatilhos disparou (`14,75 milhões` < 100 milhões; MinIO não foi exigido). MinIO e Metabase permaneceram descartados, mas o **ETL reverso** previsto na E4 foi implementado sem servidores extras via exportação idempotente de `docs/assets/dados/metra.json` para o painel e agente estáticos no GitHub Pages, conforme formalizado na [ADR-0008](0008-disponibilizacao-camada-semantica-e-json-pages.md).

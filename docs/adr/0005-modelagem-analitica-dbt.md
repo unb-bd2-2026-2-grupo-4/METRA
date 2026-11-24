@@ -1,8 +1,8 @@
 # 0005 - Preservar o grão de movimentação na Gold e validar as camadas com dbt
 
 - **Status:** Aceito
-- **Data:** 29/10/2026 (atualização de escopo em 03/11/2026)
-- **Decisores:** Euller Júlio
+- **Data:** 29/10/2026 (atualização de escopo em 03/11/2026; revisão E4 em 23/11/2026)
+- **Decisores:** Euller Júlio (revisão E4: Arthur Evangelista)
 
 ---
 
@@ -10,7 +10,7 @@
 
 A Silver já transforma cinco conjuntos Parquet em quatro tabelas DuckDB. A E3 exige modelagem dimensional, grão explícito, dimensão de variação lenta e testes de esquema, volume, unicidade, integridade e distribuição. As cinco perguntas incluem recortes geográficos, temporais, setoriais e demográficos; uma agregação precoce pode eliminar os recortes necessários à P5.
 
-A amostra versionada tem 49.178 movimentações; o volume completo documentado pelo projeto é de aproximadamente 14,7 milhões e não foi executado neste experimento. A proposta usa ambiente local, sem novo servidor de banco. A Gold de Tiago já está na base deste PR com cinco dimensões, uma fato detalhada e três fatos mensais. Esta ADR documenta a escolha do grão e os testes acrescentados por Euller; a proposta de histórico SCD continua pendente.
+A amostra versionada tem 49.178 movimentações; o volume completo documentado pelo projeto é de `14.753.112` registros (inicialmente não executado no experimento de granularidade da amostra e posteriormente medido em `src/qualidade/comparar_explain.py`, Seção 7). A proposta usa ambiente local, sem novo servidor de banco. A Gold de Tiago iniciou na base deste PR com cinco dimensões, uma fato detalhada e três fatos mensais, estendida depois pelo histórico SCD2 (`dim_cbo_historico`) e pelas views `consumo.*` (E4). Esta ADR documenta a escolha do grão e os testes acrescentados por Euller.
 
 ---
 
@@ -56,7 +56,7 @@ A suíte de qualidade usa Parquet sintético independente: valida o dbt real, os
 
 ## 4. Decisão
 
-**Manter o grão de uma movimentação por linha, dimensões compartilhadas e agregados de consumo derivados, usando dbt para transformação e validação.** Esse desenho já corresponde à Gold disponível na base. O histórico observado da CBO por SCD2 permanece como evolução proposta, ainda não implementada; o diagrama da página analítica reflete as chaves atuais, sem atribuir SCD ao modelo existente. A aprovação formal desta ADR cabe à Squad.
+**Manter o grão de uma movimentação por linha, dimensões compartilhadas e agregados de consumo derivados, usando dbt para transformação e validação.** Esse desenho corresponde à Gold materializada na base, complementada pelo histórico observado da CBO por SCD Tipo 2 (`snapshots/snp_cbo.yml` e `gold.dim_cbo_historico`, implementado na sequência da E3 — ver Seção 7).
 
 ---
 
@@ -70,17 +70,27 @@ A suíte de qualidade usa Parquet sintético independente: valida o dbt real, os
 
 ### O que se perde ou se compromete
 
-- Mais linhas e joins do que uma tabela mensal; a carga completa ainda precisa ser medida.
-- SCD exige snapshots persistentes, tratamento de intervalos e associação estável de cada fato à versão do cadastro.
+- Mais linhas e joins do que uma tabela mensal (custo medido posteriormente na base completa em `0005-explain-completo.json` e superado pelos 3 agregados mensais).
+- SCD exige snapshots persistentes, tratamento de intervalos e associação estável de cada fato à versão do cadastro (`referencia_cadastro_em` segue como evolução pendente em reconstruções completas).
 - `dbt build` não publica todo o banco atomicamente; o Dagster precisa impedir consumo de uma execução incompleta.
 - Limites de variação mensal são avisos operacionais, sujeitos a calibração com os dados reais.
 
 ### O que restringe o sistema futuro
 
-As chaves e métricas virarão contratos do painel. A CBO atual não oferece vigência histórica: os intervalos documentam observação, não validade retroativa. Trocar o grão ou reconstruir versões SCD exige preservar as associações e revalidar agregados e consumidores. A seleção de ferramentas continua reversível; os dados permanecem em formatos locais abertos.
+As chaves e métricas virarão contratos do painel. A CBO atual não oferece vigência histórica: os intervalos documentam observação, não validade retroativa. Trocar o grão ou reconstruir versões SCD exige preservar as associações e revalidar os 4 marts, `metricas.yml`, as 4 views `consumo.*` e mais de 210 testes dbt (custo estimado de ~3 a 4 dias de engenharia para migrar tudo para um modelo alternativo). A seleção de ferramentas continua reversível; os dados permanecem em formatos locais abertos.
 
 ---
 
 ## 6. Gatilho de Revisão
 
 Revisar antes de aceitar a ADR se a Gold não puder responder aos recortes de P5, se o ensaio de mudança de título CBO perder histórico, se houver duplicação após joins ou se o SLA proposto de publicação em 24 horas após extração validada não for atendido. Repetir o benchmark com a carga completa, dimensões reais e consultas do painel antes de afirmar desempenho. A definição de turnover depende de uma fonte de estoque de empregos; não substituir esse denominador pelo saldo.
+
+---
+
+## 7. Revisão E4 (23/11/2026)
+
+Todas as pendências registradas originalmente em 29/10–03/11 foram implementadas no fechamento da E3 e consolidadas na E4:
+
+1. **SCD Tipo 2 implementado e testado:** `dbt_metra/snapshots/snp_cbo.yml` materializa `gold.dim_cbo_historico` com intervalos `[observado_desde, observado_ate)`, validado por `dbt_metra/tests/assert_cbo_uma_versao_vigente.sql` e `tests/test_scd_cbo.py`. Permanece apenas a limitação documentada de a fato usar `dim_cbo` vigente em reconstruções completas (`referencia_cadastro_em` não vinculada retroativamente).
+2. **Carga completa medida (`EXPLAIN ANALYZE`):** O benchmark `src/qualidade/comparar_explain.py` sobre as `14.753.112` movimentações reais confirmou ganho de **`≈ 40×`** na consulta P1: `33,27 ms` (`fct_movimentacao`, 918.397 linhas após filtros) contra `0,84 ms` (`fct_setor_mensal`, 251 linhas), preservado em [0005-explain-completo.json](evidencias/0005-explain-completo.json).
+3. **Evolução na E4:** A Gold passou a ser governada pela camada semântica única (`dbt_metra/models/semantic/metricas.yml`), exposta com supressão $k \ge 5$ nas views `consumo.*` e auditada por 12 testes sobre a Gold real em `tests/test_gold_integracao.py`. Os gatilhos de revisão de P5, SCD2 e duplicação foram superados com sucesso.

@@ -8,7 +8,7 @@
 
 ## 1. Contexto
 
-O METRA precisa coordenar a atualização da origem PostgreSQL, a extração para o lake Parquet e a transformação dbt-duckdb das camadas Silver e Gold. Antes desta decisão, os scripts `src/ingestao/executar_pipeline.py` e `src/extracao/exportar_parquet.py` podiam ser executados diretamente, mas a dependência entre as etapas e a visão operacional do pipeline ficavam fora de uma interface única.
+O METRA precisa coordenar a atualização da origem PostgreSQL (`49.178` registros na amostra versionada e `14,75 milhões` na base completa, com ciclos mensais do Novo CAGED), a extração para o lake Parquet/Delta e a transformação dbt-duckdb das camadas Silver, Snapshot SCD2, Gold e Consumo (`20` modelos/snapshots, mais de `210` testes dbt e `46` partições mensais de conciliação entre `2023-01` e `2026-10`). Antes desta decisão, os scripts `src/ingestao/executar_pipeline.py` e `src/extracao/exportar_parquet.py` podiam ser executados diretamente, mas a dependência entre as etapas e a visão operacional do pipeline ficavam fora de uma interface única.
 
 A E3 também exige que a linhagem seja verificável. O grafo deve mostrar a sequência `executar_pipeline` → `exportar_parquet` → sources `lake/*` → modelos Silver → modelos Gold. Os arquivos Parquet são produzidos pela extração, por isso, os cinco sources declarados no dbt não são materializações independentes, mas precisam aparecer como assets virtuais no grafo.
 
@@ -38,24 +38,25 @@ A validação foi feita sobre o código e o manifesto presentes no repositório,
 
 Foram verificadas as seguintes propriedades:
 
-| Verificação | Resultado esperado |
+| Verificação | Resultado observado |
 |---|---|
 | Carregamento das definições | `Definitions.validate_loadable` sem erro |
-| Dependência de ingestão e extração | `executar_pipeline` precede `exportar_parquet` |
+| Dependência de ingestão e extração | `executar_pipeline` precede `exportar_parquet` e `materializar_delta` |
 | Sources do lake | Cinco sources Parquet virtuais dependem de `exportar_parquet` |
-| Transformação analítica | O manifesto dbt expõe Silver e Gold no mesmo grafo |
+| Transformação analítica e entrega E4 | Manifesto dbt expõe Silver, SCD2, Gold e `consumo.*`, seguido por `base_consumo` e `exportar_json_consumo` |
+| Resiliência, backfill e fluxo do zero | Retry 3× validado derrubando Postgres por 25 s; backfill `single_run` em 46 partições (`2023-01`..`2026-10`); fluxo `sh scripts/metra-do-zero.sh --sim` verde no CI (`testes-integracao.yml`) |
 | Ambiente containerizado | `docker compose config --quiet` válido; webserver e daemon compartilham `DAGSTER_HOME` |
 | Evidência visual | Grafo revisado na UI e preservado em [grafo_linhagem.svg](../assets/grafo_linhagem.svg) |
 
-Reprodução da validação principal na raiz do repositório:
+Reprodução da validação principal e da execução completa na raiz do repositório:
 
 ```bash
 dagster definitions validate -w workspace.yaml
 docker compose config --quiet
-git diff --check
+sh scripts/metra-do-zero.sh
 ```
 
-Essas verificações validam a estrutura das definições e da configuração, porém não constituem benchmark de latência nem comprovam, sozinhas, a execução de uma carga completa de produção.
+As validações estruturais e a execução ponta a ponta em CI operam sobre a amostra versionada (49.178 movimentações); a janela operacional na carga completa (14,75 milhões) permanece dependente de execução local dedicada.
 
 ---
 
@@ -86,10 +87,19 @@ O pipeline passa a ter dois assets Python materializáveis, cinco sources Parque
 
 ### O que restringe o sistema futuro
 
-Os nomes dos assets e as chaves de origem passam a ser contratos da observabilidade do pipeline. Alterações nos nomes dos sources, nos caminhos Parquet ou no manifesto dbt exigem revisar as specs virtuais, a documentação e a evidência do grafo. A escolha de Dagster continua substituível, desde que as dependências, os contratos de qualidade e a linhagem sejam preservados.
+Os nomes dos assets e as chaves de origem passam a ser contratos da observabilidade do pipeline. Alterações nos nomes dos sources, nos caminhos Parquet ou no manifesto dbt exigem revisar as specs virtuais, a documentação e a evidência do grafo. A escolha de Dagster continua substituível (~2 a 3 dias de engenharia para portar `assets.py` e `definitions.py` para Airflow ou cron), desde que as dependências, os contratos de qualidade e a linhagem sejam preservados.
 
 ---
 
 ## 6. Gatilho de Revisão
 
-Revisar esta ADR se a carga completa não puder ser executada dentro da janela operacional definida pela Squad, se o daemon não conseguir processar materializações disparadas pela UI, se a geração do manifesto deixar de ser reprodutível ou se a linhagem exibida deixar de representar a sequência real de dados. Também revisar antes de adicionar múltiplos consumidores, ambientes distribuídos ou requisitos de SLA que justifiquem uma plataforma de orquestração diferente.
+Revisar esta ADR se:
+- A execução do fluxo completo sobre a amostra ultrapassar **30 minutos** no CI (`testes-integracao.yml`) ou a carga completa exceder o SLA operacional de **24 horas** entre extração e publicação validada;
+- Ocorrer contenção recorrente de escrita no arquivo DuckDB (`> 2` falhas mensais por lock simultâneo apesar da política de 3 retries); ou
+- A geração do manifesto deixar de ser reprodutível ou exigir orquestração distribuída em múltiplos nós.
+
+---
+
+## 7. Revisão E4 (23/11/2026)
+
+Na E4, o grafo do Dagster foi ampliado com `materializar_delta`, `base_consumo` (base isolada `data/metra_consumo.duckdb`) e `exportar_json_consumo` (ETL reverso para `docs/assets/dados/metra.json`). Todos os cenários exigidos — execução do zero via `sh scripts/metra-do-zero.sh`, `RetryPolicy` com queda simulada de 25s do PostgreSQL, schedules mensais e backfill em execução única de 46 competências — foram executados e validados no CI (`tests/test_orquestracao.py` e `.github/workflows/testes-integracao.yml`). Os gatilhos de revisão não dispararam.

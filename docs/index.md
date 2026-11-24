@@ -40,6 +40,12 @@ O recorte do projeto concentra-se no **Mercado de Trabalho Formal da Região Cen
     
     Diagnóstico da rotatividade e assimetria do emprego formal no Centro-Oeste, personas atendidas e pergunta norteadora de gestão.
 
+-   **[Painel Público e Agente (Pages)](consumo-json.md)**
+
+    ---
+
+    Painel interativo e agente em linguagem natural rodando direto no navegador sobre o JSON publicado pelo ETL reverso.
+
 -   **[Arquitetura da Plataforma](arquitetura.md)**
     
     ---
@@ -86,13 +92,13 @@ O recorte do projeto concentra-se no **Mercado de Trabalho Formal da Região Cen
     
     ---
     
-    Catálogo de métricas, perguntas de gestão, linhagem da fonte ao consumo e diretrizes para uso governado dos dados.
+    Catálogo de métricas, perguntas de gestão, linhagem da fonte ao consumo, LGPD e controle de acesso.
 
 -   **[Decisões de Arquitetura (ADRs)](adr/0001-modelagem-sistema-origem.md)**
     
     ---
     
-    Registros formais de decisões estruturais em 6 passos (ADR 0001: Origem Transacional e ADR 0002: Simplificação com DuckDB).
+    Registros formais de decisões estruturais em 6 passos (ADR 0001 a ADR 0008, cobrindo origem, motor analítico, lake, dbt, Dagster e disponibilização).
 
 -   **[Governança e Uso de IA](uso-de-ia.md)**
     

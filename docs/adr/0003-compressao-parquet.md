@@ -97,3 +97,9 @@ Esse segundo modo anexa PostgreSQL em `READ_ONLY` e copia `movimentacao` em uma 
 ## 6. Gatilho de Revisão
 
 Reexecutar com o OLTP completo antes de extrapolar a decisão para produção; também reavaliar quando houver troca de versão do DuckDB, hardware, particionamento, schema ou padrão de consulta. Substituir Snappy se um codec ocupar menos bytes e cumprir a tolerância de 25% no novo recorte. Se o objetivo passar a privilegiar armazenamento, redefinir explicitamente essa tolerância antes de medir. O escritor Delta requer avaliação própria caso passe a ser o principal consumidor de espaço.
+
+---
+
+## 7. Revisão E4 (23/11/2026)
+
+Na E4, Snappy permaneceu como padrão validado para a amostra auditada de 49.178 linhas (incluindo a extração Delta adicionada ao job `pipeline_metra`). O gatilho de reexecutar `src/extracao/comparar_compressao.py` sobre os 14,75 milhões de registros no OLTP completo permanece em aberto para um eventual ambiente de produção, pois o PostgreSQL de CI opera apenas sobre a amostra versionada.
