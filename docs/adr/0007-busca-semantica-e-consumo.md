@@ -1,4 +1,4 @@
-# 0007 - Integração de Busca Semântica Vetorial CBO 2002 e Assistente Text-to-SQL Governado pelo Catálogo Gold
+# 0007 - Adotar busca semântica vetorial local (384d) e assistente Text-to-SQL governado pelo catálogo Gold
 
 - **Status:** Aceito
 - **Data:** 03/11/2026
@@ -108,6 +108,7 @@ streamlit run src/app/dashboard.py
 
 ### O que restringe o sistema futuro
 - Qualquer evolução para geração assistida por LLM externo deverá atuar apenas como classificador/extrator de parâmetros sobre este mesmo catálogo e passar obrigatoriamente pelo validador `validar_sql_seguro`, mantendo o bloqueio a consultas individuais desagregadas.
+- Migrar desta arquitetura para LLM externo exigiria ~2 dias de engenharia para integrar cliente de API, controle de custos/tokens e revalidar os 13 vetores de segurança de `tests/test_busca_e_text2sql.py`.
 
 ---
 
@@ -117,3 +118,9 @@ Esta decisão será revista se:
 1. O `Hit@5` sobre o conjunto de avaliação de sinônimos cair abaixo de **90%** após atualização do catálogo CBO;
 2. Qualquer resposta do assistente Text-to-SQL divergir dos resultados das consultas compiladas em `dbt_metra/analyses/`; ou
 3. A latência p95 das consultas no painel ultrapassar **500 ms** sobre a carga completa de 14,7 milhões de registros.
+
+---
+
+## 7. Revisão E4 (23/11/2026)
+
+Na consolidação da E4, o tradutor `src/app/text_to_sql.py` e o painel `src/app/dashboard.py` passaram a compilar todas as métricas diretamente de `dbt_metra/models/semantic/metricas.yml` (`src/metricas/camada_semantica.py`), e a lógica determinística de classificação, extração de filtros e guardrails foi portada para JavaScript no painel público do GitHub Pages ([ADR-0008](0008-disponibilizacao-camada-semantica-e-json-pages.md)), omitindo ocupações CBO no canal público por governança LGPD ($k \ge 5$). Os três gatilhos de revisão permanecem sem disparo e monitorados pelos testes em CI.

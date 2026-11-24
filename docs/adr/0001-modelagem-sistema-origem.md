@@ -1,4 +1,4 @@
-# 0001 - Modelagem Relacional 3FN com Padrão Insert-Only para o Sistema de Origem OLTP
+# 0001 - Adotar modelagem relacional 3FN com padrão insert-only no sistema de origem OLTP
 
 - **Status:** Aceito
 - **Data:** 27/09/2026
@@ -39,7 +39,7 @@ Para a Entrega 1 (E1) do METRA, precisamos modelar e simular o banco de dados tr
 ## 2. Alternativas consideradas
 
 ### Alternativa A (Opção Nula): CRUD Relacional Tradicional com Sobrescrita (UPDATE)
-- **O que oferece:** Modela o cadastro de vínculos e trabalhadores com operações CRUD convencionais. A cada alteração (promoção salarial, mudança de cargo ou demissão), o sistema executa um `UPDATE` no registro existente.
+- **O que oferece:** Modela o cadastro de vínculos e trabalhadores com operações CRUD convencionais, mantendo menor volume em disco e consultas triviais quando o sistema precisa apenas do estado atual do vínculo. A cada alteração (promoção salarial, mudança de cargo ou demissão), o sistema executa um `UPDATE` no registro existente.
 - **Por que é inviável para o METRA:** Um esquema CRUD que sobrescreve destrói o estado anterior do trabalhador a cada `UPDATE`. Ao atualizar o salário ou demitir o funcionário, apaga-se o salário de admissão original e a data exata da admissão anterior. Isso torna **impossível** calcular a taxa de rotatividade (*turnover*), o saldo líquido mensal de postos (admissões menos demissões) e as tendências de sazonalidade, destruindo a base empírica necessária para responder à pergunta de gestão.
 
 ### Alternativa B: Esquema "Flat" Desnormalizado (Uma única tabela com tudo em TEXT)
@@ -66,15 +66,21 @@ Para evitar ambiguidades analíticas e relatórios inconsistentes, o modelo tran
 
 ## 4. Medição e Prototipação
 
-Os testes foram executados localmente utilizando Docker Compose sobre o PostgreSQL 16:
+Os testes do pipeline real foram executados localmente utilizando Docker Compose sobre o PostgreSQL 16 (lote de 100 mil linhas), comparando a ingestão medida nas camadas `bronze` e `oltp` frente às estimativas analíticas para a opção nula CRUD (não executada por ser destrutiva):
 
-| Métrica Avaliada | Alternativa A (CRUD Sobrescrita) | Alternativa B (Flat TEXT Bronze) | Alternativa C (3FN Insert-Only) |
+| Métrica Avaliada | Alternativa A (CRUD Sobrescrita — estimado) | Alternativa B (Flat TEXT Bronze — medido) | Alternativa C (3FN Insert-Only — medido) |
 |---|---|---|---|
 | **Preservação de Histórico** | Nula (destrói valor anterior com `UPDATE`) | Total (porém desnormalizada) | **Total (eventos imutáveis com PK/FKs)** |
 | **Integridade Referencial** | Fraca | Nula (sem constraints) | **Estrita (100% validada via FKs)** |
-| **Tempo de Carga (Lote 100k)** | ~110s (múltiplos updates/locks) | **1,8s (COPY bruto)** | **82,9s (1.205 reg/s com validação de 3 FKs)** |
-| **Tamanho Médio por Linha** | ~220 bytes | ~380 bytes | **~115 bytes (tipagem numérica forte)** |
+| **Tempo de Carga (Lote 100k)** | ~110s *(estimado c/ updates e locks)* | **1,8s (COPY bruto)** | **82,9s (1.205 reg/s com validação de 3 FKs)** |
+| **Tamanho Médio por Linha** | ~220 bytes *(estimado)* | ~380 bytes | **~115 bytes (tipagem numérica forte)** |
 | **Resposta à Pergunta de Gestão** | Impossível (perde demissões) | Complexa e inconsistente | **Nativa e imediata via SQL** |
+
+Reprodução da carga transacional na raiz do repositório:
+
+```bash
+docker compose --profile ingestao run --rm ingestao-bronze python -m src.ingestao.executar_pipeline
+```
 
 ---
 
@@ -101,9 +107,16 @@ A origem simula com fidelidade o sistema do Ministério do Trabalho:
 
 ### O que se torna irreversível ou restringe o sistema futuro
 - O sistema de origem não permite deleção lógica ou física arbitrária de eventos passados; qualquer ajuste cadastral deve ser modelado como movimentação compensatória.
+- Migrar de volta para CRUD destrutivo exigiria reescrever `src/ingestao/carga_oltp.py`, refazer as migrações DDL (`0003`) e reprocessar todo o histórico da `bronze` (~2 a 3 dias de engenharia, perdendo a capacidade nativa de CDC por eventos imutáveis).
 
 ---
 
 ## 7. Gatilho de Revisão
 
 Se o volume acumulado de movimentações ultrapassar **25 milhões de linhas** e o tempo de ingestão do lote mensal ultrapassar **10 minutos**, a Squad revisará a estratégia, adotando particionamento declarativo nativo do PostgreSQL (`PARTITION BY RANGE (ano, mes)`) na tabela `oltp.movimentacao`.
+
+---
+
+## 8. Revisão E4 (23/11/2026)
+
+Decisão mantida após fechamento das entregas E2, E3 e E4: o recorte integral segue em `14.753.112` linhas (abaixo do gatilho de 25 milhões) e a amostra versionada executa em menos de 1 minuto no fluxo de CI (`scripts/metra-do-zero.sh`).
