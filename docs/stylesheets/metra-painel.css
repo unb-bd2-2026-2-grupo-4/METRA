@@ -222,18 +222,6 @@
   color: var(--metra-muted);
 }
 
-.metra-code {
-  display: block;
-  overflow-x: auto;
-  background: var(--metra-surface-alt);
-  border: 1px solid var(--metra-border);
-  border-radius: 4px;
-  padding: 0.6rem 0.75rem;
-  font-size: 0.78rem;
-  margin: 0.5rem 0;
-  white-space: pre-wrap;
-}
-
 /* Barra de filtros globais */
 .metra-filter-bar {
   display: grid;

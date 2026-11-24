@@ -20,7 +20,7 @@ A escolha deve preservar a simplicidade operacional da ADR 0002. A proposta prio
 
 ## 2. Alternativas consideradas
 
-### Situação atual: manter apenas a extração em lote
+### Situação atual (opção nula): manter apenas a extração em lote
 
 É a opção de menor esforço imediato e permanece útil para a carga inicial. Porém, não atende ao objetivo desta decisão de capturar continuamente alterações por decodificação lógica. Por isso, é registrada como referência e não integra as três alternativas de CDC abaixo.
 

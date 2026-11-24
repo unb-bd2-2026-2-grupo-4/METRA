@@ -4,10 +4,10 @@ Compara três alternativas sobre o snapshot real publicado (`docs/assets/dados/m
 derivado das views `consumo.*` com supressão k >= 5):
   A. Opção nula: exportação em 4 arquivos CSV agendados + leitura/cálculo em Python.
   B. Escolhida: snapshot JSON v1 (`metra.json`) no GitHub Pages + agente JavaScript no navegador.
-  C. Servidor BI (Metabase) consultando as views `consumo.*` em DuckDB.
+  C. Consultas SQL em DuckDB como referência para uma implantação com Metabase.
 
-Verifica também a paridade numérica exata da resposta P3 (capitais vs. interior)
-entre os três caminhos.
+Verifica a paridade de P3 (capitais vs. interior) entre os três caminhos,
+com igualdade para contagens e saldo e tolerância absoluta para salários.
 
 Uso, na raiz do repositório:
     python -m src.consumo.avaliar_disponibilizacao --saida docs/adr/evidencias/0008-disponibilizacao.json
@@ -27,7 +27,6 @@ import platform
 import shutil
 import statistics
 import subprocess
-import sys
 import tempfile
 import time
 from typing import Any
@@ -38,6 +37,7 @@ RAIZ = Path(__file__).resolve().parents[2]
 FONTE_PADRAO = RAIZ / "docs" / "assets" / "dados" / "metra.json"
 AGENTE_JS = RAIZ / "docs" / "javascripts" / "metra-agente.js"
 SAIDA_PADRAO = RAIZ / "docs" / "adr" / "evidencias" / "0008-disponibilizacao.json"
+TOLERANCIA_SALARIAL_P3 = 1e-6
 
 
 def _resumo_tempos(tempos_ms: list[float]) -> dict[str, float]:
@@ -154,6 +154,11 @@ def _medir_alternativa_csv(
 
     tamanho_bruto = sum(arq.stat().st_size for arq in caminhos.values())
     tamanho_gzip = sum(len(gzip.compress(arq.read_bytes(), compresslevel=6)) for arq in caminhos.values())
+    inicio, fim = conn.execute("""
+        select (max(competencia) - interval '11 months')::date, max(competencia)
+        from consumo.calendario where tem_dados
+    """).fetchone()
+    inicio_p1, fim_p1 = inicio.isoformat(), fim.isoformat()
 
     def ler_e_calcular_csv() -> dict[str, Any]:
         saldo_cap = saldo_int = qtd_cap = qtd_int = 0
@@ -174,10 +179,12 @@ def _medir_alternativa_csv(
                     qtd_int += qtd
 
         with open(caminhos["setor_mensal"], encoding="utf-8", newline="") as f:
-            por_sec: dict[str, int] = {}
+            por_sec: dict[str, list[int]] = {}
             for row in csv.DictReader(f):
-                if row["sigla_uf"] == "DF" and row["codigo_secao"] != "Z" and row["competencia"] >= "2025-02-01":
-                    por_sec[row["codigo_secao"]] = por_sec.get(row["codigo_secao"], 0) + int(row["admissoes"])
+                if row["sigla_uf"] == "DF" and row["codigo_secao"] != "Z" and inicio_p1 <= row["competencia"] <= fim_p1:
+                    totais = por_sec.setdefault(row["codigo_secao"], [0, 0, 0])
+                    for i, metrica in enumerate(("admissoes", "desligamentos", "saldo")):
+                        totais[i] += int(row[metrica])
 
         return {
             "saldo_capital": saldo_cap,
@@ -204,7 +211,7 @@ def _medir_alternativa_csv(
 
 
 def _medir_alternativa_json_js(
-    dados: dict[str, Any], fonte: Path, tmp: Path, repeticoes: int
+    dados: dict[str, Any], tmp: Path, repeticoes: int
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     arq_json = tmp / "metra.json"
 
@@ -225,24 +232,31 @@ def _medir_alternativa_json_js(
     gzip_compacto = len(gzip.compress(conteudo_compacto, compresslevel=6))
 
     node = shutil.which("node")
-    if node and AGENTE_JS.is_file():
-        script_node = f"""
+    if not node:
+        raise RuntimeError("Instale o Node.js para medir o agente JavaScript.")
+    script_node = f"""
 const fs = require("node:fs");
 const agente = require({json.dumps(str(AGENTE_JS.resolve()))});
-const caminho = {json.dumps(str(fonte.resolve()))};
+const caminho = {json.dumps(str(arq_json.resolve()))};
 const perguntas = [
-  "Qual setor econômico mais contratou e demitiu no Distrito Federal nos últimos 12 meses?",
-  "Existe sazonalidade evidente nas contratações e demissões?",
-  "Qual é a diferença no saldo líquido e no salário médio entre as capitais e o interior?",
-  "Os setores com maior rotatividade praticam salários médios mais baixos?",
-  "Como a escolaridade impacta o salário médio de admissão?"
+  ["p1_setores_df", "Qual setor econômico mais contratou e demitiu no Distrito Federal nos últimos 12 meses?"],
+  ["p2_sazonalidade", "Existe sazonalidade evidente nas contratações e demissões?"],
+  ["p3_capitais_interior", "Qual é a diferença no saldo líquido e no salário médio entre as capitais e o interior?"],
+  ["p4_fluxos_salarios", "Os setores com maior rotatividade praticam salários médios mais baixos?"],
+  ["p5_perfil_remuneracao", "Como a escolaridade impacta o salário médio de admissão?"]
 ];
 function rodarUmaVez() {{
   const t0 = performance.now();
   const dados = JSON.parse(fs.readFileSync(caminho, "utf8"));
-  const p3 = agente.calcularP3(dados, {{}});
-  for (const p of perguntas) agente.responderPergunta(dados, p);
-  return {{ ms: performance.now() - t0, p3: p3.consolidado }};
+  let p3;
+  for (const [intencao, pergunta] of perguntas) {{
+    const resposta = agente.responderPergunta(dados, pergunta);
+    if (!resposta.suportada || resposta.intencao !== intencao) {{
+      throw new Error(`Resposta inesperada para ${{intencao}}`);
+    }}
+    if (intencao === "p3_capitais_interior") p3 = resposta.dadosAnalise.consolidado;
+  }}
+  return {{ ms: performance.now() - t0, p3 }};
 }}
 rodarUmaVez();
 const tempos = [];
@@ -254,40 +268,12 @@ for (let i = 0; i < {repeticoes}; i++) {{
 }}
 console.log(JSON.stringify({{ versaoNode: process.version, tempos, p3: ultimo }}));
 """
-        proc = subprocess.run([node, "-e", script_node], capture_output=True, text=True, check=True)
-        saida_js = json.loads(proc.stdout.strip())
-        tempos_leitura = [float(t) for t in saida_js["tempos"]]
-        p3_raw = saida_js["p3"]
-        p3_js = {
-            "saldo_capital": p3_raw["saldo_capital"],
-            "saldo_interior": p3_raw["saldo_interior"],
-            "n_capital": p3_raw["n_capital"],
-            "n_interior": p3_raw["n_interior"],
-            "salario_capital": p3_raw["salario_capital"],
-            "salario_interior": p3_raw["salario_interior"],
-        }
-        motor = f"Node.js {saida_js['versaoNode']} (V8 JSON.parse + P1-P5 em metra-agente.js)"
-    else:
-        motor = "Python json.loads (fallback sem Node)"
-        tempos_leitura = []
-        p3_js = {}
-        for i in range(repeticoes + 1):
-            t0 = time.perf_counter()
-            carregado = json.loads(fonte.read_text(encoding="utf-8"))
-            cap = [r for r in carregado["geografia"] if r["is_capital"]]
-            intl = [r for r in carregado["geografia"] if not r["is_capital"]]
-            qc = sum(r["qtd_salarios_admissao"] or 0 for r in cap)
-            qi = sum(r["qtd_salarios_admissao"] or 0 for r in intl)
-            p3_js = {
-                "saldo_capital": sum(r["saldo"] for r in cap),
-                "saldo_interior": sum(r["saldo"] for r in intl),
-                "n_capital": qc,
-                "n_interior": qi,
-                "salario_capital": sum((r["salario_medio_admissao"] or 0) * (r["qtd_salarios_admissao"] or 0) for r in cap) / qc,
-                "salario_interior": sum((r["salario_medio_admissao"] or 0) * (r["qtd_salarios_admissao"] or 0) for r in intl) / qi,
-            }
-            if i > 0:
-                tempos_leitura.append((time.perf_counter() - t0) * 1000.0)
+    proc = subprocess.run([node, "-e", script_node], stdout=subprocess.PIPE, text=True, check=True)
+    saida_js = json.loads(proc.stdout)
+    p3_js = {
+        chave: saida_js["p3"][chave]
+        for chave in ("saldo_capital", "saldo_interior", "n_capital", "n_interior", "salario_capital", "salario_interior")
+    }
 
     return {
         "tamanho_bruto_bytes": len(conteudo_identado),
@@ -295,8 +281,8 @@ console.log(JSON.stringify({{ versaoNode: process.version, tempos, p3: ultimo }}
         "tamanho_compacto_bytes": len(conteudo_compacto),
         "tamanho_compacto_gzip_bytes": gzip_compacto,
         "escrita": _resumo_tempos(tempos_escrita),
-        "motor_execucao": motor,
-        "leitura_parse_e_p1_a_p5": _resumo_tempos(tempos_leitura),
+        "motor_execucao": f"Node.js {saida_js['versaoNode']} (leitura local, V8 JSON.parse e agente JS P1-P5)",
+        "leitura_parse_e_p1_a_p5": _resumo_tempos(saida_js["tempos"]),
     }, p3_js
 
 
@@ -357,13 +343,16 @@ def _paridade_p3(a: dict[str, Any], b: dict[str, Any], c: dict[str, Any]) -> boo
         if not (a[chave] == b[chave] == c[chave]):
             return False
     for chave in ("salario_capital", "salario_interior"):
-        if max(abs(a[chave] - b[chave]), abs(a[chave] - c[chave])) > 1e-6:
+        salarios = (a[chave], b[chave], c[chave])
+        if all(salario is None for salario in salarios):
+            continue
+        if any(salario is None for salario in salarios) or max(salarios) - min(salarios) > TOLERANCIA_SALARIAL_P3:
             return False
     return True
 
 
 def avaliar(fonte: Path, repeticoes: int = 7, threads: int = 1) -> dict[str, Any]:
-    bruto = fonte.read_bytes()
+    bruto = fonte.read_bytes().replace(b"\r\n", b"\n")
     dados = json.loads(bruto.decode("utf-8"))
     if dados.get("versao_schema") != 1:
         raise ValueError("Esperado snapshot JSON v1 em docs/assets/dados/metra.json.")
@@ -371,9 +360,11 @@ def avaliar(fonte: Path, repeticoes: int = 7, threads: int = 1) -> dict[str, Any
     with tempfile.TemporaryDirectory(prefix="metra_disp_") as tmp_str:
         tmp = Path(tmp_str)
         with duckdb.connect(str(tmp / "banco_consumo_bench.duckdb"), config={"threads": threads}) as conn:
+            conn.begin()
             _popular_duckdb_consumo(dados, conn)
+            conn.commit()
             alt_a, p3_a = _medir_alternativa_csv(conn, tmp, repeticoes)
-            alt_b, p3_b = _medir_alternativa_json_js(dados, fonte, tmp, repeticoes)
+            alt_b, p3_b = _medir_alternativa_json_js(dados, tmp, repeticoes)
             alt_c, p3_c = _medir_alternativa_duckdb_bi(conn, repeticoes)
 
     paridade = _paridade_p3(p3_a, p3_b, p3_c)
@@ -391,8 +382,8 @@ def avaliar(fonte: Path, repeticoes: int = 7, threads: int = 1) -> dict[str, Any
             "repeticoes_validas": repeticoes,
         },
         "fonte": {
-            "arquivo": str(fonte.relative_to(RAIZ)).replace("\\", "/"),
-            "sha256": hashlib.sha256(bruto).hexdigest(),
+            "arquivo": (fonte.relative_to(RAIZ) if fonte.is_relative_to(RAIZ) else fonte).as_posix(),
+            "sha256_lf": hashlib.sha256(bruto).hexdigest(),
             "registros": {k: len(dados[k]) for k in ("setores", "geografia", "perfis", "calendario")},
             "total_registros": sum(len(dados[k]) for k in ("setores", "geografia", "perfis", "calendario")),
         },
@@ -402,6 +393,7 @@ def avaliar(fonte: Path, repeticoes: int = 7, threads: int = 1) -> dict[str, Any
             "C_duckdb_sql_referencia_bi": alt_c,
         },
         "paridade_p3_identica": paridade,
+        "tolerancia_absoluta_salario_p3": TOLERANCIA_SALARIAL_P3,
         "p3_consolidado_observado": {k: (round(v, 2) if isinstance(v, float) else v) for k, v in p3_b.items()},
     }
 

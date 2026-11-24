@@ -31,7 +31,7 @@ Exportar as quatro relações `consumo.*` como arquivos CSV mensais gerados pelo
 
 Centralizar as métricas em `dbt_metra/models/semantic/metricas.yml` (`src/metricas/camada_semantica.py`), exportar via asset `exportar_json_consumo` o snapshot idempotente `docs/assets/dados/metra.json` (`versao_schema: 1`) e servi-lo no GitHub Pages com painel interativo e agente JavaScript local no navegador (`docs/javascripts/metra-agente.js` e `metra-painel.js`), mantendo o Streamlit para uso interno sobre a Gold.
 
-- **O que oferece:** Custo R$ 0 de servidor, zero backend, envio compactado em ~`242 KB` gzip-6, metadados semânticos embarcados no JSON e mesma lógica de guardrails e médias ponderadas no navegador e no painel interno.
+- **O que oferece:** Custo R$ 0 de servidor, zero backend, envio compactado em ~`242 KB` gzip-6, metadados semânticos embarcados no JSON e recomposição ponderada das médias salariais sobre os grupos publicados. O agente usa as dimensões do snapshot para limitar as consultas.
 
 ### C. Servidor BI tradicional (Metabase sobre DuckDB)
 
@@ -55,7 +55,7 @@ O script reproduzível `src/consumo/avaliar_disponibilizacao.py` leu o snapshot 
 
 A resposta consolidada da pergunta central (P3 sobre o snapshot publicado) atingiu **paridade exata** entre CSV, JS e DuckDB (`paridade_p3_identica = true`): saldo `+528` e salário médio `R$ 2.268,97` (`n = 10.514`) nas capitais vs. saldo `+944` e salário médio `R$ 2.138,23` (`n = 14.491`) no interior.
 
-Reprodução na raiz do repositório:
+Reprodução na raiz do repositório (com DuckDB para Python e Node.js instalados):
 
 ```bash
 python -m src.consumo.avaliar_disponibilizacao --saida docs/adr/evidencias/0008-disponibilizacao.json

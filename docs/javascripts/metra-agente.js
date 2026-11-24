@@ -59,6 +59,18 @@
 
   const UFS_VALIDAS = ["DF", "GO", "MS", "MT"];
   const ANOS_VALIDOS = [2023, 2024, 2025, 2026];
+  const UFS_FORA_DO_RECORTE = "AC AL AP AM BA CE ES MA MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO".split(" ");
+  const LOCAIS_FORA_DO_RECORTE = [
+    "acre", "alagoas", "amapa", "amazonas", "bahia", "ceara", "espirito santo",
+    "maranhao", "minas gerais", "paraiba", "parana", "pernambuco", "piaui",
+    "rio de janeiro", "rio grande do norte", "rio grande do sul", "rondonia",
+    "roraima", "santa catarina", "sao paulo", "sergipe", "tocantins",
+    "rio branco", "maceio", "macapa", "manaus", "salvador", "fortaleza",
+    "sao luis", "belo horizonte", "belem", "joao pessoa", "curitiba",
+    "recife", "teresina", "porto alegre", "porto velho", "boa vista",
+    "florianopolis", "aracaju", "brasil",
+    "regiao norte", "regiao nordeste", "regiao sudeste", "regiao sul",
+  ];
 
   const TERMOS_SETORIAIS = [
     ["A", ["agro", "agropecuaria", "agricultura", "pecuaria", "florestal", "pesca"]],
@@ -143,6 +155,16 @@
       }
     }
     return false;
+  }
+
+  function pedeLocalForaDoRecorte(texto, norm) {
+    // Preserva a distinção entre o estado Pará e a preposição "para".
+    const siglas = texto.match(/\b[A-Z]{2}\b/g) || [];
+    return siglas.some((sigla) => sigla !== "SE" && UFS_FORA_DO_RECORTE.includes(sigla)) ||
+      /\b(?:[Ee][Mm]|[Nn][OoAa])\s+SE\b/.test(texto) ||
+      /(?:^|[^\p{L}])pará(?=$|[^\p{L}])/iu.test(texto) ||
+      /\b(?:em|no|na|de|do|da)\s+(?:ac|ap|ba|ce|es|mg|pb|pi|pr|rj|rn|ro|rr|rs|sc|sp)\b/.test(norm) ||
+      contemTermo(norm, LOCAIS_FORA_DO_RECORTE);
   }
 
   function sugerirCnaeParaCargo(norm) {
@@ -316,6 +338,14 @@
       };
     }
 
+    if (pedeLocalForaDoRecorte(bruto, norm)) {
+      return {
+        intencao: "nao_suportada",
+        titulo: "Recorte Geográfico Fora da Cobertura",
+        motivo: "O snapshot público cobre o Centro-Oeste. Selecione DF, GO, MS ou MT para consultar uma UF.",
+      };
+    }
+
     const matchCboCodigo = norm.match(/\bcbo\s*(\d{4}\s*\d{2})\b/);
     if (matchCboCodigo || contemTermo(norm, GATILHOS_OCUPACAO)) {
       const secaoSugerida = sugerirCnaeParaCargo(norm);
@@ -338,7 +368,7 @@
         motivo:
           "Por governança LGPD, a granularidade por ocupação CBO 2002 foi omitida das views públicas e de `metra.json` " +
           "para evitar reidentificação em profissões raras. Para consultar CBO específica, execute o painel interno Streamlit " +
-          "(`docker compose --profile painel up`) ou explore abaixo a seção CNAE correspondente.",
+          "(`docker compose --profile painel up`). Quando disponível, a sugestão de CNAE indica uma atividade econômica relacionada.",
         sugestaoCnae: secaoSugerida
           ? {
               codigo_secao: secaoSugerida,
@@ -469,6 +499,11 @@
     const colecao = usaSetores ? "setores" : "geografia";
     const linhas = filtrarLinhasBase(dados[colecao] || [], filtros);
     const agg = agregarRegistros(linhas);
+    if (!linhas.length) {
+      agg.admissoes = null;
+      agg.desligamentos = null;
+      agg.saldo = null;
+    }
     return {
       ...agg,
       colecaoOrigem: colecao,
@@ -574,13 +609,14 @@
     const serie = calFiltrado.map((c) => {
       const { ano, mes } = parseCompetencia(c.competencia);
       const regs = porCompetencia.get(c.competencia) || [];
-      if (!c.tem_dados) {
+      const anoCompleto = anosCompletos.has(ano);
+      if (!c.tem_dados || !regs.length) {
         return {
           competencia: c.competencia,
           ano,
           mes,
-          tem_dados: false,
-          ano_completo_na_base: false,
+          tem_dados: c.tem_dados,
+          ano_completo_na_base: anoCompleto,
           admissoes: null,
           desligamentos: null,
           saldo: null,
@@ -592,7 +628,7 @@
         ano,
         mes,
         tem_dados: true,
-        ano_completo_na_base: anosCompletos.has(ano),
+        ano_completo_na_base: anoCompleto,
         admissoes: agg.admissoes,
         desligamentos: agg.desligamentos,
         saldo: agg.saldo,
@@ -908,12 +944,14 @@
 
     if (intencao === "p1_setores_df") {
       const r = calcularP1(dados, filtros);
-      const topAdm = r.linhas[0];
-      const topSaldo = [...r.linhas].sort((a, b) => b.saldo - a.saldo)[0];
-      const resumoExecutivo = topAdm
+      const lideresAdm = r.linhas.filter((linha) => linha.ranking_admissoes === 1);
+      const lideresDesl = r.linhas.filter((linha) => linha.ranking_desligamentos === 1);
+      const descreverLideres = (linhas) =>
+        linhas.map((linha) => `${linha.codigo_secao} (${linha.descricao_secao})`).join(" e ");
+      const resumoExecutivo = lideresAdm.length
         ? `Em ${r.uf} (${r.ano ? `ano ${r.ano}` : `${r.inicio?.slice(0, 7)} a ${r.fim?.slice(0, 7)}`}), ` +
-          `a seção ${topAdm.codigo_secao} (${topAdm.descricao_secao}) lidera as admissões (${inteiroSimples(topAdm.admissoes)}) ` +
-          `e a seção ${topSaldo.codigo_secao} teve o maior saldo publicado (${inteiroSimples(topSaldo.saldo, true)}).`
+          `liderança em admissões: ${descreverLideres(lideresAdm)} (${inteiroSimples(lideresAdm[0].admissoes)} por seção). ` +
+          `Liderança em desligamentos: ${descreverLideres(lideresDesl)} (${inteiroSimples(lideresDesl[0].desligamentos)} por seção).`
         : "Nenhum grupo de setor publicado neste recorte (grupos < 5 movimentações são omitidos).";
 
       return {
@@ -922,12 +960,12 @@
         intencao,
         tituloIntencao: `P1 — Setores Econômicos em ${r.uf} (${r.ano ? `Ano ${r.ano}` : "12 meses"})`,
         colecao: "setores",
-        filtros,
+        filtros: { ...filtros, sigla_uf: r.uf },
         dadosAnalise: r,
         resumoExecutivo,
         auditoria: {
           metricas: ["admissoes", "desligamentos", "saldo"],
-          consultaDeclarativa: `SELECT codigo_secao, SUM(admissoes), SUM(desligamentos), SUM(saldo) FROM setores WHERE sigla_uf = '${r.uf}' AND codigo_secao <> 'Z' AND competencia BETWEEN '${r.inicio}' AND '${r.fim}' GROUP BY codigo_secao`,
+          metodo: "Soma os fluxos publicados por seção na UF e na janela selecionadas, exclui a seção Z e calcula dois rankings independentes.",
           ressalva: dados.recorte?.ressalva || "",
         },
       };
@@ -937,11 +975,19 @@
       const r = calcularP2(dados, filtros);
       const validos = r.resumoMensal.filter((m) => m.media_admissoes_mes !== null);
       const pico = [...validos].sort((a, b) => b.media_admissoes_mes - a.media_admissoes_mes)[0];
+      const picoDesl = [...validos].sort((a, b) => b.media_desligamentos_mes - a.media_desligamentos_mes)[0];
       const vale = [...validos].sort((a, b) => a.media_saldo_mes - b.media_saldo_mes)[0];
-      const resumoExecutivo = pico
-        ? `Considerando apenas anos completos (${r.anosCompletos.join(", ")}), o pico médio de admissões ocorreu em ${pico.nome_mes} ` +
-          `(${inteiroSimples(pico.media_admissoes_mes)} adm/mês) e o menor saldo médio em ${vale.nome_mes} (${inteiroSimples(vale.media_saldo_mes, true)}).`
-        : `O recorte (${recorteDesc}) não possui anos com 12 meses completos na origem; exibindo apenas a série mensal observada.`;
+      let resumoExecutivo;
+      if (pico) {
+        resumoExecutivo =
+          `Nos meses publicados de anos completos na base (${r.anosCompletos.join(", ")}), o pico médio de admissões ocorreu em ${pico.nome_mes} ` +
+          `(${inteiroSimples(pico.media_admissoes_mes)}), o de desligamentos em ${picoDesl.nome_mes} ` +
+          `(${inteiroSimples(picoDesl.media_desligamentos_mes)}) e o menor saldo médio em ${vale.nome_mes} (${inteiroSimples(vale.media_saldo_mes, true)}).`;
+      } else if (r.serie.some((mes) => mes.admissoes !== null)) {
+        resumoExecutivo = `O recorte (${recorteDesc}) tem dados mensais publicados, mas nenhum mês publicado em ano completo na base para calcular a média sazonal.`;
+      } else {
+        resumoExecutivo = `Nenhum grupo mensal publicado no recorte (${recorteDesc}).`;
+      }
 
       return {
         perguntaOriginal: texto,
@@ -954,28 +1000,42 @@
         resumoExecutivo,
         auditoria: {
           metricas: ["admissoes", "desligamentos", "saldo"],
-          consultaDeclarativa: `SELECT mes, AVG(admissoes), AVG(desligamentos), AVG(saldo) FROM serie WHERE ano_completo_na_base GROUP BY mes`,
-          ressalva: `Meses sem dados permanecem nulos; anos parciais não entram na média sazonal. ${dados.recorte?.ressalva || ""}`,
+          metodo: "Agrega as linhas de setores por competência, mantém as lacunas do calendário e calcula a média por mês do ano.",
+          ressalva: `Cada média usa os meses publicados em anos completos na base. Mês sem grupo publicado fica nulo. ${dados.recorte?.ressalva || ""}`,
         },
       };
     }
 
     if (intencao === "p3_capitais_interior") {
+      if (filtros.codigo_secao) {
+        return {
+          perguntaOriginal: texto,
+          suportada: false,
+          intencao: "nao_suportada",
+          tituloIntencao: "P3 — Filtro de Seção Indisponível",
+          motivoRecusa: "A coleção geográfica não tem seção CNAE. Retire a seção da pergunta ou dos filtros do painel para comparar capitais e interior por UF ou ano.",
+        };
+      }
+
       const r = calcularP3(dados, filtros);
       const c = r.consolidado;
       let resumoExecutivo;
-      if (r.recorte === "DF") {
+      if (c.saldo_capital === null && c.saldo_interior === null) {
+        resumoExecutivo = `Nenhum grupo geográfico publicado no recorte (${recorteDesc}).`;
+      } else if (r.recorte === "DF") {
         resumoExecutivo =
           `No DF (${filtros.ano || "2023–2026"}), não há municípios de interior. As movimentações publicadas somam saldo de ` +
           `${inteiroSimples(c.saldo_capital, true)} e salário médio de admissão de ${moedaSimples(c.salario_capital)} (n = ${inteiroSimples(c.n_capital)}).`;
       } else {
-        const maisSaldo = (c.saldo_capital ?? -Infinity) >= (c.saldo_interior ?? -Infinity) ? "capitais" : "municípios do interior";
-        const difTexto = c.diferenca_salario !== null
-          ? `diferença salarial Capital − Interior de ${moedaSimples(c.diferenca_salario)} (${c.diferenca_salario_pct >= 0 ? "+" : ""}${c.diferenca_salario_pct.toFixed(1)}%)`
-          : "comparação salarial indisponível por supressão";
+        const pct = c.diferenca_salario_pct === null
+          ? ""
+          : ` (${c.diferenca_salario_pct.toLocaleString("pt-BR", { maximumFractionDigits: 1, signDisplay: "exceptZero" })}%)`;
+        const difTexto = c.diferenca_salario === null
+          ? "comparação salarial indisponível no recorte"
+          : `diferença salarial Capital − Interior de ${moedaSimples(c.diferenca_salario)}${pct}`;
         resumoExecutivo =
-          `Em ${r.recorte} (${filtros.ano || "2023–2026"}), os(as) ${maisSaldo} concentraram o maior saldo publicado ` +
-          `(${inteiroSimples(c.saldo_capital, true)} nas capitais vs. ${inteiroSimples(c.saldo_interior, true)} no interior), com ${difTexto}.`;
+          `Em ${r.recorte} (${filtros.ano || "2023–2026"}), o saldo publicado foi de ${inteiroSimples(c.saldo_capital, true)} nas capitais ` +
+          `e ${inteiroSimples(c.saldo_interior, true)} no interior, com ${difTexto}.`;
       }
 
       return {
@@ -989,7 +1049,7 @@
         resumoExecutivo,
         auditoria: {
           metricas: ["saldo", "salario_medio_admissao", "qtd_salarios_admissao"],
-          consultaDeclarativa: `SELECT is_capital, SUM(saldo), SUM(salario_medio_admissao * qtd_salarios_admissao) / SUM(qtd_salarios_admissao) FROM geografia GROUP BY is_capital`,
+          metodo: "Soma os saldos de capitais e interior separadamente e recompõe as médias salariais ponderadas pela quantidade de salários divulgados.",
           ressalva: `O DF não possui municípios de interior. ${dados.recorte?.ressalva || ""}`,
         },
       };
@@ -1011,7 +1071,7 @@
         resumoExecutivo: `${corrTexto} O índice é uma proxy de equilíbrio entre entradas e saídas (0–100%), não taxa sobre estoque de vínculos.`,
         auditoria: {
           metricas: ["admissoes", "desligamentos", "saldo", "salario_medio_admissao", "indice_fluxos_pareados_pct"],
-          consultaDeclarativa: `SELECT codigo_secao, indice_fluxos_pareados_pct, salario_medio_admissao FROM setores WHERE codigo_secao <> 'Z' GROUP BY codigo_secao`,
+          metodo: "Recompõe o índice de fluxos pareados e o salário médio ponderado por seção e estima a correlação sobre os pares publicados.",
           ressalva: dados.recorte?.ressalva || "",
         },
       };
@@ -1043,7 +1103,7 @@
         resumoExecutivo,
         auditoria: {
           metricas: ["admissoes", "desligamentos", "saldo", "salario_medio_admissao", "qtd_salarios_admissao"],
-          consultaDeclarativa: `SELECT codigo_categoria, categoria, SUM(admissoes), SUM(saldo), salario_medio_ponderado FROM perfis WHERE eixo = '${r.eixo}' GROUP BY codigo_categoria, categoria`,
+          metodo: "Agrupa os fluxos por categoria do eixo selecionado e recompõe as médias salariais ponderadas pela quantidade de salários divulgados.",
           ressalva: `Cada consulta usa exatamente um eixo demográfico, sem cruzar atributos. ${dados.recorte?.ressalva || ""}`,
         },
       };
@@ -1059,12 +1119,13 @@
         colecao: k.colecaoOrigem,
         filtros,
         dadosAnalise: k,
-        resumoExecutivo:
-          `Nos registros publicados de ${recorteDesc} (coleção ${k.colecaoOrigem}), foram apuradas ${inteiroSimples(k.admissoes)} admissões, ` +
-          `${inteiroSimples(k.desligamentos)} desligamentos, saldo de ${inteiroSimples(k.saldo, true)} e salário médio de ${moedaSimples(k.salario_medio_admissao)}.`,
+        resumoExecutivo: k.registrosPublicados
+          ? `Nos registros publicados de ${recorteDesc} (coleção ${k.colecaoOrigem}), foram apuradas ${inteiroSimples(k.admissoes)} admissões, ` +
+            `${inteiroSimples(k.desligamentos)} desligamentos, saldo de ${inteiroSimples(k.saldo, true)} e salário médio de ${moedaSimples(k.salario_medio_admissao)}.`
+          : `Nenhum grupo publicado no recorte (${recorteDesc}).`,
         auditoria: {
           metricas: ["admissoes", "desligamentos", "saldo", "salario_medio_admissao", "qtd_salarios_admissao", "indice_fluxos_pareados_pct"],
-          consultaDeclarativa: `SELECT SUM(admissoes), SUM(desligamentos), SUM(saldo), salario_medio_ponderado FROM ${k.colecaoOrigem}`,
+          metodo: "Soma os fluxos do recorte na coleção selecionada e recompõe a média salarial ponderada pela quantidade de salários divulgados.",
           ressalva: dados.recorte?.ressalva || "",
         },
       };

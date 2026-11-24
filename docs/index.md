@@ -40,6 +40,12 @@ O recorte do projeto concentra-se no **Mercado de Trabalho Formal da Região Cen
     
     Diagnóstico da rotatividade e assimetria do emprego formal no Centro-Oeste, personas atendidas e pergunta norteadora de gestão.
 
+-   **[Painel Público e Agente (Pages)](consumo-json.md)**
+
+    ---
+
+    Painel interativo e agente em linguagem natural rodando direto no navegador sobre o JSON publicado pelo ETL reverso.
+
 -   **[Arquitetura da Plataforma](arquitetura.md)**
     
     ---
@@ -87,12 +93,6 @@ O recorte do projeto concentra-se no **Mercado de Trabalho Formal da Região Cen
     ---
     
     Catálogo de métricas, perguntas de gestão, linhagem da fonte ao consumo, LGPD e controle de acesso.
-
--   **[Painel Público e Agente (Pages)](consumo-json.md)**
-
-    ---
-
-    Painel interativo e agente em linguagem natural rodando direto no navegador sobre o JSON publicado pelo ETL reverso.
 
 -   **[Decisões de Arquitetura (ADRs)](adr/0001-modelagem-sistema-origem.md)**
     

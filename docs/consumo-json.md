@@ -55,6 +55,9 @@ agente ocorrem localmente no seu navegador, sem necessidade de backend ou chave 
 
 Os salários são nominais. As linhas de perfis representam um eixo demográfico por
 vez, sem permitir cruzar eixos. O calendário distingue mês sem dados de zero
-observado; um mês com dados pode ter todos os seus grupos suprimidos. O arquivo
-é atualizado após revisão e merge do PR na `main` (detalhes em
+observado. Em P2, competências sem grupos publicados ficam sem valor na série
+e fora do cálculo da média sazonal. A média usa apenas meses publicados em anos
+com 12 competências observadas na origem, com contagem de anos por mês.
+A comparação entre capitais e interior (P3) aceita UF e ano no agente.
+O arquivo é atualizado após revisão e merge do PR na `main` (detalhes em
 [Consumo e governança](consumo-e-governanca.md#etl-reverso-json-publico)).

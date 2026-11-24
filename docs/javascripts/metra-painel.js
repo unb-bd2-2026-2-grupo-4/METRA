@@ -1,4 +1,4 @@
-/* Interface pública do Painel Executivo e Agente Text-to-SQL no GitHub Pages (ADR-0008).
+/* Interface pública do painel executivo e agente analítico no GitHub Pages (ADR-0008).
  * Consome exclusivamente `docs/assets/dados/metra.json` via `window.MetraAgente`.
  */
 (() => {
@@ -22,12 +22,12 @@
     p1: {
       rotulo: "Pergunta de gestão P1",
       enunciado: "Qual setor econômico mais contratou e demitiu no Distrito Federal nos últimos 12 meses?",
-      nota: "Sem ano filtrado, apura os últimos 12 meses publicados da UF selecionada (DF por padrão).",
+      nota: "Sem ano filtrado, usa uma janela de 12 meses até a competência mais recente da base. O DF é a UF padrão.",
     },
     p2: {
       rotulo: "Pergunta de gestão P2",
       enunciado: "Existe sazonalidade evidente nas contratações e demissões?",
-      nota: "Compara a série mensal observada com a média sazonal calculada apenas sobre anos completos (12 competências).",
+      nota: "A média sazonal usa meses com grupos publicados em anos com 12 competências observadas na base.",
     },
     p3: {
       rotulo: "Pergunta de gestão P3",
@@ -78,6 +78,8 @@
     const sinal = comSinal && v > 0 ? "+" : "";
     return `${sinal}${v.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
   };
+
+  const fmtMedia = (v) => v === null ? "—" : v.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
 
   function el(tag, props = {}, ...filhos) {
     const node = document.createElement(tag);
@@ -207,12 +209,13 @@
       : [];
     const minV = Math.min(0, ...filtrados.map((i) => i[campoValor]), ...valoresSub);
     const maxV = Math.max(0, ...filtrados.map((i) => i[campoValor]), ...valoresSub);
+    const temNegativos = minV < 0;
     const range = maxV - minV || 1;
     const xParaPx = (v) => padL + ((v - minV) / range) * plotW;
     const xZero = xParaPx(0);
 
     const svg = svgEl("svg", { viewBox: `0 0 ${w} ${h}`, className: "metra-svg", role: "img" });
-    if (minV < 0) {
+    if (temNegativos) {
       svg.append(svgEl("line", { x1: xZero, x2: xZero, y1: padT, y2: h - padB, stroke: "rgba(148,163,184,0.5)", "stroke-width": 1 }));
     }
 
@@ -242,9 +245,8 @@
         );
       }
 
-      const xTxt = v < 0 ? xBar - 6 : xBar + wBar + 6;
-      const anchor = v < 0 ? "end" : "start";
-      svg.append(svgEl("text", { x: xTxt, y: y + 18, "text-anchor": anchor, "font-size": 10, fill: "currentColor" }, formatar(v)));
+      const xTxt = temNegativos ? w - padR + 6 : xBar + wBar + 6;
+      svg.append(svgEl("text", { x: xTxt, y: y + 18, "text-anchor": "start", "font-size": 10, fill: "currentColor" }, formatar(v)));
     });
 
     return svg;
@@ -442,10 +444,10 @@
       return frag;
     }
     const topAdm = p1.linhas[0];
-    const topSaldo = [...p1.linhas].sort((a, b) => b.saldo - a.saldo)[0];
+    const topDesl = p1.linhas.find((linha) => linha.ranking_desligamentos === 1);
     frag.append(el("div", { className: "metra-kpi-grid-3" },
       criarKpi("Maior volume de admissões", `Seção ${topAdm.codigo_secao} (${fmtInt(topAdm.admissoes)})`, topAdm.descricao_secao.slice(0, 44)),
-      criarKpi("Maior saldo líquido", `Seção ${topSaldo.codigo_secao} (${fmtInt(topSaldo.saldo, true)})`, topSaldo.descricao_secao.slice(0, 44)),
+      criarKpi("Maior volume de desligamentos", `Seção ${topDesl.codigo_secao} (${fmtInt(topDesl.desligamentos)})`, topDesl.descricao_secao.slice(0, 44)),
       criarKpi("Janela de apuração", p1.inicio ? `${p1.inicio.slice(0, 7)} a ${p1.fim.slice(0, 7)}` : "—", `${p1.competenciasDisponiveis} competências · UF ${p1.uf}`)
     ));
 
@@ -456,16 +458,21 @@
       graficoBarrasHorizontaisSvg(top8, "admissoes", "rotulo", (v) => fmtInt(v), "desligamentos")
     ));
 
-    frag.append(criarTabela([
-      { key: "ranking_admissoes", label: "Pos.", fmt: (v) => `${v}º` },
+    frag.append(criarTabelaP1(p1.linhas));
+    return frag;
+  }
+
+  function criarTabelaP1(linhas) {
+    return criarTabela([
       { key: "codigo_secao", label: "Seção" },
       { key: "descricao_secao", label: "Descrição" },
       { key: "admissoes", label: "Admissões", num: true, fmt: (v) => fmtInt(v) },
+      { key: "ranking_admissoes", label: "Pos. adm.", num: true, fmt: (v) => `${v}º` },
       { key: "desligamentos", label: "Desligamentos", num: true, fmt: (v) => fmtInt(v) },
+      { key: "ranking_desligamentos", label: "Pos. desl.", num: true, fmt: (v) => `${v}º` },
       { key: "saldo", label: "Saldo", num: true, fmt: (v) => fmtInt(v, true) },
       { key: "salario_medio_admissao", label: "Salário médio", num: true, fmt: fmtMoeda },
-    ], p1.linhas));
-    return frag;
+    ], linhas);
   }
 
   function renderConteudoP2(p2) {
@@ -478,23 +485,27 @@
         graficoLinhasSerieSvg(p2.serie, "admissoes", "desligamentos", (p) => p.competencia.slice(0, 7))
       ),
       el("div", { className: "metra-card" },
-        el("h4", { className: "metra-card-title", textContent: p2.anosCompletos.length ? `Média sazonal (anos completos: ${p2.anosCompletos.join(", ")})` : "Sazonalidade: apenas anos parciais no recorte" }),
+        el("h4", { className: "metra-card-title", textContent: p2.anosCompletos.length ? `Média sazonal (anos completos na base: ${p2.anosCompletos.join(", ")})` : "Média sazonal indisponível" }),
         criarLegenda([[COR_ACENTO, "Média admissões"], [COR_SECUNDARIA, "Média desligamentos"]]),
         p2.anosCompletos.length
           ? graficoLinhasSerieSvg(p2.resumoMensal, "media_admissoes_mes", "media_desligamentos_mes", (m) => m.nome_mes.slice(5))
-          : el("p", { className: "metra-source-note", textContent: "Nenhum ano com 12 meses completos no filtro atual; a média sazonal fica suspensa para evitar distorção." })
+          : el("p", { className: "metra-source-note", textContent: "Nenhum ano com 12 competências observadas na base para o período selecionado." })
       )
     ));
 
-    frag.append(criarTabela([
-      { key: "nome_mes", label: "Mês" },
-      { key: "anos_considerados", label: "Anos completos", num: true, fmt: (v) => fmtInt(v) },
-      { key: "media_admissoes_mes", label: "Média admissões", num: true, fmt: (v) => fmtInt(v) },
-      { key: "media_desligamentos_mes", label: "Média desligamentos", num: true, fmt: (v) => fmtInt(v) },
-      { key: "media_saldo_mes", label: "Média saldo", num: true, fmt: (v) => fmtInt(v, true) },
-      { key: "saldo_obs", label: "Saldo acumulado", num: true, fmt: (v) => fmtInt(v, true) },
-    ], p2.resumoMensal));
+    frag.append(criarTabelaMediaSazonal(p2.resumoMensal));
     return frag;
+  }
+
+  function criarTabelaMediaSazonal(linhas) {
+    return criarTabela([
+      { key: "nome_mes", label: "Mês" },
+      { key: "anos_considerados", label: "Anos na média", num: true, fmt: (v) => fmtInt(v) },
+      { key: "media_admissoes_mes", label: "Média admissões", num: true, fmt: fmtMedia },
+      { key: "media_desligamentos_mes", label: "Média desligamentos", num: true, fmt: fmtMedia },
+      { key: "media_saldo_mes", label: "Média saldo", num: true, fmt: fmtMedia },
+      { key: "saldo_obs", label: "Saldo acumulado", num: true, fmt: (v) => fmtInt(v, true) },
+    ], linhas);
   }
 
   function renderConteudoP4(p4) {
@@ -661,13 +672,7 @@
       boxResultadoAgente.append(el("div", { className: "metra-callout", textContent: resp.resumoExecutivo }));
 
       if (resp.intencao === "p1_setores_df") {
-        boxResultadoAgente.append(criarTabela([
-          { key: "ranking_admissoes", label: "Pos.", fmt: (v) => `${v}º` },
-          { key: "codigo_secao", label: "Seção" },
-          { key: "descricao_secao", label: "Descrição" },
-          { key: "admissoes", label: "Admissões", num: true, fmt: (v) => fmtInt(v) },
-          { key: "saldo", label: "Saldo", num: true, fmt: (v) => fmtInt(v, true) },
-        ], resp.dadosAnalise.linhas));
+        boxResultadoAgente.append(criarTabelaP1(resp.dadosAnalise.linhas));
       } else if (resp.intencao === "p3_capitais_interior") {
         boxResultadoAgente.append(criarTabela([
           { key: "recorte", label: "Recorte" },
@@ -689,27 +694,36 @@
         boxResultadoAgente.append(criarTabela([
           { key: "categoria", label: resp.dadosAnalise.rotuloEixo },
           { key: "admissoes", label: "Admissões", num: true, fmt: (v) => fmtInt(v) },
+          { key: "desligamentos", label: "Desligamentos", num: true, fmt: (v) => fmtInt(v) },
+          { key: "saldo", label: "Saldo", num: true, fmt: (v) => fmtInt(v, true) },
           { key: "participacao_admissoes_pct", label: "Part. (%)", num: true, fmt: (v) => fmtPct(v) },
           { key: "salario_medio_admissao", label: "Salário médio", num: true, fmt: fmtMoeda },
           { key: "diferenca_salarial", label: "Dif. p/ média", num: true, fmt: fmtMoeda },
         ], resp.dadosAnalise.linhas));
       } else if (resp.intencao === "p2_sazonalidade") {
+        boxResultadoAgente.append(el("h4", { className: "metra-card-title", textContent: "Série mensal publicada" }));
         boxResultadoAgente.append(criarTabela([
-          { key: "nome_mes", label: "Mês" },
-          { key: "media_admissoes_mes", label: "Média admissões", num: true, fmt: (v) => fmtInt(v) },
-          { key: "media_desligamentos_mes", label: "Média desligamentos", num: true, fmt: (v) => fmtInt(v) },
-          { key: "media_saldo_mes", label: "Média saldo", num: true, fmt: (v) => fmtInt(v, true) },
-        ], resp.dadosAnalise.resumoMensal));
+          { key: "competencia", label: "Competência", fmt: (v) => v.slice(0, 7) },
+          { key: "admissoes", label: "Admissões", num: true, fmt: (v) => fmtInt(v) },
+          { key: "desligamentos", label: "Desligamentos", num: true, fmt: (v) => fmtInt(v) },
+          { key: "saldo", label: "Saldo", num: true, fmt: (v) => fmtInt(v, true) },
+        ], resp.dadosAnalise.serie));
+        if (resp.dadosAnalise.resumoMensal.some((mes) => mes.anos_considerados > 0)) {
+          boxResultadoAgente.append(
+            el("h4", { className: "metra-card-title", textContent: "Média sazonal" }),
+            criarTabelaMediaSazonal(resp.dadosAnalise.resumoMensal)
+          );
+        }
       }
 
       const metadadosMetricas = (resp.auditoria.metricas || [])
         .map((m) => dados.metricas?.[m] ? `${dados.metricas[m].label}: ${dados.metricas[m].descricao}` : m)
         .join(" | ");
       boxResultadoAgente.append(el("details", { className: "metra-details" },
-        el("summary", { textContent: "Auditoria: contrato semântico e consulta executada" }),
+        el("summary", { textContent: "Método de cálculo e métricas" }),
         el("p", { textContent: `Intenção: ${resp.intencao} · Coleção: ${resp.colecao} · Filtros: ${JSON.stringify(resp.filtros)}` }),
         el("p", { textContent: `Catálogo semântico: ${metadadosMetricas}` }),
-        el("code", { className: "metra-code", textContent: resp.auditoria.consultaDeclarativa }),
+        el("p", { textContent: resp.auditoria.metodo }),
         el("p", { className: "metra-source-note", textContent: resp.auditoria.ressalva })
       ));
     }

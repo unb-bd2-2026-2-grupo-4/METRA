@@ -278,8 +278,9 @@ O asset `exportar_json_consumo` publica um snapshot do histórico disponível pa
 o [Painel Público e Agente (Pages)](consumo-json.md) conforme a decisão registrada na
 [ADR-0008](adr/0008-disponibilizacao-camada-semantica-e-json-pages.md). O canal
 permite inspecionar contratação, saldo, sazonalidade e disparidades por recorte,
-além de responder às perguntas P1–P5 via agente JavaScript (`docs/javascripts/metra-agente.js`)
-com os mesmos guardrails semânticos e de privacidade aplicados no painel interno.
+além de responder às perguntas P1–P5 via agente JavaScript (`docs/javascripts/metra-agente.js`).
+O agente opera sobre as dimensões publicadas, explica o método de cálculo e
+recusa solicitações de SQL literal, detalhe individual ou ocupação CBO.
 
 **Estado:** views `consumo.*`, exportador idempotente (`src/consumo/exportar_json.py`),
 snapshot real (`docs/assets/dados/metra.json`), painel público (`docs/javascripts/metra-painel.js`)

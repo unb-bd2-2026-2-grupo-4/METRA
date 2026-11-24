@@ -86,6 +86,9 @@ test("P1 exclui seção Z, respeita janela 12 meses e calcula dense_rank indepen
   assert.deepEqual(p1.linhas.map((l) => l.codigo_secao), ["G", "C", "P"]);
   assert.equal(p1.linhas[0].ranking_admissoes, 1);
   assert.equal(p1.linhas[1].ranking_desligamentos, 1);
+  const resposta = agente.responderPergunta(fixtureDados(), "Que setor mais contratou e demitiu no DF em 2024?");
+  assert.match(resposta.resumoExecutivo, /liderança em admissões: G/);
+  assert.match(resposta.resumoExecutivo, /liderança em desligamentos: C/i);
 
   const p1Janela = agente.calcularP1(fixtureDados(), {});
   assert.equal(p1Janela.inicio, "2025-02-01");
@@ -93,15 +96,31 @@ test("P1 exclui seção Z, respeita janela 12 meses e calcula dense_rank indepen
   assert.equal(p1Janela.competenciasDisponiveis, 1);
 });
 
-test("P2 separa mês sem dados de zero observado e média sazonal usa apenas anos completos", () => {
+test("P2 distingue meses sem dados, grupos omitidos e zeros observados na média sazonal", () => {
   const p2 = agente.calcularP2(fixtureDados(), { sigla_uf: "DF" });
   const mar24 = p2.serie.find((s) => s.competencia === "2024-03-01");
   assert.equal(mar24.tem_dados, false);
   assert.equal(mar24.admissoes, null);
+  const fev24 = p2.serie.find((s) => s.competencia === "2024-02-01");
+  assert.equal(fev24.tem_dados, true);
+  assert.equal(fev24.admissoes, null);
   assert.deepEqual(p2.anosCompletos, [2023]);
   const jan = p2.resumoMensal.find((m) => m.mes === 1);
   assert.equal(jan.anos_considerados, 1);
   assert.equal(jan.media_admissoes_mes, 10);
+  assert.equal(p2.resumoMensal[1].media_admissoes_mes, 0);
+  assert.equal(p2.resumoMensal[1].anos_considerados, 1);
+  assert.equal(p2.resumoMensal[2].media_admissoes_mes, null);
+  assert.equal(p2.resumoMensal[2].anos_considerados, 0);
+});
+
+test("P2 sem grupos publicados não anuncia um pico nem preenche a série", () => {
+  const dados = fixtureDados();
+  const r = agente.responderPergunta(dados, "Existe sazonalidade no DF em 2023 na seção U?");
+  assert.match(r.resumoExecutivo, /Nenhum grupo mensal publicado/);
+  assert.ok(r.dadosAnalise.serie.every((mes) => mes.tem_dados && mes.admissoes === null));
+  assert.ok(r.dadosAnalise.resumoMensal.every((mes) => mes.media_admissoes_mes === null));
+  assert.equal(agente.calcularKpisRecorte(dados, { codigo_secao: "U" }).saldo, null);
 });
 
 test("P3 mantém interior do DF nulo e compara GO capital vs interior", () => {
@@ -114,6 +133,27 @@ test("P3 mantém interior do DF nulo e compara GO capital vs interior", () => {
   assert.equal(p3Go.consolidado.saldo_capital, 10);
   assert.equal(p3Go.consolidado.saldo_interior, 20);
   assert.equal(p3Go.consolidado.diferenca_salario, 500);
+});
+
+test("o agente recusa seção em P3 e nomes ou siglas fora da cobertura", () => {
+  const dados = fixtureDados();
+  const perguntaP3 = "Qual o saldo em capitais e no interior?";
+  for (const r of [
+    agente.responderPergunta(dados, "Qual o saldo em capitais e no interior na seção P?"),
+    agente.responderPergunta(dados, perguntaP3, { codigo_secao: "P" }),
+  ]) {
+    assert.equal(r.suportada, false);
+    assert.match(r.motivoRecusa, /não tem seção CNAE/);
+    assert.equal(r.dadosAnalise, undefined);
+  }
+  for (const local of ["São Paulo", "SP", "sp", "Pará", "Recife"]) {
+    const r = agente.responderPergunta(dados, `Qual o saldo em ${local} em 2025?`);
+    assert.equal(r.suportada, false, local);
+    assert.match(r.tituloIntencao, /geográfico/i);
+  }
+  for (const pergunta of ["Qual o saldo para Goiás?", "Qual o saldo em Mato Grosso do Sul?", "Qual a sazonalidade no Natal?"]) {
+    assert.equal(agente.responderPergunta(dados, pergunta).suportada, true, pergunta);
+  }
 });
 
 test("P4 e P5 calculam correlação, quadrantes, eixo único e diferença Homem - Mulher", () => {
