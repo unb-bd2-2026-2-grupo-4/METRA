@@ -1,0 +1,107 @@
+version: 2
+
+# Consumidores finais declarados como exposures do dbt para que o grafo de linhagem
+# do dbt docs exiba o caminho completo desde as fontes Parquet até o painel Streamlit,
+# a busca vetorial CBO / Text-to-SQL, a base de consumo isolada e o ETL reverso JSON.
+exposures:
+  - name: painel_streamlit
+    label: "Painel Analítico Streamlit (src/app/dashboard.py)"
+    type: dashboard
+    maturity: high
+    url: "http://localhost:8501"
+    description: >
+      Painel executivo interativo (serviço Docker `painel`, porta 8501) que consome o schema
+      `gold` em modo somente leitura (`READ_ONLY`) e compila todas as métricas pela camada
+      semântica (`src/metricas/camada_semantica.py`), apresentando as cinco perguntas de
+      gestão (P1 a P5) com filtros por UF, Ano, Seção CNAE e Ocupação CBO.
+    depends_on:
+      - ref('fct_setor_mensal')
+      - ref('fct_geografia_mensal')
+      - ref('fct_perfil_mensal')
+      - ref('fct_movimentacao')
+      - ref('dim_competencia')
+      - ref('dim_municipio')
+      - ref('dim_cbo')
+      - ref('dim_cbo_historico')
+      - ref('dim_cnae')
+      - ref('dim_perfil_demografico')
+      - metric('admissoes')
+      - metric('desligamentos')
+      - metric('saldo')
+      - metric('qtd_salarios_admissao')
+      - metric('salario_medio_admissao')
+      - metric('indice_fluxos_pareados_pct')
+    owner:
+      name: "Squad G4 — METRA (FCTE/UnB)"
+      email: "squad-g4@unb.br"
+
+  - name: assistente_text_to_sql_e_busca_cbo
+    label: "Busca Vetorial CBO 384d e Assistente Text-to-SQL (ADR 0007)"
+    type: application
+    maturity: high
+    url: "https://unb-bd2-2026-2-grupo-4.github.io/METRA/adr/0007-busca-semantica-e-consumo/"
+    description: >
+      Índice vetorial semântico de 384 dimensões sobre `gold.dim_cbo` (`src/app/busca_cbo.py`)
+      e tradutor Text-to-SQL governado pelo catálogo (`src/app/text_to_sql.py`), com
+      validação sintática `validar_sql_seguro` e bloqueio de leitura externa e de linhas
+      individuais de `gold.fct_movimentacao`.
+    depends_on:
+      - ref('dim_cbo')
+      - ref('dim_cnae')
+      - ref('dim_competencia')
+      - ref('dim_perfil_demografico')
+      - ref('fct_movimentacao')
+      - ref('fct_setor_mensal')
+      - ref('fct_geografia_mensal')
+      - ref('fct_perfil_mensal')
+      - metric('admissoes')
+      - metric('desligamentos')
+      - metric('saldo')
+      - metric('qtd_salarios_admissao')
+      - metric('salario_medio_admissao')
+      - metric('indice_fluxos_pareados_pct')
+    owner:
+      name: "Squad G4 — METRA (FCTE/UnB)"
+      email: "squad-g4@unb.br"
+
+  - name: base_consumo_isolada
+    label: "Base de Consumo Isolada (data/metra_consumo.duckdb)"
+    type: application
+    maturity: high
+    url: "https://unb-bd2-2026-2-grupo-4.github.io/METRA/consumo-e-governanca/#controle-de-acesso"
+    description: >
+      Banco DuckDB isolado publicado atomicamente por `src/acesso/base_consumo.py` (asset
+      `base_consumo` no Dagster), contendo exclusivamente cópias físicas das quatro views
+      `consumo.*` com supressão de pequenos grupos (k >= 5) e conexão travada sem acesso externo.
+    depends_on:
+      - ref('setor_mensal')
+      - ref('geografia_mensal')
+      - ref('perfil_mensal')
+      - ref('calendario')
+    owner:
+      name: "Squad G4 — METRA (FCTE/UnB)"
+      email: "squad-g4@unb.br"
+
+  - name: etl_reverso_json_publico
+    label: "ETL Reverso: Snapshot JSON Público e Resumo Mensal (docs/assets/dados/metra.json)"
+    type: application
+    maturity: high
+    url: "https://unb-bd2-2026-2-grupo-4.github.io/METRA/consumo-json/"
+    description: >
+      Exportador `src/consumo/exportar_json.py` (asset `exportar_json_consumo` no Dagster)
+      que lê exclusivamente as views `consumo.*`, recompõe as métricas pela camada semântica
+      e publica `docs/assets/dados/metra.json` para consumo pelo resumo interativo no GitHub Pages.
+    depends_on:
+      - ref('setor_mensal')
+      - ref('geografia_mensal')
+      - ref('perfil_mensal')
+      - ref('calendario')
+      - metric('admissoes')
+      - metric('desligamentos')
+      - metric('saldo')
+      - metric('qtd_salarios_admissao')
+      - metric('salario_medio_admissao')
+      - metric('indice_fluxos_pareados_pct')
+    owner:
+      name: "Squad G4 — METRA (FCTE/UnB)"
+      email: "squad-g4@unb.br"

@@ -509,6 +509,29 @@ python -m unittest discover -s tests -p 'test_controle_acesso.py' -v
 
 A demonstração também roda ao fim do fluxo completo. Perfis, saída esperada e limites estão em [Consumo e governança](docs/consumo-e-governanca.md#controle-de-acesso).
 
+### Governança LGPD, Retenção e Script de Descarte (E4)
+
+O módulo [`src/lgpd/descarte.py`](src/lgpd/descarte.py) formaliza o inventário dos dados tratados (quase-identificadores em nível de movimentação individual nos termos do art. 5º, I da LGPD e `raca_cor` como dado pessoal sensível nos termos do art. 5º, II), a base legal para pesquisa acadêmica sobre microdados públicos oficiais do MTE (**art. 7º, IV e § 3º** e **art. 11, II, alínea "c"** da Lei nº 13.709/2018) e o prazo de retenção (**até 30 dias corridos** após o encerramento oficial do semestre letivo 2026/2 e prazo recursal da disciplina na FCTE/UnB, data-limite `31/12/2026`). Também audita o risco de reidentificação na Gold, mede a exposição a ataques por diferença nas views `consumo.*` e executa o descarte verificável dos artefatos locais com microdados individuais (`metra_analitico.duckdb`, `metra.duckdb`, `data/lake/parquet/`, `data/lake/delta/` e `data/cdc/`), preservando apenas os agregados anonimizados ($k \ge 5$).
+
+```bash
+python -m src.lgpd.descarte --simular
+python -m src.lgpd.descarte --demonstrar-descarte --saida docs/adr/evidencias/0008-lgpd-descarte.json
+python -m unittest discover -s tests -p 'test_lgpd_descarte.py' -v
+```
+
+Enquadramento completo, tabela de retenção e evidências em [Consumo e governança](docs/consumo-e-governanca.md#privacidade-e-governanca-lgpd-dados-tratados-base-legal-retencao-e-descarte) e [`docs/adr/evidencias/0008-lgpd-descarte.json`](docs/adr/evidencias/0008-lgpd-descarte.json).
+
+### Catálogo de Dados (`dbt docs` no GitHub Pages) e Linhagem Ponta a Ponta (E4)
+
+O dicionário de dados completo dos modelos (`silver`, `gold`, `snapshots` e `consumo`), das 5 fontes Parquet, das 7 métricas da camada semântica e dos 4 consumidores finais (`exposures`: Painel Streamlit, Busca Vetorial CBO / Text-to-SQL, Base de Consumo Isolada e ETL Reverso JSON Público) é compilado em um portal estático (`dbt docs generate --static`) por [`src/catalogo/gerar_dbt_docs.py`](src/catalogo/gerar_dbt_docs.py) e publicado automaticamente no GitHub Pages em `assets/dbt-docs/index.html` pelo workflow [`.github/workflows/deploy-docs.yml`](.github/workflows/deploy-docs.yml), acompanhado do manifesto versionado [`docs/assets/dbt-docs/linhagem.json`](docs/assets/dbt-docs/linhagem.json).
+
+```bash
+python -m src.catalogo.gerar_dbt_docs
+python -m unittest discover -s tests -p 'test_catalogo_linhagem.py' -v
+```
+
+Grafo completo e matriz de linhagem da fonte até o painel e o ETL reverso em [Consumo e governança](docs/consumo-e-governanca.md#catalogo-de-dados-dbt-docs-no-pages-e-linhagem-da-fonte-ao-painel-e-ao-etl-reverso).
+
 ---
 
 ## Governança, Transparência e Evolução do Projeto

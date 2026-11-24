@@ -1,6 +1,6 @@
 # Consumo e governança
 
-**Documento de integração atualizado em 22/11/2026.** O repositório já contém ingestão, OLTP, exportação Parquet/Delta, camadas Silver e Gold com 176 testes dbt de qualidade, SCD tipo 2 da CBO (`gold.dim_cbo_historico`), orquestração Dagster (com retry, schedule e backfill) e a integração da Busca Semântica CBO + Assistente Text-to-SQL Governado no painel Streamlit (`src/app/dashboard.py`), validada na [ADR-0007](adr/0007-busca-semantica-e-consumo.md), e a camada semântica única de métricas (`dbt_metra/models/semantic/metricas.yml`), consumida por dbt, painel e assistente. O controle de acesso por views de consumo agregadas e base de consumo isolada está implementado e demonstrado; LGPD institucional e ETL reverso seguem em consolidação para o fechamento da E4.
+**Documento de integração atualizado em 23/11/2026.** O repositório já contém ingestão, OLTP, exportação Parquet/Delta, camadas Silver e Gold com 176 testes dbt de qualidade, SCD tipo 2 da CBO (`gold.dim_cbo_historico`), orquestração Dagster (com retry, schedule e backfill), a integração da Busca Semântica CBO + Assistente Text-to-SQL Governado no painel Streamlit (`src/app/dashboard.py`, validada na [ADR-0007](adr/0007-busca-semantica-e-consumo.md)), a camada semântica única de métricas (`dbt_metra/models/semantic/metricas.yml`), o controle de acesso por views de consumo agregadas e base isolada (`data/metra_consumo.duckdb`), o enquadramento de governança LGPD com script de descarte executado (`src/lgpd/descarte.py`) e o ETL reverso para JSON público (`src/consumo/exportar_json.py`).
 
 ## Camada semântica: catálogo único de métricas
 
@@ -55,32 +55,162 @@ Ficam de fora da regra, de propósito, os gabaritos independentes: os scripts de
 | P4: turnover e salário | Setor, competência, salário válido e fluxos mensais | Usa o índice de fluxos pareados (`indice_fluxos_pareados_pct`) e a correlação de Pearson com `salario_medio_admissao` como aproximação explícita ([ADR-0007](adr/0007-busca-semantica-e-consumo.md)) |
 | P5: perfil e remuneração | Sexo, raça/cor, idade e escolaridade | Associação descritiva com nota metodológica explícita de que fluxos observados não estimam chance individual de recolocação |
 
-## Linhagem da fonte ao consumo
+## Catálogo de dados (`dbt docs` no Pages) e linhagem da fonte ao painel e ao ETL reverso
 
-| Informação | Origem → persistência → Silver | Destino na Gold e no consumo |
+O catálogo completo do projeto (**5 fontes Parquet**, **4 modelos Silver**, **1 snapshot SCD Tipo 2**, **11 modelos Gold/Time Spine**, **4 views públicas de Consumo**, **7 métricas da camada semântica**, **5 análises P1–P5**, **4 exposures de consumo final** e **210 testes declarativos dbt**) é compilado em um portal estático interativo por `src/catalogo/gerar_dbt_docs.py` (`dbt docs generate --static`) e publicado automaticamente no GitHub Pages pelo workflow `.github/workflows/deploy-docs.yml`.
+
+- **Catálogo interativo `dbt docs` (DAG e dicionário de colunas):** <a href="../assets/dbt-docs/index.html" target="_blank" rel="noopener">Abrir portal `dbt docs` do METRA em tela cheia (`assets/dbt-docs/index.html`)</a>
+- **Manifesto auditável de catálogo e linhagem versionado no repositório:** [`docs/assets/dbt-docs/linhagem.json`](https://github.com/unb-bd2-2026-2-grupo-4/METRA/blob/main/docs/assets/dbt-docs/linhagem.json)
+
+### Grafo de linhagem ponta a ponta (da fonte ao painel e ao ETL reverso)
+
+```mermaid
+flowchart LR
+    subgraph L1["1. Fontes Oficiais"]
+        F1["Novo CAGED (CSVs MTE)"]
+        F2["IBGE Localidades (API REST)"]
+        F3["IBGE CNAE 2.0 (API REST)"]
+        F4["CBO 2002 (Catálogo MTE)"]
+    end
+
+    subgraph L2["2. Bronze (PostgreSQL 16)"]
+        B0["bronze.arquivos_ingeridos"]
+        B1["bronze.caged_movimentacao"]
+        B2["bronze.ibge_municipio"]
+        B3["bronze.ibge_cnae_subclasse"]
+        B4["bronze.cbo_ocupacao"]
+    end
+
+    subgraph L3["3. OLTP 3FN & CDC (PostgreSQL 16)"]
+        O1["oltp.movimentacao"]
+        O2["oltp.municipio"]
+        O3["oltp.cnae_secao / cnae_subclasse"]
+        O4["oltp.cbo_2002"]
+        CDC["WAL Lógico (pg_recvlogical -> replay.sqlite3)"]
+    end
+
+    subgraph L4["4. Lake Aberto (Parquet & Delta)"]
+        P1["lake.movimentacao (ano=AAAA/*.parquet)"]
+        P2["lake.municipio (*.parquet)"]
+        P3["lake.cnae_secao / cnae_subclasse (*.parquet)"]
+        P4["lake.cbo_2002 (*.parquet)"]
+        DL["Delta Lake (data/lake/delta/movimentacao)"]
+    end
+
+    subgraph L5["5. Silver (DuckDB dbt)"]
+        S1["silver.stg_movimentacao"]
+        S2["silver.stg_municipio"]
+        S3["silver.stg_cnae"]
+        S4["silver.stg_cbo"]
+    end
+
+    subgraph L6["6. Gold, SCD2 & Camada Semântica"]
+        G_SCD["snapshots.snp_cbo -> gold.dim_cbo_historico"]
+        G_DIM["gold.dim_competencia / dim_municipio / dim_cbo / dim_cnae / dim_perfil_demografico"]
+        G_FCT["gold.fct_movimentacao"]
+        G_AGG["gold.fct_setor_mensal / fct_geografia_mensal / fct_perfil_mensal"]
+        SEM["Camada Semântica (metricas.yml / camada_semantica.py)"]
+    end
+
+    subgraph L7["7. Controle de Acesso (k >= 5)"]
+        V_CON["consumo.setor_mensal / geografia_mensal / perfil_mensal / calendario"]
+        DB_CON["Base Isolada (data/metra_consumo.duckdb)"]
+    end
+
+    subgraph L8["8. Consumidores Finais (Exposures dbt)"]
+        EXP1["Painel Streamlit (src/app/dashboard.py :8501)"]
+        EXP2["Busca Vetorial CBO 384d & Assistente Text-to-SQL"]
+        EXP3["ETL Reverso (exportar_json.py -> metra.json -> Pages)"]
+    end
+
+    F1 --> B0 & B1 --> O1 --> P1 --> S1
+    F2 --> B2 --> O2 --> P2 --> S2
+    F3 --> B3 --> O3 --> P3 --> S3
+    F4 --> B4 --> O4 --> P4 --> S4
+    O1 -. "WAL" .-> CDC
+    P1 --> DL
+    S4 --> G_SCD
+    S1 & S2 & S3 & S4 --> G_DIM & G_FCT
+    G_FCT --> G_AGG
+    G_FCT & G_AGG --> SEM
+    G_AGG & G_DIM & SEM --> V_CON
+    V_CON --> DB_CON
+    G_DIM & G_SCD & G_FCT & G_AGG & SEM --> EXP1 & EXP2
+    V_CON & DB_CON & SEM --> EXP3
+```
+
+### Matriz de linhagem da fonte até o painel e o ETL reverso
+
+| Domínio / Atributo | 1. Fonte → 2. Bronze → 3. OLTP (`PostgreSQL 16`) | 4. Lake (`Parquet`/`Delta`) → 5. Silver (`DuckDB`) | 6. Gold, SCD2 e Camada Semântica (`dbt`) | 7. Consumo Interno (Painel Streamlit e Text-to-SQL) | 8. Controle de Acesso e ETL Reverso (`metra.json` no Pages) |
+|---|---|---|---|---|---|
+| **Linhagem física do lote** (`id_ingestao`, `numero_linha`, `sha256`) | CSV CAGED → `bronze.arquivos_ingeridos` + `bronze.caged_movimentacao` → `oltp.movimentacao` | `lake.movimentacao` (+ tabela Delta) → `silver.stg_movimentacao` | Preservada em `gold.fct_movimentacao` para auditoria até a linha do CSV bruto | Bloqueada no validador `validar_sql_seguro` (LGPD) e omitida nas telas públicas | Omitida das views `consumo.*`, de `metra_consumo.duckdb` e de `metra.json` |
+| **Tempo e cobertura** (`ano`, `mes`, `competencia`, `tem_dados`) | Campos `ano`/`mes` do CAGED → `bronze.caged_movimentacao` → `oltp.movimentacao` | Partição `ano=AAAA/` em `lake.movimentacao` → `stg_movimentacao.competencia` (`DATE`) | `gold.dim_competencia`, `gold.metricflow_time_spine` e chave temporal dos 3 marts mensais | Filtro de Ano, janela móvel de 12 meses (P1), curva sazonal (P2) e série anual 2023–2026 (P3) | `consumo.calendario` → `metra_consumo.duckdb` → coleção `calendario` em `docs/assets/dados/metra.json` |
+| **Geografia e recorte capital/interior** (`id_municipio`, `sigla_uf`, `is_capital`) | API IBGE Localidades → `bronze.ibge_municipio` → `oltp.municipio` (com sentinela `9999999`) | `lake.municipio` → `silver.stg_municipio` (`is_identificado`, `is_centro_oeste`) | `gold.dim_municipio`, `gold.fct_movimentacao` e `gold.fct_geografia_mensal` | Filtro de UF na sidebar, aba **Capitais vs. Interior (P3)** e recorte geográfico por CBO | `consumo.geografia_mensal` (supressão $k \ge 5$, sem `id_municipio`) → coleção `geografia` em `metra.json` |
+| **Ocupação e histórico SCD2** (`codigo_cbo`, `titulo_ocupacao`, `id_versao_cbo`) | Catálogo CBO 2002 (MTE) → `bronze.cbo_ocupacao` → `oltp.cbo_2002` | `lake.cbo_2002` → `silver.stg_cbo` (`codigo_grande_grupo`, `is_cadastro_oficial`) | `snapshots.snp_cbo` → `gold.dim_cbo_historico` (SCD2) e `gold.dim_cbo` (vigente) | Índice vetorial híbrido 384d (`IndiceVetorialCBO`) e drill-down por cargo nas abas P1–P5 | Omitida das views `consumo.*` e do JSON público para evitar reidentificação por profissão rara |
+| **Atividade econômica** (`codigo_cnae_subclasse`, `codigo_secao`, `descricao_secao`) | API IBGE CNAE 2.0 → `bronze.ibge_cnae_subclasse` → `oltp.cnae_secao` + `oltp.cnae_subclasse` | `lake.cnae_secao` + `lake.cnae_subclasse` → join em `silver.stg_cnae` | `gold.dim_cnae`, `gold.fct_setor_mensal` e `gold.fct_perfil_mensal` | Filtro de Setor (Seção A–U), ranking setorial (P1) e matriz de rotatividade × salário (P4) | `consumo.setor_mensal` e `consumo.perfil_mensal` ($k \ge 5$, apenas `codigo_secao`) → coleções `setores` e `perfis` em `metra.json` |
+| **Perfil sociodemográfico** (`sexo`, `raca_cor`, `grau_instrucao`, `idade`) | Microdados CAGED → `bronze.caged_movimentacao` → `oltp.movimentacao` | `lake.movimentacao` → `silver.stg_movimentacao` (validação de domínios e limites de idade 10–120) | `gold.dim_perfil_demografico` (`id_perfil_demografico` e faixas etárias) e `gold.fct_perfil_mensal` | Aba **Perfil Demográfico (P5)** e assistente Text-to-SQL (cruzamento com UF, ano, setor e CBO) | `consumo.perfil_mensal` (1 eixo por vez, sem cruzar eixos, $k \ge 5$) → coleção `perfis` em `metra.json` |
+| **Fluxos e remuneração** (`saldo_movimentacao`, `salario_mensal`, `salario_valido`) | Microdados CAGED → `bronze.caged_movimentacao` → `oltp.movimentacao` | `lake.movimentacao` → `silver.stg_movimentacao` (`tipo_evento`, `salario_valido`) | Medidas e métricas em `dbt_metra/models/semantic/metricas.yml` (`admissoes`, `desligamentos`, `saldo`, `soma_salarios_admissao`, `qtd_salarios_admissao`, `salario_medio_admissao`, `indice_fluxos_pareados_pct`) | Compiladas por `src/metricas/camada_semantica.py` nos 4 KPIs globais, nas abas P1–P5 e no Text-to-SQL | Views `consumo.*` anulam `soma_salarios_admissao` e `qtd_salarios_admissao` quando $< 5$; `exportar_json.py` publica apenas a média e o denominador em `metra.json` |
+
+### Consumidores finais declarados no grafo do `dbt docs` (`exposures`)
+
+Para que o grafo de linhagem do `dbt docs` não termine nos modelos SQL e exiba os consumidores reais da camada de apresentação e do ETL reverso, o arquivo [`dbt_metra/models/consumo/_exposures.yml`](https://github.com/unb-bd2-2026-2-grupo-4/METRA/blob/main/dbt_metra/models/consumo/_exposures.yml) registra quatro *exposures*:
+
+1. **`exposure.metra.painel_streamlit`** (`type: dashboard`): aplicação Streamlit (`src/app/dashboard.py`, porta `8501`), conectada às 5 dimensões, ao histórico SCD2 (`dim_cbo_historico`), às 4 tabelas fato da Gold e às métricas da camada semântica;
+2. **`exposure.metra.assistente_text_to_sql_e_busca_cbo`** (`type: application`): índice vetorial CBO de 384 dimensões (`src/app/busca_cbo.py`) e assistente Text-to-SQL (`src/app/text_to_sql.py`);
+3. **`exposure.metra.base_consumo_isolada`** (`type: application`): banco `data/metra_consumo.duckdb` publicado pelo asset `base_consumo` (`src/acesso/base_consumo.py`) a partir das quatro views `consumo.*`;
+4. **`exposure.metra.etl_reverso_json_publico`** (`type: application`): exportador `src/consumo/exportar_json.py` (asset `exportar_json_consumo`) que alimenta `docs/assets/dados/metra.json` e a página interativa [Resumo mensal publicado](consumo-json.md).
+
+Para regenerar localmente o portal estático do `dbt docs` e o manifesto de linhagem:
+
+```bash
+python -m src.catalogo.gerar_dbt_docs
+python -m unittest discover -s tests -p 'test_catalogo_linhagem.py' -v
+```
+
+`id_ingestao` e `numero_linha` permitem voltar à origem da movimentação; `manifest.json` descreve as dependências dbt e `run_results.json` registra o resultado da execução. Esses artefatos estão integrados ao grafo de linhagem do Dagster em `dagster_metra/definitions.py` (ver [Orquestração com Dagster](orquestracao.md)). O replay CDC SQLite existente (`src/cdc/04_reprocessar.py`) demonstra a captura e deduplicação a partir do WAL do PostgreSQL e permanece desacoplado da carga em lote da Silver.
+
+## Privacidade e governança LGPD: dados tratados, base legal, retenção e descarte
+
+A fonte pública do Novo CAGED (MTE) não contém identificadores diretos (não há nome civil, CPF, RG, PIS/PASEP, NIT, CTPS nem CNPJ do empregador). No entanto, cada registro de movimentação nas camadas internas (`bronze.caged_movimentacao`, `oltp.movimentacao`, `data/lake/parquet/movimentacao/`, `data/lake/delta/movimentacao/`, `silver.stg_movimentacao` e `gold.fct_movimentacao`) combina **quase-identificadores** (`id_municipio`, `competencia`, `ano`, `mes`, `codigo_cbo`, `codigo_cnae_subclasse`, `idade`, `codigo_sexo`, `codigo_grau_instrucao`, `salario_mensal`, `horas_contratuais`, `tipo_movimentacao`, `saldo_movimentacao`, `id_ingestao` e `numero_linha`) e o atributo **`raca_cor` (`codigo_raca_cor`)**.
+
+Na auditoria automatizada sobre as `49.178` movimentações do recorte do Centro-Oeste em `gold.fct_movimentacao` (`src/lgpd/descarte.py`), existem **`49.134` combinações distintas** de município × competência × CBO × subclasse CNAE × idade × perfil demográfico, das quais **`49.091` (`99,91%`) são únicas ($k = 1$)** e **`100,0%` possuem $k < 5$**. Por isso, a ausência de CPF não torna o microdado anonimizado: combinações raras permitem identificação indireta (art. 5º, I da [Lei nº 13.709/2018 — LGPD](https://www2.camara.leg.br/legin/fed/lei/2018/lei-13709-14-agosto-2018-787077-normaatualizada-pl.html)), e `raca_cor`, quando vinculada a pessoa identificável, constitui **dado pessoal sensível** sobre origem racial ou étnica (art. 5º, II da LGPD).
+
+| Item | Enquadramento e implementação no METRA | Evidência e governança operacional |
 |---|---|---|
-| Competência e saldo | CAGED → `bronze.caged_movimentacao` → `oltp.movimentacao` → Parquet `movimentacao` → `stg_movimentacao` | Fato e agregados Gold → painel/assistente |
-| Município/UF | IBGE → `bronze.ibge_municipio` → `oltp.municipio` → Parquet `municipio` → `stg_municipio` | Dimensão geográfica (`gold.dim_municipio`) |
-| Ocupação | CBO → `bronze.cbo_ocupacao` → `oltp.cbo_2002` → Parquet `cbo_2002` → `stg_cbo` | Dimensão vigente (`gold.dim_cbo`), histórico SCD2 (`gold.dim_cbo_historico`) e índice de busca |
-| Atividade econômica | IBGE CNAE → `bronze.ibge_cnae_subclasse` → `oltp.cnae_subclasse`/`cnae_secao` → respectivos Parquets → `stg_cnae` | Dimensão econômica (`gold.dim_cnae`) |
-| Perfil e salário | Campos do CAGED → movimentação Bronze/OLTP/Parquet → `stg_movimentacao` | Dimensão demográfica (`gold.dim_perfil_demografico`), fato e métricas agregadas |
+| **Dados nomeados** | **Identificadores diretos:** nenhum na origem. **Quase-identificadores (art. 5º, I):** `id_municipio`, `competencia` (`ano`/`mes`), `codigo_cbo`, `codigo_cnae_subclasse`, `idade`, `codigo_sexo`, `codigo_grau_instrucao`, `salario_mensal`, `horas_contratuais`, `tipo_movimentacao`, `saldo_movimentacao`, `id_ingestao`, `numero_linha`. **Dado pessoal sensível (art. 5º, II):** `raca_cor` (`codigo_raca_cor`). | Inventário formal codificado em `ENQUADRAMENTO_LGPD` (`src/lgpd/descarte.py`) e testado em `tests/test_lgpd_descarte.py`. |
+| **Finalidade** | Pesquisa e ensino acadêmico em Engenharia de Dados na disciplina Banco de Dados 2 (FCTE / Universidade de Brasília — UnB, oferta 2026/2, Squad G4), voltados exclusivamente à produção de estatísticas agregadas do mercado de trabalho formal (P1 a P5). | Escopo restrito à avaliação acadêmica; vedado qualquer uso para perfilamento individual ou decisão automatizada sobre titulares. |
+| **Base legal** | **Dados pessoais (quase-identificadores):** **Art. 7º, inciso IV e § 3º da LGPD** (realização de estudos por órgão de pesquisa sobre dados de acesso público divulgados oficialmente pelo MTE, garantida, sempre que possível, a anonimização/agregação). **Dado sensível (`raca_cor`):** **Art. 11, inciso II, alínea "c" da LGPD** (estudos por órgão de pesquisa — UnB, art. 5º, XVIII — sem consentimento do titular, com supressão de pequenos grupos na publicação). | Ressalva institucional: o enquadramento técnico-acadêmico da disciplina não substitui parecer jurídico formal da Procuradoria/Encarregado (DPO) da UnB para usos fora do escopo didático. |
+| **Minimização** | O painel (`src/app/dashboard.py`), o validador Text-to-SQL (`src/app/text_to_sql.py`), a base isolada (`data/metra_consumo.duckdb`) e o JSON público (`docs/assets/dados/metra.json`) expõem apenas indicadores agregados, sem `id_movimentacao`, `id_ingestao`, `numero_linha`, município nem CBO no consumo externo. | Validado por `tests/test_busca_e_text2sql.py`, `tests/test_controle_acesso.py` e `tests/test_exportar_json.py`. |
+| **Pequenos grupos e ataques por diferença** | Nas views `consumo.*`, grupos com `admissoes + desligamentos < 5` são omitidos (`739` de `2.420` em `setor_mensal` e `29.775` de `41.101` em `perfil_mensal`), salários com `qtd_salarios_admissao < 5` são anulados (`403` grupos em `setor_mensal`) e os eixos demográficos não são cruzados entre si. | A auditoria em `src/lgpd/descarte.py` mediu o risco residual de ataque por diferença: na amostra, `1` de `148` pares `(competencia, sigla_uf)` tem exatamente 1 seção CNAE omitida (`9` têm resíduo total entre 1 e 4), e `1.864` partições de `perfil_mensal` têm exatamente 1 categoria demográfica omitida. |
+| **Prazo de retenção** | **Até 30 (trinta) dias corridos** após a publicação oficial das menções finais e encerramento do prazo recursal do semestre letivo 2026/2 da UnB (**data-limite máxima: `31/12/2026`**), nos termos dos arts. 15, I e 16 da LGPD. | Após o prazo, todos os artefatos com microdados individuais devem ser descartados, mantendo-se apenas agregados com supressão $k \ge 5$ quando necessários para fins estatísticos. |
+| **Descarte executado** | Script `src/lgpd/descarte.py` executado com remoção física verificada dos artefatos de microdados (`metra_analitico.duckdb`, `metra.duckdb`, `lake/parquet`, `lake/delta`, `cdc/eventos.log` e `cdc/replay.sqlite3`), preservando apenas a base agregada `metra_consumo.duckdb` ($k \ge 5$) e comprovando `microdados_individuais_residuais = 0`. | Evidência real versionada em [`docs/adr/evidencias/0008-lgpd-descarte.json`](https://github.com/unb-bd2-2026-2-grupo-4/METRA/blob/main/docs/adr/evidencias/0008-lgpd-descarte.json) e suíte `tests/test_lgpd_descarte.py`. |
+| **Repositório público** | Contém a amostra pública `data/caged_centro_oeste_amostra.csv` (`49.178` linhas extraídas dos microdados abertos do MTE) para reprodutibilidade da avaliação da disciplina. | O script classifica a amostra como `versionado_git_amostra`: sua remoção definitiva após o encerramento da disciplina exige `git rm` seguido de reescrita do histórico Git (`git filter-repo`), além da exclusão local com `--incluir-amostra`. |
+| **Modelo externo** | Nenhum provedor ou LLM externo recebe dados do banco: o índice vetorial CBO (`384d`) e o tradutor Text-to-SQL operam 100% localmente (*in-process*). | Nenhuma transferência internacional ou compartilhamento de dados com terceiros durante a execução da plataforma. |
 
-`id_ingestao` e `numero_linha` permitem voltar à origem da movimentação; `manifest.json` descreve as dependências dbt e `run_results.json` registra o resultado da execução. Esses artefatos estão integrados ao grafo de linhagem do Dagster em `dagster_metra/definitions.py` (ver [Orquestração com Dagster](orquestracao.md)). O replay CDC SQLite existente não está automaticamente conectado à Silver; não representar essa integração como pronta.
+### Execução do script de auditoria e descarte LGPD
 
-## Privacidade e acesso: análise inicial
+O módulo `src/lgpd/descarte.py` inventaria os artefatos de `data/`, calcula o hash SHA-256 antes da remoção, audita o risco de reidentificação e de ataque por diferença nas views `consumo.*` e executa (ou simula) o descarte dos microdados individuais:
 
-O modelo atual não contém CPF ou nome do trabalhador, mas combina município, competência, CBO, idade, sexo, raça/cor e salário. Combinações raras podem permitir identificação indireta; ausência de identificador direto não comprova anonimização. Raça/cor, quando vinculada a pessoa identificada ou identificável, requer atenção como informação sensível. Essas distinções constam do [art. 5º da LGPD](https://www2.camara.leg.br/legin/fed/lei/2018/lei-13709-14-agosto-2018-787077-normaatualizada-pl.html).
+```bash
+# 1. Simular o descarte (dry-run) sobre o diretório data/ local sem apagar arquivos
+python -m src.lgpd.descarte --simular
 
-| Item | Situação ou proposta | Ação ainda necessária |
-|---|---|---|
-| Finalidade | Análise acadêmica agregada do mercado formal | Registrar responsável institucional e escopo aprovado |
-| Base legal | **Pendente de validação institucional** | Documentar a hipótese aplicável; não presumir que dado público ou trabalho acadêmico resolve todo enquadramento |
-| Minimização | Painel implementado (`src/app/dashboard.py`) expõe apenas métricas agregadas da Gold; sem linhagem individual nas telas públicas e com bloqueio de linhas individuais no validador Text-to-SQL | Criar visões/relações dedicadas caso outros processos de consumo acessem o banco sem passar pelo validador da aplicação |
-| Pequenos grupos | Implementado nas views `consumo.*`: grupos com menos de 5 movimentações são omitidos e medidas salariais com menos de 5 salários válidos ficam nulas (ver [Controle de acesso](#controle-de-acesso)) | Validar o limiar e os ataques por diferença entre recortes; o limiar isolado não prova anonimização |
-| Retenção | Proposta: manter artefatos locais até 30 dias após encerramento da avaliação e recursos, sujeito à política institucional | Aprovar prazo, inventariar cópias e automatizar descarte; nenhum descarte executado nesta tarefa |
-| Descarte | Remover cópias locais, índices, backups e logs conforme política aprovada | Documentar execução e verificar ausência de cópias não autorizadas |
-| Repositório público | Já contém amostra de microdados | Revisar risco e finalidade da publicação; ignorar arquivos novos não remove histórico Git existente |
-| Modelo externo | Nenhum provedor escolhido nesta proposta | Definir dados permitidos, custos e retenção antes de enviar perguntas ou contexto |
+# 2. Executar a auditoria na Gold real e o descarte real verificável em ambiente isolado, gerando a evidência JSON
+python -m src.lgpd.descarte --demonstrar-descarte --saida docs/adr/evidencias/0008-lgpd-descarte.json
+
+# 3. Executar o descarte físico em um diretório de dados ao término do prazo de retenção
+python -m src.lgpd.descarte --executar --diretorio-dados data
+
+# 4. Executar os testes automatizados de governança e descarte LGPD
+python -m unittest discover -s tests -p 'test_lgpd_descarte.py' -v
+```
+
+Para descartar também os volumes do PostgreSQL e do Dagster gerados pelos contêineres Docker no encerramento do prazo de retenção, combine o script com:
+
+```bash
+docker compose --profile completo --profile dagster --profile painel --profile ingestao down --volumes --remove-orphans
+python -m src.lgpd.descarte --executar --incluir-agregados
+```
 
 ## Controle de acesso
 
@@ -135,7 +265,7 @@ A leitura do detalhe é uma contagem, para que nem a demonstração imprima regi
 ### Limites
 
 - **Proteção por arquivo, não por usuário.** O controle vale para quem recebe só a base de consumo. Quem tem acesso ao sistema de arquivos com `data/metra_analitico.duckdb`, ao lake ou ao PostgreSQL continua lendo o detalhe; a separação desses ambientes é operacional.
-- **Ataques por diferença.** A supressão é aplicada em cada view, isoladamente. Um grupo omitido pode ser estimado subtraindo, do total de um recorte publicado, os grupos publicados de outro (por exemplo, a geografia de uma UF menos os setores publicados dessa UF). A análise desse risco e do limiar fica com a frente de LGPD.
+- **Ataques por diferença.** A supressão é aplicada em cada view, isoladamente. Um grupo omitido pode ser estimado subtraindo, do total de um recorte publicado, os grupos publicados de outro (por exemplo, a geografia de uma UF menos os setores publicados dessa UF). A auditoria quantitativa em `src/lgpd/descarte.py` ([evidência JSON](https://github.com/unb-bd2-2026-2-grupo-4/METRA/blob/main/docs/adr/evidencias/0008-lgpd-descarte.json)) mostra que, na amostra, `1` de `148` pares `(competencia, sigla_uf)` possui exatamente 1 seção CNAE omitida (`9` possuem resíduo total entre 1 e 4 movimentações) e `1.864` partições de `perfil_mensal` possuem exatamente 1 categoria demográfica omitida; por isso a política de governança veda a recomposição cruzada entre coleções distintas.
 - **Amostra do repositório.** `data/caged_centro_oeste_amostra.csv` continua público no repositório; o controle de acesso não muda isso.
 
 ## Operação e freshness
@@ -286,6 +416,6 @@ publicação revisada não existir.
 - [x] Integrar painel Streamlit (`src/app/dashboard.py`), busca semântica CBO e consulta em linguagem natural conforme [ADR-0007](adr/0007-busca-semantica-e-consumo.md).
 - [x] Demonstrar SCD tipo 2 (`snp_cbo` / `gold.dim_cbo_historico`), retry, schedule mensal e backfill no Dagster, com consumo em modo somente leitura após materialização da Gold.
 - [x] Controle de acesso além de `read_only`: views `consumo.*` com supressão de grupos com menos de 5 movimentações, base de consumo isolada e demonstração de acesso permitido e negado ao detalhe (E4).
-- [ ] Validar base legal da LGPD, retenção, o limiar de pequenos grupos e os ataques por diferença; guardar evidências reais (E4).
+- [x] Validar base legal da LGPD, retenção, o limiar de pequenos grupos, os ataques por diferença e executar o script de descarte com evidências reais (`src/lgpd/descarte.py` e `docs/adr/evidencias/0008-lgpd-descarte.json`) (E4).
 - [ ] Implementar e demonstrar o caminho de ETL reverso com seu consumidor (E4).
 - [ ] Atualizar diários e registro de IA conforme as atividades da E4 ocorrerem; não antecipar evidências de execução futura.
