@@ -1,0 +1,545 @@
+/* Estilo editorial e institucional para o Painel Público e Agente (GitHub Pages).
+ * Compatível com os esquemas claro e escuro (slate) do MkDocs Material.
+ */
+
+.metra-app {
+  --metra-accent: #0f766e;
+  --metra-accent-soft: rgba(15, 118, 110, 0.08);
+  --metra-accent-border: rgba(15, 118, 110, 0.35);
+  --metra-secondary: #64748b;
+  --metra-secondary-soft: rgba(100, 116, 139, 0.14);
+  --metra-warn: #b45309;
+  --metra-warn-soft: rgba(180, 83, 9, 0.08);
+  --metra-danger: #b91c1c;
+  --metra-danger-soft: rgba(185, 28, 28, 0.08);
+  --metra-surface: var(--md-default-bg-color, #ffffff);
+  --metra-surface-alt: var(--md-code-bg-color, #f8fafc);
+  --metra-fg: var(--md-default-fg-color, #0f172a);
+  --metra-muted: var(--md-default-fg-color--light, #475569);
+  --metra-border: rgba(148, 163, 184, 0.28);
+
+  text-align: left;
+  hyphens: none;
+  color: var(--metra-fg);
+  font-variant-numeric: tabular-nums;
+  margin-top: 1rem;
+  margin-bottom: 2rem;
+}
+
+[data-md-color-scheme="slate"] .metra-app {
+  --metra-accent: #14b8a6;
+  --metra-accent-soft: rgba(20, 184, 166, 0.12);
+  --metra-accent-border: rgba(20, 184, 166, 0.4);
+  --metra-secondary: #94a3b8;
+  --metra-warn: #f59e0b;
+  --metra-warn-soft: rgba(245, 158, 11, 0.12);
+  --metra-danger: #f87171;
+  --metra-danger-soft: rgba(248, 113, 113, 0.12);
+  --metra-border: rgba(148, 163, 184, 0.22);
+}
+
+.metra-app p,
+.metra-app li,
+.metra-app blockquote {
+  text-align: left;
+  hyphens: none;
+}
+
+/* Cabeçalho editorial */
+.metra-masthead {
+  border-bottom: 1px solid var(--metra-border);
+  padding-bottom: 0.9rem;
+  margin-bottom: 1.25rem;
+}
+
+.metra-eyebrow {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--metra-accent);
+  margin-bottom: 0.25rem;
+}
+
+.metra-masthead h2 {
+  margin: 0 0 0.35rem 0;
+  font-size: 1.35rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.metra-subtitle {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--metra-muted);
+}
+
+/* Seção Agente Text-to-SQL */
+.metra-agent-box {
+  background: var(--metra-surface-alt);
+  border: 1px solid var(--metra-border);
+  border-top: 2px solid var(--metra-accent);
+  border-radius: 6px;
+  padding: 1.1rem 1.2rem;
+  margin-bottom: 1.5rem;
+}
+
+.metra-section-label {
+  font-size: 0.74rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--metra-muted);
+  margin: 0 0 0.55rem 0;
+}
+
+.metra-agent-form {
+  display: flex;
+  gap: 0.6rem;
+  align-items: stretch;
+}
+
+.metra-agent-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.6rem 0.85rem;
+  font-size: 0.92rem;
+  font-family: inherit;
+  color: var(--metra-fg);
+  background: var(--metra-surface);
+  border: 1px solid var(--metra-border);
+  border-radius: 5px;
+}
+
+.metra-agent-input:focus {
+  outline: 2px solid var(--metra-accent-border);
+  border-color: var(--metra-accent);
+}
+
+.metra-btn-primary {
+  padding: 0.6rem 1.15rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  font-family: inherit;
+  color: #ffffff;
+  background: var(--metra-accent);
+  border: 1px solid var(--metra-accent);
+  border-radius: 5px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.metra-btn-primary:hover {
+  filter: brightness(0.92);
+}
+
+.metra-btn-secondary {
+  padding: 0.45rem 0.85rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  font-family: inherit;
+  color: var(--metra-fg);
+  background: var(--metra-surface);
+  border: 1px solid var(--metra-border);
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.metra-btn-secondary:hover {
+  border-color: var(--metra-accent);
+  color: var(--metra-accent);
+}
+
+.metra-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.75rem;
+}
+
+.metra-chip {
+  padding: 0.3rem 0.65rem;
+  font-size: 0.77rem;
+  font-weight: 500;
+  font-family: inherit;
+  color: var(--metra-muted);
+  background: var(--metra-surface);
+  border: 1px solid var(--metra-border);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.metra-chip:hover {
+  border-color: var(--metra-accent);
+  color: var(--metra-accent);
+}
+
+/* Resposta do agente */
+.metra-agent-result {
+  margin-top: 1rem;
+  padding-top: 0.95rem;
+  border-top: 1px solid var(--metra-border);
+}
+
+.metra-agent-title {
+  margin: 0 0 0.4rem 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.metra-callout {
+  padding: 0.75rem 0.95rem;
+  border-radius: 5px;
+  border-left: 3px solid var(--metra-accent);
+  background: var(--metra-accent-soft);
+  font-size: 0.88rem;
+  line-height: 1.5;
+  margin-bottom: 0.85rem;
+}
+
+.metra-callout-warn {
+  border-left-color: var(--metra-warn);
+  background: var(--metra-warn-soft);
+}
+
+.metra-callout-danger {
+  border-left-color: var(--metra-danger);
+  background: var(--metra-danger-soft);
+}
+
+.metra-details {
+  margin-top: 0.85rem;
+  border: 1px solid var(--metra-border);
+  border-radius: 5px;
+  background: var(--metra-surface);
+  padding: 0.55rem 0.85rem;
+  font-size: 0.82rem;
+}
+
+.metra-details > summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--metra-muted);
+}
+
+.metra-code {
+  display: block;
+  overflow-x: auto;
+  background: var(--metra-surface-alt);
+  border: 1px solid var(--metra-border);
+  border-radius: 4px;
+  padding: 0.6rem 0.75rem;
+  font-size: 0.78rem;
+  margin: 0.5rem 0;
+  white-space: pre-wrap;
+}
+
+/* Barra de filtros globais */
+.metra-filter-bar {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) minmax(130px, 1fr) minmax(220px, 2fr) auto;
+  gap: 0.75rem;
+  align-items: end;
+  padding: 0.85rem 1rem;
+  background: var(--metra-surface-alt);
+  border: 1px solid var(--metra-border);
+  border-radius: 6px;
+  margin-bottom: 1rem;
+}
+
+.metra-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.metra-field label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--metra-muted);
+}
+
+.metra-select {
+  padding: 0.45rem 0.6rem;
+  font-size: 0.84rem;
+  font-family: inherit;
+  color: var(--metra-fg);
+  background: var(--metra-surface);
+  border: 1px solid var(--metra-border);
+  border-radius: 4px;
+}
+
+/* Grid de KPIs */
+.metra-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.metra-kpi-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.metra-kpi {
+  background: var(--metra-surface);
+  border: 1px solid var(--metra-border);
+  border-top: 2px solid var(--metra-accent);
+  border-radius: 6px;
+  padding: 0.85rem 0.95rem;
+}
+
+.metra-kpi-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--metra-muted);
+  margin-bottom: 0.28rem;
+}
+
+.metra-kpi-val {
+  font-size: 1.4rem;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+.metra-kpi-meta {
+  font-size: 0.75rem;
+  color: var(--metra-muted);
+  margin-top: 0.3rem;
+}
+
+.metra-source-note {
+  font-size: 0.77rem;
+  color: var(--metra-muted);
+  margin: 0.35rem 0 1.2rem 0;
+}
+
+/* Abas P1-P5 */
+.metra-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.25rem;
+  border-bottom: 1px solid var(--metra-border);
+  margin-bottom: 1rem;
+}
+
+.metra-tab {
+  padding: 0.55rem 0.15rem;
+  font-size: 0.86rem;
+  font-weight: 500;
+  font-family: inherit;
+  color: var(--metra-muted);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+}
+
+.metra-tab[aria-selected="true"] {
+  color: var(--metra-accent);
+  font-weight: 600;
+  border-bottom-color: var(--metra-accent);
+}
+
+/* Enunciado da pergunta de gestão dentro de cada aba */
+.metra-question-banner {
+  background: var(--metra-surface-alt);
+  border: 1px solid var(--metra-border);
+  border-left: 3px solid var(--metra-accent);
+  border-radius: 5px;
+  padding: 0.72rem 0.95rem;
+  margin-bottom: 1rem;
+}
+
+.metra-question-code {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--metra-accent);
+  margin-bottom: 0.2rem;
+}
+
+.metra-question-text {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--metra-fg);
+}
+
+.metra-question-note {
+  margin: 0.28rem 0 0 0;
+  font-size: 0.78rem;
+  color: var(--metra-muted);
+}
+
+/* Controle segmentado para eixos P5 */
+.metra-segmented {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 1rem;
+}
+
+.metra-seg-btn {
+  padding: 0.35rem 0.8rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  font-family: inherit;
+  color: var(--metra-muted);
+  background: var(--metra-surface-alt);
+  border: 1px solid var(--metra-border);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.metra-seg-btn[aria-pressed="true"] {
+  color: #ffffff;
+  background: var(--metra-accent);
+  border-color: var(--metra-accent);
+}
+
+/* Painéis e gráficos */
+.metra-two-col {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.metra-card {
+  background: var(--metra-surface);
+  border: 1px solid var(--metra-border);
+  border-radius: 6px;
+  padding: 0.85rem 0.95rem;
+  margin-bottom: 1rem;
+}
+
+.metra-card-title {
+  margin: 0 0 0.55rem 0;
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+.metra-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.9rem;
+  font-size: 0.74rem;
+  color: var(--metra-muted);
+  margin-bottom: 0.4rem;
+}
+
+.metra-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.metra-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+.metra-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  overflow: visible;
+}
+
+.metra-svg text {
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Tabelas */
+.metra-table-wrap {
+  overflow-x: auto;
+  max-height: 360px;
+  overflow-y: auto;
+  border: 1px solid var(--metra-border);
+  border-radius: 5px;
+  margin-bottom: 0.85rem;
+}
+
+.metra-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+
+.metra-table th,
+.metra-table td {
+  padding: 0.45rem 0.65rem;
+  border-bottom: 1px solid var(--metra-border);
+  white-space: nowrap;
+}
+
+.metra-table th {
+  position: sticky;
+  top: 0;
+  background: var(--metra-surface-alt);
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--metra-muted);
+  text-align: left;
+  z-index: 1;
+}
+
+.metra-table th.num,
+.metra-table td.num {
+  text-align: right;
+}
+
+.metra-table tr:last-child td {
+  border-bottom: none;
+}
+
+.metra-raw-details {
+  margin-top: 1.5rem;
+  border: 1px solid var(--metra-border);
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  background: var(--metra-surface-alt);
+}
+
+.metra-raw-details > summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.86rem;
+  color: var(--metra-muted);
+}
+
+@media (max-width: 900px) {
+  .metra-filter-bar {
+    grid-template-columns: 1fr 1fr;
+  }
+  .metra-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .metra-kpi-grid-3,
+  .metra-two-col {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .metra-agent-form,
+  .metra-filter-bar,
+  .metra-kpi-grid {
+    grid-template-columns: 1fr;
+    flex-direction: column;
+  }
+}

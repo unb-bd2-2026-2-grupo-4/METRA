@@ -37,9 +37,12 @@ extra:
 
 extra_css:
   - stylesheets/extra.css
+  - stylesheets/metra-painel.css
 
 extra_javascript:
   - javascripts/consumo.js
+  - javascripts/metra-agente.js
+  - javascripts/metra-painel.js
 
 markdown_extensions:
   - admonition
@@ -62,6 +65,7 @@ nav:
   - Visão Geral:
       - Início: index.md
       - Domínio e Gestão: dominio.md
+  - Painel Público e Agente: consumo-json.md
   - Engenharia de Dados:
       - Arquitetura da Plataforma: arquitetura.md
       - Camada Bronze: camada-bronze.md
@@ -71,7 +75,6 @@ nav:
       - Camada Analítica e Qualidade dbt: camada-analitica-dbt.md
       - Orquestração com Dagster: orquestracao.md
       - Consumo e Governança: consumo-e-governanca.md
-      - Resumo mensal publicado: consumo-json.md
   - Governança & Decisões:
       - Decisões de Arquitetura (ADR):
           - "ADR 0001: Origem Transacional OLTP": adr/0001-modelagem-sistema-origem.md
@@ -81,6 +84,7 @@ nav:
           - "ADR 0005: Modelagem Analítica e Qualidade": adr/0005-modelagem-analitica-dbt.md
           - "ADR 0006: Adoção do Dagster para o Pipeline": adr/0006-orquestracao-com-dagster.md
           - "ADR 0007: Busca Semântica CBO e Text-to-SQL": adr/0007-busca-semantica-e-consumo.md
+          - "ADR 0008: Disponibilização Semântica e JSON": adr/0008-disponibilizacao-camada-semantica-e-json-pages.md
       - Governança e IA: uso-de-ia.md
       - Diário de Bordo:
           - Semana 01: diario/semana-01.md
