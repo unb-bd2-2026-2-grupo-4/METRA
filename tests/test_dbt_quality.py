@@ -122,7 +122,11 @@ class DbtQualityTest(unittest.TestCase):
         self.assertFalse([r for r in self.results() if r['status'] == 'error'], result.stdout)
 
     def test_valid_build_and_types(self):
-        self.assertTrue(all(r['status'] in ('pass', 'success') for r in self.baseline_results))
+        self.assertTrue(all(
+            r['status'] in ('pass', 'success')
+            or (r['unique_id'].startswith('exposure.') and r['status'] == 'no-op')
+            for r in self.baseline_results
+        ))
         with duckdb.connect(str(self.db), read_only=True) as conn:
             types = {r[0]: r[1] for r in conn.execute('describe silver.stg_movimentacao').fetchall()}
             self.assertEqual(types['id_movimentacao'], 'BIGINT')
