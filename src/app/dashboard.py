@@ -47,27 +47,68 @@ ESTILO_CSS = """
     }
 
     .block-container {
-        padding-top: 1.5rem;
+        padding-top: 1.4rem;
         padding-bottom: 2.5rem;
         max-width: 1320px;
     }
 
+    /* Cabeçalho editorial */
+    .metra-masthead {
+        border-bottom: 1px solid rgba(148, 163, 184, 0.25);
+        padding-bottom: 0.85rem;
+        margin-bottom: 1.15rem;
+    }
+    .metra-eyebrow {
+        font-size: 0.70rem;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #0f766e;
+        margin-bottom: 0.25rem;
+    }
+    .metra-masthead h2 {
+        margin: 0 0 0.5rem 0;
+        font-size: 1.65rem;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+        line-height: 1.2;
+    }
+    .filter-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+    }
+    .filter-chip {
+        display: inline-block;
+        padding: 0.18rem 0.55rem;
+        font-size: 0.76rem;
+        font-weight: 500;
+        font-variant-numeric: tabular-nums;
+        color: #475569;
+        background: rgba(148, 163, 184, 0.08);
+        border: 1px solid rgba(148, 163, 184, 0.24);
+        border-radius: 4px;
+    }
+
     /* Cartões de métricas sóbrios */
     .kpi-box {
-        padding: 0.95rem 1.15rem;
-        background: rgba(148, 163, 184, 0.06);
+        padding: 0.9rem 1.05rem;
+        background: rgba(148, 163, 184, 0.05);
         border: 1px solid rgba(148, 163, 184, 0.22);
+        border-top: 2px solid #0f766e;
         border-radius: 6px;
-        min-height: 96px;
+        min-height: 98px;
     }
     .kpi-label {
-        font-size: 0.75rem;
-        font-weight: 500;
+        font-size: 0.70rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
         color: #64748b;
         margin-bottom: 0.3rem;
     }
     .kpi-number {
-        font-size: 1.45rem;
+        font-size: 1.55rem;
         font-weight: 600;
         line-height: 1.2;
         font-variant-numeric: tabular-nums;
@@ -78,14 +119,6 @@ ESTILO_CSS = """
         color: #64748b;
         margin-top: 0.3rem;
         font-variant-numeric: tabular-nums;
-    }
-
-    /* Cabeçalho discreto */
-    .header-meta {
-        font-size: 0.82rem;
-        color: #64748b;
-        margin-top: -0.4rem;
-        margin-bottom: 1rem;
     }
 
     /* Abas limpas */
@@ -101,6 +134,37 @@ ESTILO_CSS = """
         font-weight: 500;
         font-size: 0.88rem;
         background: transparent;
+    }
+    .stTabs [data-baseweb="tab"][aria-selected="true"] {
+        color: #0f766e;
+        font-weight: 600;
+    }
+    .stTabs [data-baseweb="tab-highlight"] {
+        background-color: #0f766e;
+    }
+
+    /* Enunciado da pergunta de gestão */
+    .metra-question-box {
+        padding: 0.65rem 0.9rem;
+        margin: 0.25rem 0 0.85rem 0;
+        background: rgba(148, 163, 184, 0.06);
+        border: 1px solid rgba(148, 163, 184, 0.22);
+        border-left: 3px solid #0f766e;
+        border-radius: 5px;
+    }
+    .metra-question-code {
+        font-size: 0.68rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: #0f766e;
+        margin-bottom: 0.18rem;
+    }
+    .metra-question-text {
+        font-size: 0.92rem;
+        font-weight: 600;
+        line-height: 1.35;
+        margin: 0;
     }
 </style>
 """
@@ -118,6 +182,29 @@ MAPA_EIXOS_DEMOGRAFICOS = {
     "faixa_etaria": "Faixa Etária",
 }
 
+PERGUNTAS_GESTAO: dict[str, tuple[str, str]] = {
+    "P1": (
+        "Pergunta de gestão P1",
+        "Qual setor econômico mais contratou e demitiu no Distrito Federal nos últimos 12 meses?",
+    ),
+    "P2": (
+        "Pergunta de gestão P2",
+        "Existe sazonalidade evidente nas contratações e demissões?",
+    ),
+    "P3": (
+        "Pergunta de gestão P3",
+        "Qual é a disparidade no saldo de empregos formais e no salário médio entre as capitais e os municípios do interior?",
+    ),
+    "P4": (
+        "Pergunta de gestão P4",
+        "Setores econômicos com maior taxa de rotatividade praticam salários médios menores?",
+    ),
+    "P5": (
+        "Pergunta de gestão P5",
+        "Como o perfil sociodemográfico (sexo, raça/cor, idade e escolaridade) impacta o nível salarial e o saldo de empregos?",
+    ),
+}
+
 SUGESTOES_PROFISSOES = [
     ("Professor", "professor"),
     ("Desenvolvedor", "desenvolvedor de software"),
@@ -130,12 +217,12 @@ SUGESTOES_PROFISSOES = [
 ]
 
 PERGUNTAS_EXEMPLO = [
-    ("Diferença por sexo", "Qual a diferença salarial entre homens e mulheres?"),
-    ("Escolaridade", "Como a escolaridade impacta o salário médio de admissão?"),
-    ("Capitais vs. Interior", "Qual é a diferença no saldo líquido e no salário médio entre as capitais e o interior?"),
-    ("Setores no DF", "Qual setor econômico mais contratou e demitiu no Distrito Federal nos últimos 12 meses?"),
-    ("Sazonalidade", "Existe sazonalidade nas contratações e demissões ao longo dos meses do ano?"),
-    ("Rotatividade", "Os setores com maior rotatividade praticam salários médios mais baixos?"),
+    ("P1 · Setores no DF", "Qual setor econômico mais contratou e demitiu no Distrito Federal nos últimos 12 meses?"),
+    ("P2 · Sazonalidade", "Existe sazonalidade nas contratações e demissões ao longo dos meses do ano?"),
+    ("P3 · Capitais vs. Interior", "Qual é a diferença no saldo líquido e no salário médio entre as capitais e o interior?"),
+    ("P4 · Rotatividade", "Os setores com maior rotatividade praticam salários médios mais baixos?"),
+    ("P5 · Diferença por sexo", "Qual a diferença salarial entre homens e mulheres?"),
+    ("P5 · Escolaridade", "Como a escolaridade impacta o salário médio de admissão?"),
     ("Recorte por cargo", "Qual a diferença salarial entre homens e mulheres para o cargo de professor?"),
     ("Teste de bloqueio", "DROP TABLE gold.fct_movimentacao;"),
 ]
@@ -347,6 +434,17 @@ def render_kpi(titulo: str, valor: str, detalhe: str = "") -> None:
     """, unsafe_allow_html=True)
 
 
+def render_enunciado_pergunta(codigo: str) -> None:
+    rotulo, enunciado = PERGUNTAS_GESTAO[codigo]
+    st.markdown(
+        f'<div class="metra-question-box">'
+        f'<div class="metra-question-code">{html.escape(rotulo)}</div>'
+        f'<div class="metra-question-text">{html.escape(enunciado)}</div>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+
+
 def render_auditoria_expander(resposta: RespostaTextToSQL) -> None:
     with st.expander("Especificação técnica e consulta SQL executada"):
         c1, c2 = st.columns([1, 1])
@@ -403,6 +501,7 @@ def render_p3_capitais_interior(
 
     sufixo = f" — {cargo_label}" if cargo_label else ""
     st.markdown(f"#### Capitais vs. Interior ({recorte_alvo}){sufixo}")
+    render_enunciado_pergunta("P3")
     st.caption(
         "Comparação de saldo líquido de empregos e salário médio nominal de admissão "
         "entre capitais e municípios do interior (diferença = capital − interior)."
@@ -518,7 +617,11 @@ def render_p1_setores_df(
     uf_label = (filtros or {}).get("sigla_uf", "DF")
     ano_label = f"Ano {filtros['ano']}" if (filtros and filtros.get("ano")) else "12 meses"
     st.markdown(f"#### Setores econômicos em {uf_label} ({ano_label}){sufixo}")
-    st.caption("Volume de admissões, desligamentos e saldo líquido por seção da CNAE 2.0.")
+    render_enunciado_pergunta("P1")
+    if filtros and filtros.get("ano"):
+        st.caption("Volume de admissões, desligamentos e saldo líquido por seção da CNAE 2.0.")
+    else:
+        st.caption("Volume de admissões, desligamentos e saldo líquido por seção CNAE 2.0 (sem ano filtrado, apura os últimos 12 meses da base).")
 
     if not df_ativos.empty:
         mais_adm = df_ativos.sort_values("admissoes", ascending=False).iloc[0]
@@ -599,6 +702,7 @@ def render_p2_sazonalidade(
     sufixo_secao = f" · Seção {secao_filtro}" if secao_filtro else ""
     sufixo = f" — {cargo_label}" if cargo_label else ""
     st.markdown(f"#### Sazonalidade mensal das movimentações{sufixo_secao}{sufixo}")
+    render_enunciado_pergunta("P2")
     st.caption(
         "Curva sazonal (média mensal sobre anos completos de 12 competências) e evolução histórica mensal "
         "de contratações, desligamentos e saldo líquido."
@@ -719,6 +823,7 @@ def render_p4_rotatividade(
 
     sufixo = f" — {cargo_label}" if cargo_label else ""
     st.markdown(f"#### Rotatividade setorial e remuneração{sufixo}")
+    render_enunciado_pergunta("P4")
     st.caption("Relação entre o índice de fluxos pareados (substituição de postos) e o salário médio inicial por seção CNAE.")
     secao_filtro = (filtros or {}).get("codigo_secao")
     if secao_filtro:
@@ -868,6 +973,7 @@ def render_p5_sociodemografico(
 
     sufixo = f" — {cargo_label}" if cargo_label else ""
     st.markdown(f"#### Perfil sociodemográfico e remuneração{sufixo}")
+    render_enunciado_pergunta("P5")
     st.caption("Recorte de admissões, desligamentos e salário médio inicial por sexo, escolaridade, raça/cor e faixa etária.")
     if filtros.get("codigo_secao"):
         st.caption(f"Recorte da seção CNAE {filtros['codigo_secao']}.")
@@ -1128,16 +1234,13 @@ def render_view_painel_executivo(
         )
 
     st.write("")
-    tab_p3, tab_p1, tab_p2, tab_p4, tab_p5 = st.tabs([
-        "Capitais vs. Interior (P3)",
-        "Setores Econômicos (P1)",
-        "Sazonalidade (P2)",
-        "Rotatividade e Salário (P4)",
-        "Perfil Demográfico (P5)",
+    tab_p1, tab_p2, tab_p3, tab_p4, tab_p5 = st.tabs([
+        "P1 · Setores Econômicos",
+        "P2 · Sazonalidade",
+        "P3 · Capitais vs. Interior",
+        "P4 · Rotatividade e Salário",
+        "P5 · Perfil Demográfico",
     ])
-
-    with tab_p3:
-        renderizar_resposta_geral(resp_p3, caminho_str, "painel_p3")
 
     with tab_p1:
         periodo_p1 = f"em {filtro_ano}" if filtro_ano else "nos últimos 12 meses"
@@ -1161,6 +1264,9 @@ def render_view_painel_executivo(
             codigo_secao_override=filtro_secao,
         )
         renderizar_resposta_geral(resp_p2, caminho_str, "painel_p2")
+
+    with tab_p3:
+        renderizar_resposta_geral(resp_p3, caminho_str, "painel_p3")
 
     with tab_p4:
         resp_p4 = obter_resposta_cached(
@@ -1202,24 +1308,27 @@ def render_view_busca_cbo(
     if "busca_termo_ativo" not in st.session_state:
         st.session_state["busca_termo_ativo"] = "professor"
 
-    col_input, col_btn = st.columns([5, 1])
-    with col_input:
-        termo_digitado = st.text_input(
-            "Ocupação ou código CBO:",
-            value=st.session_state["busca_termo_ativo"],
-            placeholder="Digite o nome da função, sinônimo ou código CBO de 6 dígitos...",
-            label_visibility="collapsed",
-        )
-    with col_btn:
-        if st.button("Pesquisar", type="primary", use_container_width=True):
-            st.session_state["busca_termo_ativo"] = termo_digitado
-            st.rerun()
+    with st.form("form_busca_cbo", clear_on_submit=False, border=False):
+        col_input, col_btn = st.columns([5, 1])
+        with col_input:
+            termo_digitado = st.text_input(
+                "Ocupação ou código CBO:",
+                value=st.session_state["busca_termo_ativo"],
+                placeholder="Digite o nome da função, sinônimo ou código CBO de 6 dígitos...",
+                label_visibility="collapsed",
+            )
+        with col_btn:
+            if st.form_submit_button("Pesquisar", type="primary", use_container_width=True) and termo_digitado.strip():
+                st.session_state["busca_termo_ativo"] = termo_digitado.strip()
+                st.rerun()
 
-    cols_sug = st.columns(len(SUGESTOES_PROFISSOES))
-    for i, (label_sug, val_sug) in enumerate(SUGESTOES_PROFISSOES):
-        if cols_sug[i].button(label_sug, key=f"sug_cbo_{i}", use_container_width=True):
-            st.session_state["busca_termo_ativo"] = val_sug
-            st.rerun()
+    for idx_base in range(0, len(SUGESTOES_PROFISSOES), 4):
+        bloco = SUGESTOES_PROFISSOES[idx_base:idx_base + 4]
+        cols_sug = st.columns(4)
+        for i, (label_sug, val_sug) in enumerate(bloco):
+            if cols_sug[i].button(label_sug, key=f"sug_cbo_{idx_base + i}", use_container_width=True):
+                st.session_state["busca_termo_ativo"] = val_sug
+                st.rerun()
 
     termo_ativo = st.session_state["busca_termo_ativo"].strip()
     if not termo_ativo:
@@ -1326,6 +1435,7 @@ def render_view_assistente_sql(
     filtro_uf: str | None,
     filtro_ano: int | None,
     cargo_filtro: str | None,
+    filtro_secao: str | None = None,
 ) -> None:
     st.markdown("#### Consulta em Linguagem Natural (Text-to-SQL)")
     st.caption("Tradução de perguntas para SQL somente leitura sobre os contratos da camada Gold.")
@@ -1333,24 +1443,27 @@ def render_view_assistente_sql(
     if "pergunta_input" not in st.session_state:
         st.session_state["pergunta_input"] = "Qual a diferença salarial entre homens e mulheres?"
 
-    col_input, col_btn = st.columns([5, 1])
-    with col_input:
-        pergunta_digitada = st.text_input(
-            "Pergunta:",
-            value=st.session_state["pergunta_input"],
-            placeholder="Ex.: Qual a diferença salarial entre homens e mulheres para professor?",
-            label_visibility="collapsed",
-        )
-    with col_btn:
-        if st.button("Executar", type="primary", use_container_width=True):
-            st.session_state["pergunta_input"] = pergunta_digitada
-            st.rerun()
+    with st.form("form_assistente_sql", clear_on_submit=False, border=False):
+        col_input, col_btn = st.columns([5, 1])
+        with col_input:
+            pergunta_digitada = st.text_input(
+                "Pergunta:",
+                value=st.session_state["pergunta_input"],
+                placeholder="Ex.: Qual a diferença salarial entre homens e mulheres para professor?",
+                label_visibility="collapsed",
+            )
+        with col_btn:
+            if st.form_submit_button("Executar", type="primary", use_container_width=True) and pergunta_digitada.strip():
+                st.session_state["pergunta_input"] = pergunta_digitada.strip()
+                st.rerun()
 
-    cols_p = st.columns(len(PERGUNTAS_EXEMPLO))
-    for i, (rotulo, perg) in enumerate(PERGUNTAS_EXEMPLO):
-        if cols_p[i].button(rotulo, key=f"btn_faq_{i}", use_container_width=True):
-            st.session_state["pergunta_input"] = perg
-            st.rerun()
+    for idx_base in range(0, len(PERGUNTAS_EXEMPLO), 4):
+        bloco = PERGUNTAS_EXEMPLO[idx_base:idx_base + 4]
+        cols_p = st.columns(4)
+        for i, (rotulo, perg) in enumerate(bloco):
+            if cols_p[i].button(rotulo, key=f"btn_faq_{idx_base + i}", use_container_width=True):
+                st.session_state["pergunta_input"] = perg
+                st.rerun()
 
     pergunta_ativa = st.session_state["pergunta_input"].strip()
     if not pergunta_ativa:
@@ -1362,6 +1475,7 @@ def render_view_assistente_sql(
         filtro_cargo=cargo_filtro,
         sigla_uf_override=filtro_uf,
         ano_override=filtro_ano,
+        codigo_secao_override=filtro_secao,
     )
 
     if not resposta.suportada:
@@ -1464,8 +1578,7 @@ def main() -> None:
             f"Saldo: {fmt_int(resumo['saldo'], True)}"
         )
 
-    # Cabeçalho principal (com html.escape em todas as variáveis interpoladas)
-    st.markdown("## METRA — Mercado de Trabalho Formal no Centro-Oeste")
+    # Cabeçalho editorial (com html.escape em todas as variáveis interpoladas)
     filtros_ativos = [
         f"UF: {filtro_uf_efetivo}" if filtro_uf_efetivo else "Região: Centro-Oeste (DF, GO, MT, MS)",
         f"Ano: {filtro_ano_efetivo}" if filtro_ano_efetivo else "Período: 2023–2026",
@@ -1479,8 +1592,15 @@ def main() -> None:
         filtros_ativos.append(f"Ocupação: {cargo_efetivo}")
     filtros_ativos.append(f"Salário médio na base: {fmt_moeda(resumo['salario_medio'])}")
 
-    texto_cabecalho = html.escape(" · ".join(filtros_ativos))
-    st.markdown(f'<div class="header-meta">{texto_cabecalho}</div>', unsafe_allow_html=True)
+    chips_html = "".join(f'<span class="filter-chip">{html.escape(item)}</span>' for item in filtros_ativos)
+    st.markdown(
+        '<div class="metra-masthead">'
+        '<div class="metra-eyebrow">MONITORAMENTO DO EMPREGO FORMAL · CENTRO-OESTE</div>'
+        '<h2>METRA — Mercado de Trabalho Formal no Centro-Oeste</h2>'
+        f'<div class="filter-chips">{chips_html}</div>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
 
     if opcao_menu == "Perguntas de Gestão (P1–P5)":
         render_view_painel_executivo(
@@ -1503,6 +1623,7 @@ def main() -> None:
             filtro_uf_efetivo,
             filtro_ano_efetivo,
             cargo_efetivo,
+            filtro_secao_efetivo,
         )
 
 
