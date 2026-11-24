@@ -417,3 +417,10 @@ Abaixo constam os registros de todas as atividades:
 - **O que foi aproveitado:** P1 passou a mostrar os rankings de admissões e desligamentos. P2 preserva zeros observados e deixa sem valor os meses sem grupos publicados. O agente explica o método de cálculo, recusa seção CNAE em P3 e sinaliza localidades reconhecidas fora da cobertura. Em P5, o gráfico com valores negativos ganhou uma coluna à direita para os valores.
 - **Como foi verificado:** A execução do commit com o snapshot versionado confirmou que os 12 meses de 2024 no DF para a seção U entravam como zeros em P2, embora o recorte tivesse zero grupos publicados. Após a correção, os valores ficaram nulos e fora da média sazonal. Passaram 14 casos Node, 12 testes Python da camada semântica, `mkdocs build --strict` e `git diff --check`. O SVG de P5 foi conferido com o snapshot em DOM simulado.
 - **Quem revisou:** Davi Camilo
+
+#### Continuação - Documentação de freshness e SLA da publicação (E4)
+
+- **Onde:** `docs/freshness-sla.md`, `README.md` e referências nas páginas de orquestração, camada analítica e consumo.
+- **O que foi pedido:** Documentar a meta de publicação da E4, como medir o prazo do mesmo lote e como testar o procedimento.
+- **O que foi aproveitado:** Meta proposta de até 24 horas corridas entre a extração Parquet bem-sucedida e a validação do JSON no Pages. O procedimento usa o `run_id` para relacionar os eventos do Dagster e o SHA-256 para conferir os bytes servidos. A documentação distingue o prazo de publicação da última competência observada.
+- **Como foi verificado:** O build estrito do MkDocs passou. O comando documentado baixou o snapshot do Pages, confirmou o SHA-256 registrado no Git e imprimiu o horário em UTC. Os commits de integração e deploy registraram um intervalo de 18 h 32min 57s.
