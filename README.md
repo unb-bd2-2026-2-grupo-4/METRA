@@ -343,6 +343,7 @@ python3 -m src.extracao.validar_lake        # compara PostgreSQL, Parquet e Delt
 A extração copia as cinco tabelas do schema `oltp` em modo somente leitura, particiona `movimentacao` por `ano` (roteando pelo tempo do evento para absorver dados atrasados na competência correta) e concilia a contagem de linhas com a origem. A tabela Delta é gravada com `deltalake` (delta-rs) e lida pelo DuckDB com `delta_scan`. Reexecuções substituem os arquivos sem acumular registros, e nada em `data/lake/` é versionado. A primeira execução precisa de internet para baixar as extensões `postgres` e `delta` do DuckDB.
 
 Os dois primeiros comandos aceitam `--compressao` (`snappy`, `zstd` ou `uncompressed`); o padrão `snappy` foi validado por benchmark reproduzível conforme documentado no [`ADR 0003`](./docs/adr/0003-compressao-parquet.md). Detalhes em [`docs/camada-parquet.md`](./docs/camada-parquet.md).
+
 ### Camada Silver com dbt-duckdb (E3)
 
 Depois da extração para Parquet, no mesmo ambiente Python:
@@ -380,39 +381,6 @@ O mesmo `dbt build` também reconstrói o schema `gold`, usando `ref()` sobre a 
 - `fct_perfil_mensal`: competência × UF × capital/interior × seção CNAE × perfil (P5).
 
 Os agregados usam municípios identificados do Centro-Oeste entre 2023 e 2026. Preservam somas e denominadores salariais para recalcular médias em qualquer agrupamento. As tabelas são reconstruídas integralmente, incluindo competências antigas que recebam dados atrasados.
-
-#### ETL reverso e resumo público (E4)
-
-O asset `exportar_json_consumo`, incluído no job `pipeline_metra` e no seu schedule
-mensal, exporta as views públicas `consumo.*` para `docs/assets/dados/metra.json`.
-O JSON fornece séries mensais de setor, geografia, perfis e calendário para P1–P5.
-As fórmulas vêm da camada semântica; a publicação é atômica e idempotente, com o
-retry compartilhado do Dagster. Uma página mínima no MkDocs lê o arquivo por
-JavaScript. O merge do PR com o JSON revisado aciona o deploy existente do Pages.
-
-**Dependência de integração:** as views públicas são entregues pela frente de
-controle de acesso. Sem elas, o exportador e o pipeline completo falham, mantendo
-o JSON anterior. Não há fallback para a Gold nem JSON fictício de produção.
-
-Para regenerar somente a publicação, depois de materializar as views:
-
-```bash
-docker compose --profile dagster run --build --rm dagster-webserver \
-  dagster job execute -m dagster_metra.definitions -j exportar_json_consumo_job
-```
-
-Contrato, supressão, comandos e procedimento de publicação em
-[Consumo e governança](docs/consumo-e-governanca.md#etl-reverso-json-publico).
-O [resumo mensal](docs/consumo-json.md) exibe apenas os grupos publicados; seus
-totais podem ser parciais por causa das supressões.
-
-#### Camada semântica única de métricas (E4)
-
-Cada métrica (admissões, desligamentos, saldo, salário médio de admissão e índice de fluxos pareados) é definida **uma única vez** em [`dbt_metra/models/semantic/metricas.yml`](dbt_metra/models/semantic/metricas.yml), no formato de `semantic_models`/`metrics` do dbt, que o próprio dbt valida. Os marts e as análises compilam o SQL pelo macro `metrica()`. O painel, a busca CBO e o assistente Text-to-SQL compilam pelo módulo [`src/metricas/camada_semantica.py`](src/metricas/camada_semantica.py). Os dois caminhos geram SQL idêntico, e um teste falha se alguém reescrever uma fórmula à mão. Detalhes em [Consumo e governança](docs/consumo-e-governanca.md#camada-semantica-catalogo-unico-de-metricas).
-
-```bash
-python -m unittest tests.test_camada_semantica -v   # definição, SQL compilado e guarda anti-duplicação
-```
 
 As cinco consultas de referência estão em [`dbt_metra/analyses/`](./dbt_metra/analyses/README.md). P2 trata sazonalidade; P3 compara capitais e interior. P4 usa explicitamente a proxy `200 × min(admissões, desligamentos) / (admissões + desligamentos)`, que mede equilíbrio dos fluxos e não a taxa convencional de turnover sobre estoque. P5 descreve salários e movimentações, sem estimar chances individuais de recolocação. Os resultados se referem aos dados carregados, não a totais populacionais ou ao saldo oficial ajustado do CAGED.
 
@@ -497,6 +465,39 @@ python -m unittest discover -s tests -p 'test_busca_e_text2sql.py' -v
 python -m src.app.avaliar_busca_e_text2sql --saida docs/adr/evidencias/0007-busca-semantica-e-text2sql.json
 ```
 
+### ETL reverso e resumo público (E4)
+
+O asset `exportar_json_consumo`, incluído no job `pipeline_metra` e no seu schedule
+mensal, exporta as views públicas `consumo.*` para `docs/assets/dados/metra.json`.
+O JSON fornece séries mensais de setor, geografia, perfis e calendário para P1–P5.
+As fórmulas vêm da camada semântica; a publicação é atômica e idempotente, com o
+retry compartilhado do Dagster. Uma página mínima no MkDocs lê o arquivo por
+JavaScript. O merge do PR com o JSON revisado aciona o deploy existente do Pages.
+
+**Dependência de integração:** as views públicas são entregues pela frente de
+controle de acesso. Sem elas, o exportador e o pipeline completo falham, mantendo
+o JSON anterior. Não há fallback para a Gold nem JSON fictício de produção.
+
+Para regenerar somente a publicação, depois de materializar as views:
+
+```bash
+docker compose --profile dagster run --build --rm dagster-webserver \
+  dagster job execute -m dagster_metra.definitions -j exportar_json_consumo_job
+```
+
+Contrato, supressão, comandos e procedimento de publicação em
+[Consumo e governança](docs/consumo-e-governanca.md#etl-reverso-json-publico).
+O [resumo mensal](docs/consumo-json.md) exibe apenas os grupos publicados; seus
+totais podem ser parciais por causa das supressões.
+
+### Camada semântica única de métricas (E4)
+
+Cada métrica (admissões, desligamentos, saldo, salário médio de admissão e índice de fluxos pareados) é definida **uma única vez** em [`dbt_metra/models/semantic/metricas.yml`](dbt_metra/models/semantic/metricas.yml), no formato de `semantic_models`/`metrics` do dbt, que o próprio dbt valida. Os marts e as análises compilam o SQL pelo macro `metrica()`. O painel, a busca CBO e o assistente Text-to-SQL compilam pelo módulo [`src/metricas/camada_semantica.py`](src/metricas/camada_semantica.py). Os dois caminhos geram SQL idêntico, e um teste falha se alguém reescrever uma fórmula à mão. Detalhes em [Consumo e governança](docs/consumo-e-governanca.md#camada-semantica-catalogo-unico-de-metricas).
+
+```bash
+python -m unittest tests.test_camada_semantica -v   # definição, SQL compilado e guarda anti-duplicação
+```
+
 ### Controle de acesso (E4)
 
 Consumidores externos não abrem o banco analítico. O dbt publica as views agregadas `consumo.setor_mensal`, `consumo.geografia_mensal`, `consumo.perfil_mensal` e `consumo.calendario`, que omitem grupos com menos de 5 movimentações e anulam o salário com menos de 5 salários válidos. O asset `base_consumo` copia essas views para `data/metra_consumo.duckdb`, a única base que o consumidor abre: somente leitura, sem acesso externo e com a configuração travada, sem caminho até a Gold detalhada.
@@ -531,6 +532,14 @@ python -m unittest discover -s tests -p 'test_catalogo_linhagem.py' -v
 ```
 
 Grafo completo e matriz de linhagem da fonte até o painel e o ETL reverso em [Consumo e governança](docs/consumo-e-governanca.md#catalogo-de-dados-dbt-docs-no-pages-e-linhagem-da-fonte-ao-painel-e-ao-etl-reverso).
+
+### Freshness e SLA da publicação (E4)
+
+Foi proposto a publicação e validação do snapshot no GitHub Pages em até **24 horas
+corridas** após a extração Parquet bem-sucedida. Para medir o prazo, utilize o horário
+de `exportar_parquet` no Dagster e o da primeira conferência do SHA-256 do mesmo
+lote no Pages. A última competência observada indica a cobertura dos dados do Novo
+CAGED (tudo conforme [procedimento e evidências de freshness](docs/freshness-sla.md)).
 
 ---
 

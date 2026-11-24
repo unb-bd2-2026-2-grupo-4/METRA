@@ -75,6 +75,7 @@ nav:
       - Camada Analítica e Qualidade dbt: camada-analitica-dbt.md
       - Orquestração com Dagster: orquestracao.md
       - Consumo e Governança: consumo-e-governanca.md
+      - Freshness e SLA: freshness-sla.md
   - Governança & Decisões:
       - Decisões de Arquitetura (ADR):
           - "ADR 0001: Origem Transacional OLTP": adr/0001-modelagem-sistema-origem.md

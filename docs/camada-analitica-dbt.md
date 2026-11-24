@@ -214,9 +214,7 @@ Os 54 testes da Gold estão no YAML de contratos (`models/marts/_gold__models.ym
 
 ## Freshness e próximos critérios de aceite
 
-**SLA proposto para validação da equipe:** publicar consumo validado em até 24 horas após o sucesso da extração do snapshot completo. Medir `publicacao_validada_em - extracao_concluida_em` para o mesmo lote; alerta quando exceder o SLA. Esses metadados ainda precisam ser persistidos pelo fluxo de orquestração.
-
-`max(competencia)` indica cobertura temporal do dado, não freshness de processamento. O conjunto disponível pode terminar em janeiro/2026 e ainda ter sido processado hoje. `registrado_em` também não substitui o instante da extração.
+A meta proposta é publicar o consumo validado em até 24 horas após a extração bem-sucedida do mesmo lote. `max(competencia)` descreve a cobertura temporal da fonte. O procedimento em [Freshness e SLA](freshness-sla.md) usa os eventos do Dagster e a verificação do snapshot servido para medir o prazo de publicação.
 
 O benchmark da [ADR-0005](adr/0005-modelagem-analitica-dbt.md) compara granularidades sobre a amostra. A otimização da Gold é medida separadamente, na seção seguinte; retry e backfill estão demonstrados em [Orquestração](orquestracao.md#retry-agendamento-e-backfill).
 

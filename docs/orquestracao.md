@@ -142,6 +142,9 @@ Use caminhos absolutos ao apontar para outro lake ou banco. O diretório pai do 
 
 ## Retry, Agendamento e Backfill
 
+Para verificar o prazo entre extração e disponibilização do mesmo lote no Pages,
+consulte [Freshness e SLA](freshness-sla.md).
+
 Definidos em `dagster_metra/assets.py` e `dagster_metra/definitions.py`:
 
 | Recurso | Configuração |

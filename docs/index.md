@@ -94,6 +94,12 @@ O recorte do projeto concentra-se no **Mercado de Trabalho Formal da Região Cen
     
     Catálogo de métricas, perguntas de gestão, linhagem da fonte ao consumo, LGPD e controle de acesso.
 
+-   **[Freshness e SLA](freshness-sla.md)**
+
+    ---
+
+    Cobertura dos dados, meta de atualização e verificação do prazo entre a extração e a publicação no GitHub Pages.
+
 -   **[Decisões de Arquitetura (ADRs)](adr/0001-modelagem-sistema-origem.md)**
     
     ---

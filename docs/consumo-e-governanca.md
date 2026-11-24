@@ -270,7 +270,7 @@ A leitura do detalhe é uma contagem, para que nem a demonstração imprima regi
 
 ## Operação e freshness
 
-O destino configurável deve ser compartilhado por dbt, Dagster e consumidores; hoje o padrão dbt é `data/metra_analitico.duckdb`. O consumo só deve apontar para uma execução validada. SLA inicialmente proposto: até 24 horas entre conclusão da extração e publicação validada do mesmo lote. Ver [camada analítica](camada-analitica-dbt.md#freshness-e-proximos-criterios-de-aceite) para separar atraso de processamento de cobertura temporal da fonte.
+O consumo deve apontar para uma execução validada. A meta proposta é de até 24 horas entre a extração concluída e a publicação validada do mesmo lote. O procedimento e a evidência estão em [Freshness e SLA](freshness-sla.md).
 
 ## ETL reverso: JSON público
 
@@ -419,4 +419,4 @@ publicação revisada não existir.
 - [x] Controle de acesso além de `read_only`: views `consumo.*` com supressão de grupos com menos de 5 movimentações, base de consumo isolada e demonstração de acesso permitido e negado ao detalhe (E4).
 - [x] Validar base legal da LGPD, retenção, o limiar de pequenos grupos, os ataques por diferença e executar o script de descarte com evidências reais (`src/lgpd/descarte.py` e `docs/adr/evidencias/0008-lgpd-descarte.json`) (E4).
 - [x] Implementar e demonstrar o caminho de ETL reverso com seu consumidor (`docs/assets/dados/metra.json` + painel e agente no GitHub Pages, ADR-0008) (E4).
-- [ ] Atualizar diários e registro de IA conforme as atividades da E4 ocorrerem; não antecipar evidências de execução futura.
+- [x] Atualizar diários e registro de IA conforme as atividades da E4 ocorrerem; não antecipar evidências de execução futura.
