@@ -75,6 +75,7 @@ nav:
       - Camada Analítica e Qualidade dbt: camada-analitica-dbt.md
       - Orquestração com Dagster: orquestracao.md
       - Consumo e Governança: consumo-e-governanca.md
+      - Freshness e SLA: freshness-sla.md
   - Governança & Decisões:
       - Decisões de Arquitetura (ADR):
           - "ADR 0001: Origem Transacional OLTP": adr/0001-modelagem-sistema-origem.md
@@ -98,3 +99,7 @@ nav:
           - Semana 09: diario/semana-09.md
           - Semana 10: diario/semana-10.md
           - Semana 11: diario/semana-11.md
+          - Semana 12: diario/semana-12.md
+          - Semana 13: diario/semana-13.md
+          - Semana 14: diario/semana-14.md
+          - Retrospectiva do Ciclo de Vida: diario/retrospectiva.md
