@@ -495,13 +495,15 @@ totais podem ser parciais por causa das supressões.
 
 Cada métrica (admissões, desligamentos, saldo, salário médio de admissão e índice de fluxos pareados) é definida **uma única vez** em [`dbt_metra/models/semantic/metricas.yml`](dbt_metra/models/semantic/metricas.yml), no formato de `semantic_models`/`metrics` do dbt, que o próprio dbt valida. Os marts e as análises compilam o SQL pelo macro `metrica()`. O painel, a busca CBO e o assistente Text-to-SQL compilam pelo módulo [`src/metricas/camada_semantica.py`](src/metricas/camada_semantica.py). Os dois caminhos geram SQL idêntico, e um teste falha se alguém reescrever uma fórmula à mão. Detalhes em [Consumo e governança](docs/consumo-e-governanca.md#camada-semantica-catalogo-unico-de-metricas).
 
+O mesmo arquivo declara o **vocabulário** das métricas e das dimensões (sinônimos como "salário", "contratações", "setor" ou "estado"), publicado no `metra.json`. Com ele, o agente do Pages responde perguntas livres de ranking, total e evolução, como "Qual o maior salário?" ou "Quais os 3 setores que mais contrataram em GO?". O salário válido é positivo e vai até R$ 150.000 (`metra_salario_maximo_valido` em `dbt_metra/dbt_project.yml`); acima disso, o valor é tratado como erro de cadastro. O `metra.json` publicado é gerado da base completa, agregada, com perfis demográficos anuais (contrato v2). Detalhes em [Vocabulário](docs/consumo-e-governanca.md#vocabulario-como-uma-pergunta-livre-chega-a-metrica).
+
 ```bash
 python -m unittest tests.test_camada_semantica -v   # definição, SQL compilado e guarda anti-duplicação
 ```
 
 ### Controle de acesso (E4)
 
-Consumidores externos não abrem o banco analítico. O dbt publica as views agregadas `consumo.setor_mensal`, `consumo.geografia_mensal`, `consumo.perfil_mensal` e `consumo.calendario`, que omitem grupos com menos de 5 movimentações e anulam o salário com menos de 5 salários válidos. O asset `base_consumo` copia essas views para `data/metra_consumo.duckdb`, a única base que o consumidor abre: somente leitura, sem acesso externo e com a configuração travada, sem caminho até a Gold detalhada.
+Consumidores externos não abrem o banco analítico. O dbt publica as views agregadas `consumo.setor_mensal`, `consumo.geografia_mensal`, `consumo.perfil_anual` e `consumo.calendario`, que omitem grupos com menos de 5 movimentações e anulam o salário com menos de 5 salários válidos. O asset `base_consumo` copia essas views para `data/metra_consumo.duckdb`, a única base que o consumidor abre: somente leitura, sem acesso externo e com a configuração travada, sem caminho até a Gold detalhada.
 
 ```bash
 python -m src.acesso.base_consumo        # publica a base de consumo (o pipeline_metra já faz isso)
