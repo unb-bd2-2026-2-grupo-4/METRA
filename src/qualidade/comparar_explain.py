@@ -26,6 +26,8 @@ import time
 import duckdb
 import psycopg
 
+from src.metricas.camada_semantica import condicao_salario_valido
+
 ROOT = Path(__file__).resolve().parents[2]
 
 # Mesmas métricas da macro metricas_movimentacao, por seção CNAE.
@@ -56,14 +58,14 @@ group by codigo_secao
 order by codigo_secao
 """
 
-# Mesma pergunta na origem transacional, com os joins da 3FN.
-CONSULTA_ORIGEM = """
+# Mesma pergunta na origem transacional, com os joins da 3FN e a regra de salário válido da Silver.
+CONSULTA_ORIGEM = f"""
 select s.codigo_secao,
        count(*) filter (where m.saldo_movimentacao = 1) as admissoes,
        count(*) filter (where m.saldo_movimentacao = -1) as desligamentos,
        sum(m.saldo_movimentacao) as saldo,
-       sum(case when m.saldo_movimentacao = 1 and m.salario_mensal > 0 then m.salario_mensal else 0 end) as soma_salarios_admissao,
-       count(*) filter (where m.saldo_movimentacao = 1 and m.salario_mensal > 0) as qtd_salarios_admissao
+       sum(case when m.saldo_movimentacao = 1 and {condicao_salario_valido('m.salario_mensal')} then m.salario_mensal else 0 end) as soma_salarios_admissao,
+       count(*) filter (where m.saldo_movimentacao = 1 and {condicao_salario_valido('m.salario_mensal')}) as qtd_salarios_admissao
 from oltp.movimentacao m
 join oltp.municipio mu using (id_municipio)
 join oltp.cnae_subclasse s on s.codigo = m.cnae_2_subclasse

@@ -16,6 +16,8 @@ import unittest
 import duckdb
 import psycopg
 
+from src.metricas.camada_semantica import condicao_salario_valido
+
 
 ROOT = Path(__file__).resolve().parents[1]
 AGREGADOS = {
@@ -222,16 +224,16 @@ class GoldIntegracaoTest(unittest.TestCase):
         # recorte dos agregados não deve esconder perdas entre OLTP e Gold.
         with psycopg.connect(connect_timeout=10) as pg:
             pg.read_only = True
-            esperado = pg.execute("""
+            esperado = pg.execute(f"""
                 select make_date(m.ano, m.mes, 1) as competencia, mu.sigla_uf,
                     count(*) as movimentacoes,
                     count(*) filter (where m.saldo_movimentacao = 1) as admissoes,
                     count(*) filter (where m.saldo_movimentacao = -1) as desligamentos,
                     sum(m.saldo_movimentacao) as saldo,
-                    sum(case when m.saldo_movimentacao = 1 and m.salario_mensal > 0
+                    sum(case when m.saldo_movimentacao = 1 and {condicao_salario_valido('m.salario_mensal')}
                         then m.salario_mensal else 0 end) as soma_salarios_admissao,
                     count(*) filter (
-                        where m.saldo_movimentacao = 1 and m.salario_mensal > 0
+                        where m.saldo_movimentacao = 1 and {condicao_salario_valido('m.salario_mensal')}
                     ) as qtd_salarios_admissao
                 from oltp.movimentacao m
                 left join oltp.municipio mu using (id_municipio)
