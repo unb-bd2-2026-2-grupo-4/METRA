@@ -97,7 +97,7 @@ class CatalogoELinhagemTest(unittest.TestCase):
         for esperado_etl in (
             "model.metra.setor_mensal",
             "model.metra.geografia_mensal",
-            "model.metra.perfil_mensal",
+            "model.metra.perfil_anual",
             "model.metra.calendario",
             "metric.metra.salario_medio_admissao",
         ):
