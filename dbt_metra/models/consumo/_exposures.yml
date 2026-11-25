@@ -76,7 +76,7 @@ exposures:
     depends_on:
       - ref('setor_mensal')
       - ref('geografia_mensal')
-      - ref('perfil_mensal')
+      - ref('perfil_anual')
       - ref('calendario')
     owner:
       name: "Squad G4 — METRA (FCTE/UnB)"
@@ -94,7 +94,7 @@ exposures:
     depends_on:
       - ref('setor_mensal')
       - ref('geografia_mensal')
-      - ref('perfil_mensal')
+      - ref('perfil_anual')
       - ref('calendario')
       - metric('admissoes')
       - metric('desligamentos')

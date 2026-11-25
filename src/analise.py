@@ -4,6 +4,8 @@ from pathlib import Path
 
 import duckdb
 
+from src.metricas.camada_semantica import condicao_salario_valido
+
 BANCO = Path(__file__).resolve().parents[1] / "data" / "metra.duckdb"
 
 
@@ -34,15 +36,15 @@ def carregar_dados(conn: duckdb.DuckDBPyConnection) -> None:
 
 def consultar_indicadores(conn: duckdb.DuckDBPyConnection) -> duckdb.DuckDBPyRelation:
     """Calcula médias por evento e diferenças antes de qualquer arredondamento."""
-    return conn.sql("""
+    return conn.sql(f"""
         WITH grupos AS (
             SELECT ano, is_capital,
                    SUM(saldo_movimentacao) AS saldo,
                    AVG(salario_mensal) FILTER (
-                       WHERE saldo_movimentacao = 1 AND salario_mensal > 0
+                       WHERE saldo_movimentacao = 1 AND {condicao_salario_valido()}
                    ) AS salario,
                    COUNT(*) FILTER (
-                       WHERE saldo_movimentacao = 1 AND salario_mensal > 0
+                       WHERE saldo_movimentacao = 1 AND {condicao_salario_valido()}
                    ) AS salarios_considerados
             FROM movimentacao
             GROUP BY GROUPING SETS ((ano, is_capital), (is_capital))

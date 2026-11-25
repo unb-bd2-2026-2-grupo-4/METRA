@@ -59,5 +59,14 @@ observado. Em P2, competências sem grupos publicados ficam sem valor na série
 e fora do cálculo da média sazonal. A média usa apenas meses publicados em anos
 com 12 competências observadas na origem, com contagem de anos por mês.
 A comparação entre capitais e interior (P3) aceita UF e ano no agente.
+
+Além de P1–P5, o agente responde perguntas livres de ranking, total e evolução,
+como "Qual o maior salário?", "Quais os 3 setores que mais contrataram em GO?",
+"Qual mês teve mais demissões em 2024?" ou "Evolução do saldo no DF". Ele
+identifica a métrica e a dimensão pelo vocabulário da camada semântica, publicado
+no próprio JSON ([como funciona](consumo-e-governanca.md#vocabulario-como-uma-pergunta-livre-chega-a-metrica)).
+O salário individual não é publicado: rankings de salário usam a média de grupos
+com pelo menos 5 salários válidos.
+
 O arquivo é atualizado após revisão e merge do PR na `main` (detalhes em
 [Consumo e governança](consumo-e-governanca.md#etl-reverso-json-publico)).

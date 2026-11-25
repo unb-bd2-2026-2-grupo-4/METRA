@@ -22,22 +22,22 @@
         "grupos_omitidos_fluxo_menor_k": 0,
         "grupos_com_salario_suprimido": 0
       },
-      "perfil_mensal": {
-        "grupos_totais": 41101,
-        "grupos_publicados": 11326,
-        "grupos_omitidos_fluxo_menor_k": 29775
+      "perfil_anual": {
+        "grupos_totais": 7757,
+        "grupos_publicados": 4195,
+        "grupos_omitidos_fluxo_menor_k": 3562
       }
     },
     "auditoria_ataque_por_diferenca": {
       "uf_competencia_total": 148,
       "uf_competencia_com_exatamente_1_setor_omitido": 1,
       "uf_competencia_com_residuo_entre_1_e_k_menos_1": 9,
-      "particoes_perfil_com_exatamente_1_categoria_omitida": 1864,
+      "particoes_perfil_com_exatamente_1_categoria_omitida": 361,
       "mitigacao_adotada": "As views consumo.* impedem cruzamento entre múltiplos eixos demográficos e não expõem município nem CBO. Ainda assim, como a supressão primária (k >= 5) ocorre por view sem supressão complementar secundária, um consumidor que subtraia a soma de setores ou categorias publicadas do total da partição pode estimar resíduos quando apenas 1 célula foi omitida; por isso a regra de governança proíbe inferência por diferença entre coleções."
     }
   },
   "execucao_real_descarte": {
-    "executado_em_utc": "2026-11-23T23:15:57Z",
+    "executado_em_utc": "2026-11-25T20:05:00Z",
     "modo": "executar",
     "diretorio_dados": "data/ (ambiente de homologação isolado)",
     "enquadramento_lgpd": {
@@ -85,7 +85,7 @@
     "resumo_descarte": {
       "artefatos_descartados": 5,
       "arquivos_fisicos_removidos": 7,
-      "bytes_liberados": 1646297,
+      "bytes_liberados": 1639558,
       "artefatos_preservados": 1,
       "microdados_individuais_residuais": 0,
       "verificacao_pos_descarte_ok": true
@@ -97,7 +97,7 @@
         "categoria_lgpd": "microdados_individuais",
         "tamanho_bytes": 798720,
         "arquivos_contidos": 1,
-        "sha256_antes_do_descarte": "ccdca3171b9933dc84621ef32cd29b7d609a8a4be01087921268444945154b94",
+        "sha256_antes_do_descarte": "d930ea6cc1b2e0920eb706dd038d766ed54612e59e9d3cf4087c8393aa71d217",
         "acao": "removido"
       },
       {
@@ -106,14 +106,14 @@
         "categoria_lgpd": "microdados_individuais",
         "tamanho_bytes": 798720,
         "arquivos_contidos": 1,
-        "sha256_antes_do_descarte": "ccdca3171b9933dc84621ef32cd29b7d609a8a4be01087921268444945154b94",
+        "sha256_antes_do_descarte": "d930ea6cc1b2e0920eb706dd038d766ed54612e59e9d3cf4087c8393aa71d217",
         "acao": "removido"
       },
       {
         "id_artefato": "lake_parquet",
         "caminho": "data/lake/parquet",
         "categoria_lgpd": "microdados_individuais",
-        "tamanho_bytes": 24361,
+        "tamanho_bytes": 20993,
         "arquivos_contidos": 1,
         "sha256_antes_do_descarte": null,
         "acao": "removido"
@@ -122,7 +122,7 @@
         "id_artefato": "lake_delta",
         "caminho": "data/lake/delta",
         "categoria_lgpd": "microdados_individuais",
-        "tamanho_bytes": 24397,
+        "tamanho_bytes": 21029,
         "arquivos_contidos": 2,
         "sha256_antes_do_descarte": null,
         "acao": "removido"
@@ -131,7 +131,7 @@
         "id_artefato": "cdc_logs_e_estado",
         "caminho": "data/cdc",
         "categoria_lgpd": "microdados_individuais",
-        "tamanho_bytes": 99,
+        "tamanho_bytes": 96,
         "arquivos_contidos": 2,
         "sha256_antes_do_descarte": null,
         "acao": "removido"

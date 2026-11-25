@@ -25,7 +25,7 @@ jobs:
           node-version: "20"
 
       - name: Testar leitura, filtros e agente do JSON público
-        run: node --test tests/test_consumo_js.cjs tests/test_agente_pages_js.cjs
+        run: node --test tests/test_consumo_js.cjs tests/test_agente_pages_js.cjs tests/test_agente_semantico_js.cjs
 
       - name: Gerar a base do zero e iniciar o painel
         run: sh scripts/metra-do-zero.sh --sim

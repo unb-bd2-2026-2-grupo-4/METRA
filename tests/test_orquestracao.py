@@ -55,7 +55,7 @@ class OrquestracaoTest(unittest.TestCase):
         self.assertEqual(
             {dep.to_user_string() for dep in base.asset_deps[base.key]},
             {"consumo/setor_mensal", "consumo/geografia_mensal",
-             "consumo/perfil_mensal", "consumo/calendario"},
+             "consumo/perfil_anual", "consumo/calendario"},
         )
         # As dependências precisam existir no grafo: são os modelos dbt do schema consumo.
         for dep in base.asset_deps[base.key]:
@@ -79,7 +79,7 @@ class OrquestracaoTest(unittest.TestCase):
         self.assertEqual(
             {dep.to_user_string() for dep in exportacao.asset_deps[exportacao.key]},
             {"consumo/setor_mensal", "consumo/geografia_mensal",
-             "consumo/perfil_mensal", "consumo/calendario"},
+             "consumo/perfil_anual", "consumo/calendario"},
         )
         completo = self.defs.resolve_job_def("pipeline_metra")
         self.assertIn(exportacao.key, completo.asset_layer.selected_asset_keys)

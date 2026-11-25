@@ -12,6 +12,7 @@ import tempfile
 import duckdb
 
 from src.app.busca_cbo import CATALOGO_CBO_PADRAO
+from src.metricas.camada_semantica import salario_maximo_valido
 
 ROOT = Path(__file__).resolve().parents[2]
 DBT_PROJECT_DIR = ROOT / "dbt_metra"
@@ -200,7 +201,7 @@ def construir_gold_de_amostra(caminho_banco: Path) -> None:
                         tipo_movimentacao::INTEGER AS tipo_movimentacao,
                         saldo_movimentacao::INTEGER AS saldo_movimentacao,
                         CASE
-                            WHEN salario_mensal::DECIMAL(16,2) BETWEEN 0.01 AND 150000.00
+                            WHEN salario_mensal::DECIMAL(16,2) BETWEEN 0.01 AND {salario_maximo_valido()}
                             THEN salario_mensal::DECIMAL(16,2)
                             ELSE 0.00
                         END::DECIMAL(16,2) AS salario_mensal,

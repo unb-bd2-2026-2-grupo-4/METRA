@@ -343,8 +343,8 @@ def auditar_pequenos_grupos_e_diferenca(
             FROM por_uf_mes
         """).fetchone()
 
-        # 4. Ataque por diferença dentro de perfil_mensal (subtraindo do total de setor_mensal
-        # a soma das categorias demográficas publicadas para um mesmo eixo):
+        # 4. Ataque por diferença dentro de perfil_anual (subtraindo do total da partição
+        # a soma das categorias demográficas publicadas para um mesmo eixo), no grão anual publicado:
         (
             perfis_grupos_total,
             perfis_grupos_publicados,
@@ -358,7 +358,7 @@ def auditar_pequenos_grupos_e_diferenca(
             ),
             eixos AS (
                 SELECT
-                    b.competencia, b.sigla_uf, b.is_capital, b.codigo_secao,
+                    year(b.competencia) AS ano, b.sigla_uf, b.is_capital, b.codigo_secao,
                     e.eixo, e.codigo_categoria,
                     SUM(b.admissoes) AS admissoes,
                     SUM(b.desligamentos) AS desligamentos
@@ -373,7 +373,7 @@ def auditar_pequenos_grupos_e_diferenca(
             ),
             por_particao AS (
                 SELECT
-                    competencia, sigla_uf, is_capital, codigo_secao, eixo,
+                    ano, sigla_uf, is_capital, codigo_secao, eixo,
                     COUNT(*) AS total_cats,
                     COUNT(*) FILTER (WHERE admissoes + desligamentos >= {int(limiar_k)}) AS cats_publicadas,
                     COUNT(*) FILTER (WHERE admissoes + desligamentos < {int(limiar_k)}) AS cats_omitidas
@@ -412,7 +412,7 @@ def auditar_pequenos_grupos_e_diferenca(
                 "grupos_omitidos_fluxo_menor_k": int(geo_omitidos_fluxo),
                 "grupos_com_salario_suprimido": int(geo_salario_suprimido),
             },
-            "perfil_mensal": {
+            "perfil_anual": {
                 "grupos_totais": int(perfis_grupos_total),
                 "grupos_publicados": int(perfis_grupos_publicados),
                 "grupos_omitidos_fluxo_menor_k": int(perfis_grupos_omitidos),

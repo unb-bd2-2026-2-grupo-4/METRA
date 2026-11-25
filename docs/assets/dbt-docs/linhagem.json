@@ -102,7 +102,7 @@
       "objetos": [
         "consumo.setor_mensal",
         "consumo.geografia_mensal",
-        "consumo.perfil_mensal",
+        "consumo.perfil_anual",
         "consumo.calendario",
         "data/metra_consumo.duckdb (somente leitura, enable_external_access = false)"
       ],
@@ -950,11 +950,11 @@
       ]
     },
     {
-      "unique_id": "model.metra.perfil_mensal",
-      "nome": "perfil_mensal",
+      "unique_id": "model.metra.perfil_anual",
+      "nome": "perfil_anual",
       "schema": "consumo",
       "materializacao": "view",
-      "descricao": "Fluxos por competência, UF, capital/interior, seção CNAE e categoria de um eixo demográfico por vez (P5), com a mesma supressão. Os eixos não se cruzam.",
+      "descricao": "Fluxos por ano, UF, capital/interior, seção CNAE e categoria de um eixo demográfico por vez (P5), com a mesma supressão. Os eixos não se cruzam.",
       "depende_de": [
         "model.metra.dim_perfil_demografico",
         "model.metra.fct_perfil_mensal"
@@ -963,9 +963,9 @@
       "quantidade_testes_dbt": 9,
       "colunas": [
         {
-          "nome": "competencia",
-          "tipo": "DATE",
-          "descricao": "Primeiro dia do mês de ocorrência da movimentação (DATE)."
+          "nome": "ano",
+          "tipo": "INTEGER",
+          "descricao": "Ano de ocorrência das movimentações (INTEGER); os perfis são publicados por ano."
         },
         {
           "nome": "sigla_uf",
@@ -1242,7 +1242,7 @@
         {
           "nome": "salario_valido",
           "tipo": "BOOLEAN",
-          "descricao": "Verdadeiro quando salario_mensal > 0; critério para entrar em médias salariais."
+          "descricao": "Verdadeiro quando salario_mensal > 0 e não passa do teto metra_salario_maximo_valido (R$ 150.000); critério para entrar em médias salariais."
         },
         {
           "nome": "horas_contratuais",
@@ -1453,7 +1453,7 @@
     {
       "unique_id": "analysis.metra.p1_setores_df",
       "nome": "p1_setores_df",
-      "caminho": "analyses\\p1_setores_df.sql",
+      "caminho": "analyses/p1_setores_df.sql",
       "depende_de": [
         "model.metra.dim_cnae",
         "model.metra.fct_setor_mensal"
@@ -1462,7 +1462,7 @@
     {
       "unique_id": "analysis.metra.p2_sazonalidade",
       "nome": "p2_sazonalidade",
-      "caminho": "analyses\\p2_sazonalidade.sql",
+      "caminho": "analyses/p2_sazonalidade.sql",
       "depende_de": [
         "model.metra.dim_competencia",
         "model.metra.fct_setor_mensal"
@@ -1471,7 +1471,7 @@
     {
       "unique_id": "analysis.metra.p3_capitais_interior",
       "nome": "p3_capitais_interior",
-      "caminho": "analyses\\p3_capitais_interior.sql",
+      "caminho": "analyses/p3_capitais_interior.sql",
       "depende_de": [
         "model.metra.fct_geografia_mensal"
       ]
@@ -1479,7 +1479,7 @@
     {
       "unique_id": "analysis.metra.p4_fluxos_salarios",
       "nome": "p4_fluxos_salarios",
-      "caminho": "analyses\\p4_fluxos_salarios.sql",
+      "caminho": "analyses/p4_fluxos_salarios.sql",
       "depende_de": [
         "model.metra.fct_setor_mensal"
       ]
@@ -1487,7 +1487,7 @@
     {
       "unique_id": "analysis.metra.p5_perfil_remuneracao",
       "nome": "p5_perfil_remuneracao",
-      "caminho": "analyses\\p5_perfil_remuneracao.sql",
+      "caminho": "analyses/p5_perfil_remuneracao.sql",
       "depende_de": [
         "model.metra.dim_perfil_demografico",
         "model.metra.fct_perfil_mensal"
@@ -1529,7 +1529,7 @@
       "depende_de": [
         "model.metra.calendario",
         "model.metra.geografia_mensal",
-        "model.metra.perfil_mensal",
+        "model.metra.perfil_anual",
         "model.metra.setor_mensal"
       ]
     },
@@ -1549,7 +1549,7 @@
         "metric.metra.saldo",
         "model.metra.calendario",
         "model.metra.geografia_mensal",
-        "model.metra.perfil_mensal",
+        "model.metra.perfil_anual",
         "model.metra.setor_mensal"
       ]
     },

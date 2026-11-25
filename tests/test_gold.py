@@ -19,6 +19,7 @@ import unittest
 import duckdb
 
 from src.analise import consultar_indicadores
+from src.metricas.camada_semantica import condicao_salario_valido
 
 ROOT = Path(__file__).resolve().parents[1]
 PROJECT = ROOT / "dbt_metra"
@@ -167,11 +168,11 @@ class GoldRegrasTest(unittest.TestCase):
             (select id_movimentacao from gold.fct_movimentacao
              except all select id_movimentacao from silver.stg_movimentacao)
         """).fetchall(), [])
-        esperado = self.conn.execute("""
+        esperado = self.conn.execute(f"""
             select count(*) filter(where saldo_movimentacao = 1),
                    count(*) filter(where saldo_movimentacao = -1), sum(saldo_movimentacao),
-                   sum(case when saldo_movimentacao=1 and salario_mensal>0 then salario_mensal else 0 end),
-                   count(*) filter(where saldo_movimentacao=1 and salario_mensal>0)
+                   sum(case when saldo_movimentacao=1 and {condicao_salario_valido()} then salario_mensal else 0 end),
+                   count(*) filter(where saldo_movimentacao=1 and {condicao_salario_valido()})
             from gold.fct_movimentacao
             where is_identificado and is_centro_oeste and ano between 2023 and 2026
         """).fetchone()

@@ -1,8 +1,9 @@
--- Fluxos por competência, UF, capital/interior, seção CNAE e categoria de um eixo
--- demográfico por vez (P5), sem grupos pequenos. Os eixos não se cruzam: cruzar
--- sexo, raça/cor, escolaridade e idade criaria grupos menores e reidentificáveis.
+-- Fluxos por ano, UF, capital/interior, seção CNAE e categoria de um eixo demográfico
+-- por vez (P5), sem grupos pequenos. O grão é anual: a P5 filtra só por ano, UF e seção,
+-- e o grão mensal multiplicava por 12 os grupos publicados e os suprimidos. Os eixos não
+-- se cruzam: cruzar sexo, raça/cor, escolaridade e idade criaria grupos menores e reidentificáveis.
 with eixos as (
-    select f.competencia, f.sigla_uf, f.is_capital, f.codigo_secao,
+    select year(f.competencia)::integer as ano, f.sigla_uf, f.is_capital, f.codigo_secao,
            e.eixo, e.codigo_categoria, e.categoria,
            f.admissoes, f.desligamentos, f.saldo,
            f.soma_salarios_admissao, f.qtd_salarios_admissao
@@ -16,7 +17,7 @@ with eixos as (
     ) e(eixo, codigo_categoria, categoria)
 ), publicado as (
     {{ publicar_grupos('eixos', [
-        'competencia', 'sigla_uf', 'is_capital', 'codigo_secao', 'eixo', 'codigo_categoria', 'categoria',
+        'ano', 'sigla_uf', 'is_capital', 'codigo_secao', 'eixo', 'codigo_categoria', 'categoria',
     ]) }}
 )
 select * from publicado

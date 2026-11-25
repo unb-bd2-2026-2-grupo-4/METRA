@@ -38,9 +38,10 @@ select
         when -1 then 'desligamento'
     end as tipo_evento,
 
-    -- A E1 grava salário ausente ou negativo como zero; só salário positivo entra em médias.
+    -- A E1 grava salário ausente ou negativo como zero. Entra em médias o salário positivo
+    -- até o teto metra_salario_maximo_valido; acima dele, é erro de cadastro.
     salario_mensal,
-    salario_mensal > 0 as salario_valido,
+    salario_mensal > 0 and salario_mensal <= {{ var('metra_salario_maximo_valido') }} as salario_valido,
     horas_contratuais,
 
     id_ingestao,

@@ -69,7 +69,7 @@ class ControleAcessoTest(unittest.TestCase):
 
     def test_categoria_pequena_omitida_dentro_de_grupo_publicado(self):
         sexo = self.linhas("""
-            select categoria, admissoes from consumo.perfil_mensal
+            select categoria, admissoes from consumo.perfil_anual
             where eixo = 'sexo' and codigo_secao = 'A'
         """)
         self.assertEqual(sexo, [{"categoria": "Homem", "admissoes": 5}])

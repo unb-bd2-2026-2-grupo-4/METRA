@@ -26,7 +26,7 @@ function fixture() {
   const linha = { competencia: "2025-01-01", sigla_uf: "GO", codigo_secao: "A",
     admissoes: 5, salario_medio_admissao: null, indice_fluxos_pareados_pct: 80 };
   return {
-    versao_schema: 1,
+    versao_schema: 2,
     recorte: { ufs: ["DF", "GO"], ressalva: "Totais parciais." },
     metricas: {
       admissoes: { label: "Admissões", formato: "inteiro" },
@@ -35,7 +35,8 @@ function fixture() {
     },
     setores: [linha, { ...linha, sigla_uf: "DF", salario_medio_admissao: 2000 }],
     geografia: [],
-    perfis: [{ ...linha, is_capital: true, eixo: "sexo", codigo_categoria: 1,
+    // Perfis anuais (v2): sem competência; a competência escolhida seleciona o ano.
+    perfis: [{ ...linha, competencia: undefined, ano: 2025, is_capital: true, eixo: "sexo", codigo_categoria: 1,
       categoria: "<img src=x onerror=alert(1)>" }],
     calendario: [{ competencia: "2025-01-01", tem_dados: true },
       { competencia: "2025-02-01", tem_dados: false }],
@@ -102,7 +103,7 @@ test("calendário ignora UF e rótulos demográficos permanecem texto", async ()
 });
 
 test("arquivo ausente ou contrato incompatível mantém controles desabilitados", async () => {
-  for (const [dados, ok] of [[fixture(), false], [{ versao_schema: 2 }, true]]) {
+  for (const [dados, ok] of [[fixture(), false], [{ ...fixture(), versao_schema: 1 }, true]]) {
     const pagina = await carregar(dados, ok);
     assert.match(pagina.elementos["consumo-status"].textContent, /indisponível/);
     assert.equal(pagina.elementos["consumo-colecao"].disabled, true);

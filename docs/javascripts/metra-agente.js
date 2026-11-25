@@ -181,6 +181,11 @@
     return { ano: Number(anoStr), mes: Number(mesStr) };
   }
 
+  // Setores e geografia são mensais (competencia); perfis são anuais (ano) desde o contrato v2.
+  function anoDoRegistro(r) {
+    return typeof r.ano === "number" ? r.ano : parseCompetencia(r.competencia).ano;
+  }
+
   function subtrairMesesCompetencia(comp, meses) {
     const { ano, mes } = parseCompetencia(comp);
     const total = ano * 12 + (mes - 1) - meses;
@@ -382,7 +387,7 @@
     return null;
   }
 
-  function classificarIntencao(pergunta) {
+  function classificarIntencao(pergunta, dados = null) {
     const norm = normalizarTexto(pergunta);
     if (!norm) return "nao_suportada";
 
@@ -402,12 +407,8 @@
       return "p2_sazonalidade";
     }
 
-    if (
-      contemTermo(norm, [
-        "rotatividade", "turnover", "fluxos pareados", "equilibrio dos fluxos",
-        "correlacao", "pearson", "praticam salarios", "salarios mais baixos",
-      ])
-    ) {
+    // Relação entre rotatividade e salário: a P4.
+    if (contemTermo(norm, ["correlacao", "pearson", "praticam salarios", "praticam salarios medios", "relacao entre"])) {
       return "p4_fluxos_salarios";
     }
 
@@ -424,12 +425,21 @@
       return "p5_perfil_remuneracao";
     }
 
-    if (
-      contemTermo(norm, [
-        "setor", "setores", "cnae", "secao", "ultimos 12 meses",
-        "mais contratou", "mais demitiu", "ranking de admissoes",
-      ])
-    ) {
+    // Janela de 12 meses e ranking duplo de admissões: a P1.
+    if (contemTermo(norm, ["ultimos 12 meses", "ranking de admissoes"])) {
+      return "p1_setores_df";
+    }
+
+    // Qualquer outra pergunta com métrica e operação do vocabulário semântico.
+    if (dados && planejarConsulta(dados, pergunta)) {
+      return "consulta_semantica";
+    }
+
+    if (contemTermo(norm, ["rotatividade", "turnover", "fluxos pareados", "equilibrio dos fluxos", "salarios mais baixos"])) {
+      return "p4_fluxos_salarios";
+    }
+
+    if (contemTermo(norm, ["setor", "setores", "cnae", "secao", "mais contratou", "mais demitiu"])) {
       return "p1_setores_df";
     }
 
@@ -488,7 +498,7 @@
   function filtrarLinhasBase(linhas, filtros) {
     return linhas.filter((r) => {
       if (filtros.sigla_uf && r.sigla_uf !== filtros.sigla_uf) return false;
-      if (filtros.ano && parseCompetencia(r.competencia).ano !== Number(filtros.ano)) return false;
+      if (filtros.ano && anoDoRegistro(r) !== Number(filtros.ano)) return false;
       if (filtros.codigo_secao && r.codigo_secao !== filtros.codigo_secao) return false;
       return true;
     });
@@ -889,6 +899,229 @@
     };
   }
 
+  // ==========================================================================
+  // Consulta semântica genérica: pergunta -> métrica + operação + dimensão + filtros.
+  // O vocabulário (sinônimos de métricas e dimensões) vem da camada semântica, publicado
+  // em metra.json; aqui fica só a gramática das operações.
+  // ==========================================================================
+
+  const NUMEROS_POR_EXTENSO = { dois: 2, duas: 2, tres: 3, quatro: 4, cinco: 5, seis: 6, sete: 7, oito: 8, nove: 9, dez: 10 };
+  const LIMITE_PADRAO_TABELA = 5;
+  // Prioridade quando a pergunta cita mais de uma dimensão ou nenhuma.
+  const ORDEM_DIMENSOES_PADRAO = ["codigo_secao", "sigla_uf", "competencia"];
+  // Preferência de coleção: a geografia tem menos supressão; perfis só para eixos demográficos.
+  const ORDEM_COLECOES = ["geografia", "setores", "perfis"];
+
+  function vocabularioSemantico(dados) {
+    if (!dados || !dados.dimensoes || !dados.metricas) return null;
+    const metricas = Object.entries(dados.metricas)
+      .filter(([, m]) => Array.isArray(m.sinonimos) && m.sinonimos.length)
+      .map(([nome, m]) => ({ nome, ...m, termos: m.sinonimos.map(normalizarTexto) }));
+    const dimensoes = Object.values(dados.dimensoes)
+      .map((d) => ({ ...d, termos: d.sinonimos.map(normalizarTexto) }));
+    return metricas.length ? { metricas, dimensoes } : null;
+  }
+
+  function detectarOperacao(norm) {
+    const matchTop = norm.match(/\btop\s*(\d{1,2})\b/) ||
+      norm.match(/\b(\d{1,2}|dois|duas|tres|quatro|cinco|seis|sete|oito|nove|dez)\s+(?:maiores|menores|primeir[oa]s|ultim[oa]s|setores|secoes|estados|ufs|meses|anos|categorias)\b/);
+    const limite = matchTop ? (NUMEROS_POR_EXTENSO[matchTop[1]] || Number(matchTop[1])) : null;
+    const menor = /\b(menor|menores|mais baix[oa]s?|pior|piores|menos)\b/.test(norm);
+    const maior = /\b(maior|maiores|mais alt[oa]s?|melhor|melhores|lider|lidera|lideram|top|mais|primeir[oa]s)\b/.test(norm);
+    if (menor || maior || limite) return { tipo: "ranking", direcao: menor ? "asc" : "desc", limite };
+    if (/\b(ranking|rank|ordene|ordenar|ordenad[oa]s?|classificacao|compare|comparar|comparacao|por)\b/.test(norm)) {
+      return { tipo: "ranking", direcao: "desc", limite: null, completo: true };
+    }
+    if (/\b(evolucao|evoluiu|ao longo|tendencia|historico|serie)\b/.test(norm)) return { tipo: "serie" };
+    if (/\b(quant[oa]s|total|soma|somam|somaram)\b/.test(norm)) return { tipo: "total" };
+    return null;
+  }
+
+  function planejarConsulta(dados, pergunta, filtros = extrairFiltros(pergunta)) {
+    const vocab = vocabularioSemantico(dados);
+    if (!vocab) return null;
+    const norm = normalizarTexto(pergunta);
+    const operacao = detectarOperacao(norm);
+    if (!operacao) return null;
+
+    const metricas = vocab.metricas.filter((m) => contemTermo(norm, m.termos));
+    if (!metricas.length) return null;
+    // Admissões e desligamentos juntos são o ranking duplo da P1 (ou a série da P2).
+    const nomes = metricas.map((m) => m.nome);
+    if (nomes.includes("admissoes") && nomes.includes("desligamentos")) return null;
+    const metrica = metricas[0];
+
+    const filtradas = new Set(["sigla_uf", "codigo_secao", "ano"].filter((d) => filtros[d]));
+    const citadas = vocab.dimensoes.filter((d) => contemTermo(norm, d.termos) && !filtradas.has(d.nome));
+    let dimensao = null;
+    if (operacao.tipo === "serie") {
+      dimensao = vocab.dimensoes.find((d) => d.nome === (citadas.some((c) => c.nome === "ano") ? "ano" : "competencia"));
+    } else if (operacao.tipo === "ranking") {
+      dimensao = citadas.find((d) => d.eixo) || citadas[0] ||
+        vocab.dimensoes.find((d) => d.nome === ORDEM_DIMENSOES_PADRAO.find((n) => !filtradas.has(n)));
+    }
+    if (operacao.tipo !== "total" && !dimensao) return null;
+    // "Saldo por mês" sem superlativo é uma série no tempo, não um ranking.
+    if (operacao.completo && ["competencia", "ano"].includes(dimensao.nome)) {
+      operacao.tipo = "serie";
+    }
+
+    const precisa = new Set([dimensao?.nome, ...filtradas].filter(Boolean));
+    precisa.delete("ano"); // o ano sai da competência, presente em todas as coleções
+    const colecao = ORDEM_COLECOES.find((c) => [...precisa].every((n) => {
+      const d = vocab.dimensoes.find((x) => x.nome === n);
+      return d && d.colecoes.includes(c);
+    }));
+    if (!colecao) return null;
+
+    return {
+      metrica,
+      operacao,
+      dimensao,
+      dimensaoImplicita: operacao.tipo === "ranking" && !citadas.length,
+      colecao,
+      filtros: Object.fromEntries([...filtradas].map((d) => [d, filtros[d]])),
+    };
+  }
+
+  function chaveERotulo(dimensao, r) {
+    switch (dimensao?.nome) {
+      case "codigo_secao": return [r.codigo_secao, `${r.codigo_secao} — ${SECOES_CNAE[r.codigo_secao] || r.codigo_secao}`];
+      case "sigla_uf": return [r.sigla_uf, r.sigla_uf];
+      case "is_capital": return [String(r.is_capital), r.is_capital ? "Capitais" : "Interior"];
+      case "competencia": return [r.competencia, r.competencia.slice(0, 7)];
+      case "ano": { const ano = String(anoDoRegistro(r)); return [ano, ano]; }
+      default:
+        if (dimensao?.eixo) return [String(r.codigo_categoria), r.categoria];
+        return ["total", "Total"];
+    }
+  }
+
+  function executarConsulta(dados, plano) {
+    const { metrica, operacao, dimensao, colecao, filtros } = plano;
+    const linhasBase = filtrarLinhasBase(dados[colecao] || [], filtros).filter((r) => {
+      if (dimensao?.eixo && r.eixo !== dimensao.eixo) return false;
+      // Na coleção de perfis, cada movimentação aparece uma vez por eixo: sem eixo, usa um só.
+      if (!dimensao?.eixo && colecao === "perfis" && r.eixo !== "sexo") return false;
+      // Seção não identificada fica fora dos rankings por seção, como na P1.
+      if (dimensao?.nome === "codigo_secao" && r.codigo_secao === "Z") return false;
+      return true;
+    });
+
+    const grupos = new Map();
+    for (const r of linhasBase) {
+      const [chave, rotulo] = chaveERotulo(dimensao, r);
+      if (!grupos.has(chave)) grupos.set(chave, { chave, rotulo, registros: [] });
+      grupos.get(chave).registros.push(r);
+    }
+    let linhas = [...grupos.values()]
+      .map((g) => ({ chave: g.chave, rotulo: g.rotulo, ...agregarRegistros(g.registros) }))
+      .filter((l) => l[metrica.nome] !== null && l[metrica.nome] !== undefined && Number.isFinite(l[metrica.nome]));
+
+    if (operacao.tipo === "serie") {
+      linhas.sort((a, b) => a.chave.localeCompare(b.chave));
+    } else {
+      const sinal = operacao.direcao === "asc" ? 1 : -1;
+      linhas.sort((a, b) => sinal * (a[metrica.nome] - b[metrica.nome]) || a.rotulo.localeCompare(b.rotulo));
+    }
+    const totalGrupos = linhas.length;
+    if (operacao.tipo === "ranking" && !operacao.completo) {
+      linhas = linhas.slice(0, operacao.limite || LIMITE_PADRAO_TABELA);
+    }
+    return { linhas, totalGrupos, registrosConsultados: linhasBase.length };
+  }
+
+  function formatarMetrica(metrica, valor) {
+    if (metrica.formato === "moeda") return moedaSimples(valor);
+    if (metrica.formato === "percentual") {
+      return Number.isFinite(valor) ? `${valor.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%` : "—";
+    }
+    return inteiroSimples(valor, metrica.nome === "saldo");
+  }
+
+  function responderConsultaSemantica(dados, texto, plano) {
+    const { metrica, operacao, dimensao, colecao, filtros } = plano;
+    const r = executarConsulta(dados, plano);
+    const recorte = [
+      filtros.sigla_uf || "Centro-Oeste",
+      filtros.ano ? `ano ${filtros.ano}` : "2023–2026",
+      filtros.codigo_secao ? `seção ${filtros.codigo_secao}` : null,
+    ].filter(Boolean).join(" · ");
+    const valor = (l) => formatarMetrica(metrica, l[metrica.nome]);
+    const comN = (l) => (metrica.formato === "moeda" ? ` (n = ${inteiroSimples(l.qtd_salarios_admissao)} salários)` : "");
+    // Siglas como UF e CNAE ficam em maiúsculas; o resto do rótulo vai para minúscula inicial.
+    const minuscula = (s) => s.replace(/^\p{Lu}(?!\p{Lu})/u, (c) => c.toLowerCase());
+    const porDimensao = dimensao ? ` por ${minuscula(dimensao.label)}` : "";
+    const nomeMetrica = minuscula(metrica.label);
+
+    let titulo;
+    let resumo;
+    if (!r.linhas.length) {
+      titulo = `${metrica.label}${porDimensao} (${recorte})`;
+      resumo = `Nenhum grupo publicado com ${nomeMetrica} no recorte ${recorte} (grupos com menos de 5 movimentações ou 5 salários são omitidos).`;
+    } else if (operacao.tipo === "total") {
+      titulo = `${metrica.label} (${recorte})`;
+      resumo = `${metrica.label} no recorte ${recorte}: ${valor(r.linhas[0])}${comN(r.linhas[0])}.`;
+    } else if (operacao.tipo === "serie") {
+      const extremo = (sinal) => [...r.linhas].sort((a, b) => sinal * (a[metrica.nome] - b[metrica.nome]))[0];
+      const pico = extremo(-1);
+      const vale = extremo(1);
+      titulo = `Evolução de ${nomeMetrica}${porDimensao} (${recorte})`;
+      resumo = `${metrica.label}${porDimensao} no recorte ${recorte}, de ${r.linhas[0].rotulo} a ${r.linhas[r.linhas.length - 1].rotulo}: ` +
+        `máximo em ${pico.rotulo} (${valor(pico)}) e mínimo em ${vale.rotulo} (${valor(vale)}).`;
+    } else {
+      // Contagens pedem "mais/menos"; médias, índices e saldo, "maior/menor".
+      const contagem = ["admissoes", "desligamentos"].includes(metrica.nome);
+      const adjetivo = operacao.direcao === "asc" ? (contagem ? "Menos" : "Menor") : (contagem ? "Mais" : "Maior");
+      const [primeiro, ...demais] = r.linhas;
+      titulo = `${operacao.completo ? "Ranking de" : adjetivo} ${nomeMetrica}${porDimensao} (${recorte})`;
+      resumo = `${adjetivo} ${nomeMetrica}${porDimensao} no recorte ${recorte}: ${primeiro.rotulo}, com ${valor(primeiro)}${comN(primeiro)}.`;
+      if (demais.length) {
+        resumo += ` Em seguida: ${demais.slice(0, 2).map((l) => `${l.rotulo} (${valor(l)})`).join("; ")}.`;
+      }
+      if (plano.dimensaoImplicita) {
+        resumo += ` A pergunta não indicou o recorte do ranking; foi usado ${minuscula(dimensao.label)}.`;
+      }
+    }
+    if (metrica.nome === "salario_medio_admissao" && operacao.tipo === "ranking" && plano.dimensaoImplicita) {
+      resumo += " O salário individual máximo ou mínimo não é publicado: o canal público só divulga médias de grupos " +
+        "com pelo menos 5 salários válidos (LGPD), e salários isolados extremos costumam ser erros de registro.";
+    }
+
+    const colunas = [
+      ...(dimensao ? [{ key: "rotulo", label: dimensao.label }] : []),
+      { key: metrica.nome, label: metrica.label, formato: metrica.formato, num: true },
+      ...(metrica.nome !== "admissoes" ? [{ key: "admissoes", label: dados.metricas.admissoes?.label || "Admissões", formato: "inteiro", num: true }] : []),
+      ...(metrica.formato === "moeda" ? [{ key: "qtd_salarios_admissao", label: dados.metricas.qtd_salarios_admissao?.label || "Salários válidos", formato: "inteiro", num: true }] : []),
+    ];
+
+    return {
+      perguntaOriginal: texto,
+      suportada: true,
+      intencao: "consulta_semantica",
+      tituloIntencao: titulo,
+      colecao,
+      filtros,
+      dadosAnalise: {
+        metrica: metrica.nome,
+        operacao,
+        dimensao: dimensao?.nome || null,
+        colunas,
+        linhas: r.linhas,
+        totalGrupos: r.totalGrupos,
+      },
+      resumoExecutivo: resumo,
+      auditoria: {
+        metricas: [...new Set([metrica.nome, "admissoes", ...(metrica.formato === "moeda" ? ["qtd_salarios_admissao"] : [])])],
+        metodo:
+          `Identifica pela camada semântica a métrica "${metrica.label}"${dimensao ? ` e a dimensão "${dimensao.label}"` : ""}, ` +
+          `agrega os grupos publicados da coleção ${colecao} no recorte e recompõe as médias ponderadas pela quantidade de salários divulgados` +
+          `${operacao.tipo === "ranking" ? `; ordena ${operacao.direcao === "asc" ? "do menor para o maior" : "do maior para o menor"} (${r.totalGrupos} grupos)` : ""}.`,
+        ressalva: `${metrica.ressalva || ""} ${dados.recorte?.ressalva || ""}`.trim(),
+      },
+    };
+  }
+
   function moedaSimples(v) {
     if (v === null || v === undefined || !Number.isFinite(v)) return "não divulgado";
     return `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -926,7 +1159,7 @@
       };
     }
 
-    const intencao = classificarIntencao(texto);
+    const intencao = classificarIntencao(texto, dados);
     const extraidos = extrairFiltros(texto);
     const filtros = {
       ...extraidos,
@@ -935,6 +1168,11 @@
       ...(overrides.codigo_secao && !extraidos.codigo_secao ? { codigo_secao: overrides.codigo_secao } : {}),
       ...(overrides.eixo && !extraidos.eixo ? { eixo: overrides.eixo } : {}),
     };
+
+    if (intencao === "consulta_semantica") {
+      const plano = planejarConsulta(dados, texto, filtros);
+      if (plano) return responderConsultaSemantica(dados, texto, plano);
+    }
 
     const recorteDesc = [
       filtros.sigla_uf || "Centro-Oeste",
@@ -1161,6 +1399,8 @@
     calcularP3,
     calcularP4,
     calcularP5,
+    planejarConsulta,
+    executarConsulta,
     responderPergunta,
   };
 });

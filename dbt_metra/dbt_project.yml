@@ -28,3 +28,7 @@ models:
 vars:
   # Mínimo de movimentações por grupo e de salários válidos por medida salarial.
   metra_limite_publicacao: 5
+  # Teto do salário válido (R$). Acima dele o registro é tratado como erro de cadastro:
+  # a base completa tem admissões de R$ 1 milhão a R$ 1 trilhão, que distorcem toda média.
+  # Lido também por src/metricas/camada_semantica.py (salario_maximo_valido).
+  metra_salario_maximo_valido: 150000

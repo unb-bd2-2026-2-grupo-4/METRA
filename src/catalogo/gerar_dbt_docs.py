@@ -122,7 +122,7 @@ LINHAGEM_CAMADAS_PONTA_A_PONTA: list[dict[str, Any]] = [
         "objetos": [
             "consumo.setor_mensal",
             "consumo.geografia_mensal",
-            "consumo.perfil_mensal",
+            "consumo.perfil_anual",
             "consumo.calendario",
             "data/metra_consumo.duckdb (somente leitura, enable_external_access = false)",
         ],

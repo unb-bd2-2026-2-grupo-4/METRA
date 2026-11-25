@@ -22,6 +22,8 @@ Medidas aditivas, com o mesmo nome das colunas dos marts, sobre `gold.fct_movime
 | `soma_salarios_admissao` | `sum` do salário das admissões com `salario_valido` |
 | `qtd_salarios_admissao` | `count` das admissões com `salario_valido` |
 
+**Salário válido.** `salario_valido` (Silver) exige salário positivo e até o teto `metra_salario_maximo_valido` (R$ 150.000, em `dbt_metra/dbt_project.yml`). Acima dele, o registro é tratado como erro de cadastro e fica fora das médias, mas continua contando nas admissões. Na base completa, há admissões registradas de R$ 1 milhão a R$ 1 trilhão; só a de R$ 1 trilhão respondia por cerca de 98% da massa salarial. O teto exclui 2.038 de 7,5 milhões de salários de admissão (0,027%). Quem lê a origem sem passar pela Silver, como `src/analise.py` e os gabaritos de conferência, usa `condicao_salario_valido()` da camada semântica, com o mesmo valor.
+
 Métricas publicadas:
 
 | Métrica | Tipo | Definição | Unidade e ressalva |
@@ -30,7 +32,7 @@ Métricas publicadas:
 | Desligamentos | simples | medida `desligamentos` | Movimentações |
 | Saldo líquido | simples | medida `saldo` (admissões − desligamentos) | Fluxo líquido; não é estoque de vínculos |
 | Admissões com salário válido | simples | medida `qtd_salarios_admissao` | Denominador da média; deve acompanhar o valor exibido |
-| Salário médio de admissão | razão | `soma_salarios_admissao` / `qtd_salarios_admissao` | R$ nominais; nulo quando não há admissão com salário válido |
+| Salário médio de admissão | razão | `soma_salarios_admissao` / `qtd_salarios_admissao` | R$ nominais; nulo quando não há admissão com salário válido (positivo e até R$ 150.000) |
 | Índice de fluxos pareados (turnover proxy) | derivada | `200 × least(admissoes, desligamentos) / (admissoes + desligamentos)` ([ADR-0007](adr/0007-busca-semantica-e-consumo.md)) | 0 a 100%; não é taxa sobre estoque de vínculos (indisponível no CAGED) |
 
 A métrica tem duas origens. Sobre **eventos** (`gold.fct_movimentacao`), cada medida aplica sua agregação. Sobre **agregados** (marts ou CTEs que já trazem as medidas), a recomposição é sempre `sum(<medida>)`. Por isso o salário médio é sempre a razão das somas, e nunca a média simples de médias. Com `janela=`, a mesma métrica é recomposta sobre uma janela nomeada; a P5 usa isso para a média do recorte.
@@ -44,6 +46,30 @@ Recortes analíticos (série mensal, capital/interior, disparidade por sexo, ra�
 - `tests/test_gold_integracao.py` confere na Gold real que a mesma métrica dá o mesmo valor a partir dos eventos e de cada mart, e que os KPIs do painel batem com a camada semântica.
 
 Ficam de fora da regra, de propósito, os gabaritos independentes: os scripts de medição em `src/qualidade/`, o avaliador da ADR-0007 e as referências dos testes de conciliação. Eles recalculam os números por conta própria justamente para conferir a camada semântica.
+
+### Vocabulário: como uma pergunta livre chega à métrica
+
+Além das fórmulas, a camada semântica declara o **vocabulário** com que uma pergunta identifica métricas e dimensões. O `metra.json` publica esse vocabulário, e o agente do Pages o usa para montar a consulta, sem lista própria de termos.
+
+- **Sinônimos das métricas** (`config.meta.sinonimos` em cada métrica de `metricas.yml`): "salário", "remuneração", "paga", "piores salários" identificam o salário médio de admissão; "contratações" e "contratou", as admissões; "demissões" e "demitiu", os desligamentos; "gerou empregos", o saldo; "rotatividade" e "turnover", o índice de fluxos pareados. As medidas técnicas (`soma_salarios_admissao`) não têm sinônimos e não são pedidas diretamente.
+- **Dimensões de consulta** (`config.meta.dimensoes_consulta` no modelo semântico): seção CNAE, UF, capital/interior, mês, ano, sexo, raça/cor, escolaridade e faixa etária. Cada uma tem rótulo, sinônimos ("setor", "estado", "competência"…) e as coleções do `metra.json` que a contêm. Os eixos demográficos só existem em `perfis` e nunca se cruzam.
+
+O agente decompõe a pergunta em **métrica + operação + dimensão + filtros**. A métrica e a dimensão saem do vocabulário; as operações são maior/menor, top N, ranking, total e evolução no tempo; os filtros são UF, ano e seção. Em seguida, ele escolhe a coleção que contém todas as dimensões pedidas, preferindo a geografia, que tem menos supressão, e recompõe as médias ponderadas. Exemplos:
+
+| Pergunta | Métrica | Operação | Dimensão | Filtros |
+|---|---|---|---|---|
+| Qual o maior salário? | salário médio de admissão | maior | seção CNAE (padrão) | — |
+| Qual estado paga menos? | salário médio de admissão | menor | UF | — |
+| Quais os 3 setores que mais contrataram em GO? | admissões | top 3 | seção CNAE | UF = GO |
+| Qual mês teve mais demissões em 2024? | desligamentos | maior | mês | ano = 2024 |
+| Quantas admissões houve em MT em 2025? | admissões | total | — | UF = MT, ano = 2025 |
+| Evolução do saldo no DF | saldo líquido | evolução | mês | UF = DF |
+
+Quando a pergunta não indica o recorte do ranking, o agente usa a seção CNAE e diz isso na resposta. Para "maior salário", ele também explica que o **salário individual máximo não é publicado**: o canal público só divulga médias de grupos com pelo menos 5 salários válidos, e os salários isolados extremos da base, como uma admissão de R$ 2,3 milhões, costumam ser erros de registro.
+
+As perguntas oficiais P1–P5 e os bloqueios de segurança e LGPD continuam com as respostas dedicadas. Um `metra.json` sem vocabulário faz o agente voltar ao comportamento anterior.
+
+**Garantias testadas:** `tests/test_camada_semantica.py` exige sinônimos nas métricas conversacionais, coleções válidas nas dimensões e **nenhum termo que identifique duas coisas**. `tests/test_agente_semantico_js.cjs` confere as respostas com dados controlados, mostra que, removido um sinônimo do vocabulário, a pergunta deixa de ser entendida, e responde um banco de perguntas livres sobre o `metra.json` publicado.
 
 ### Correspondência com as perguntas publicadas
 
@@ -113,7 +139,7 @@ flowchart LR
     end
 
     subgraph L7["7. Controle de Acesso (k >= 5)"]
-        V_CON["consumo.setor_mensal / geografia_mensal / perfil_mensal / calendario"]
+        V_CON["consumo.setor_mensal / geografia_mensal / perfil_anual / calendario"]
         DB_CON["Base Isolada (data/metra_consumo.duckdb)"]
     end
 
@@ -148,7 +174,7 @@ flowchart LR
 | **Geografia e recorte capital/interior** (`id_municipio`, `sigla_uf`, `is_capital`) | API IBGE Localidades → `bronze.ibge_municipio` → `oltp.municipio` (com sentinela `9999999`) | `lake.municipio` → `silver.stg_municipio` (`is_identificado`, `is_centro_oeste`) | `gold.dim_municipio`, `gold.fct_movimentacao` e `gold.fct_geografia_mensal` | Filtro de UF na sidebar, aba **Capitais vs. Interior (P3)** e recorte geográfico por CBO | `consumo.geografia_mensal` (supressão $k \ge 5$, sem `id_municipio`) → coleção `geografia` em `metra.json` |
 | **Ocupação e histórico SCD2** (`codigo_cbo`, `titulo_ocupacao`, `id_versao_cbo`) | Catálogo CBO 2002 (MTE) → `bronze.cbo_ocupacao` → `oltp.cbo_2002` | `lake.cbo_2002` → `silver.stg_cbo` (`codigo_grande_grupo`, `is_cadastro_oficial`) | `snapshots.snp_cbo` → `gold.dim_cbo_historico` (SCD2) e `gold.dim_cbo` (vigente) | Índice vetorial híbrido 384d (`IndiceVetorialCBO`) e drill-down por cargo nas abas P1–P5 | Omitida das views `consumo.*` e do JSON público para evitar reidentificação por profissão rara |
 | **Atividade econômica** (`codigo_cnae_subclasse`, `codigo_secao`, `descricao_secao`) | API IBGE CNAE 2.0 → `bronze.ibge_cnae_subclasse` → `oltp.cnae_secao` + `oltp.cnae_subclasse` | `lake.cnae_secao` + `lake.cnae_subclasse` → join em `silver.stg_cnae` | `gold.dim_cnae`, `gold.fct_setor_mensal` e `gold.fct_perfil_mensal` | Filtro de Setor (Seção A–U), ranking setorial (P1) e matriz de rotatividade × salário (P4) | `consumo.setor_mensal` e `consumo.perfil_mensal` ($k \ge 5$, apenas `codigo_secao`) → coleções `setores` e `perfis` em `metra.json` |
-| **Perfil sociodemográfico** (`sexo`, `raca_cor`, `grau_instrucao`, `idade`) | Microdados CAGED → `bronze.caged_movimentacao` → `oltp.movimentacao` | `lake.movimentacao` → `silver.stg_movimentacao` (validação de domínios e limites de idade 10–120) | `gold.dim_perfil_demografico` (`id_perfil_demografico` e faixas etárias) e `gold.fct_perfil_mensal` | Aba **Perfil Demográfico (P5)** e assistente Text-to-SQL (cruzamento com UF, ano, setor e CBO) | `consumo.perfil_mensal` (1 eixo por vez, sem cruzar eixos, $k \ge 5$) → coleção `perfis` em `metra.json` |
+| **Perfil sociodemográfico** (`sexo`, `raca_cor`, `grau_instrucao`, `idade`) | Microdados CAGED → `bronze.caged_movimentacao` → `oltp.movimentacao` | `lake.movimentacao` → `silver.stg_movimentacao` (validação de domínios e limites de idade 10–120) | `gold.dim_perfil_demografico` (`id_perfil_demografico` e faixas etárias) e `gold.fct_perfil_mensal` | Aba **Perfil Demográfico (P5)** e assistente Text-to-SQL (cruzamento com UF, ano, setor e CBO) | `consumo.perfil_anual` (por ano, 1 eixo por vez, sem cruzar eixos, $k \ge 5$) → coleção `perfis` em `metra.json` |
 | **Fluxos e remuneração** (`saldo_movimentacao`, `salario_mensal`, `salario_valido`) | Microdados CAGED → `bronze.caged_movimentacao` → `oltp.movimentacao` | `lake.movimentacao` → `silver.stg_movimentacao` (`tipo_evento`, `salario_valido`) | Medidas e métricas em `dbt_metra/models/semantic/metricas.yml` (`admissoes`, `desligamentos`, `saldo`, `soma_salarios_admissao`, `qtd_salarios_admissao`, `salario_medio_admissao`, `indice_fluxos_pareados_pct`) | Compiladas por `src/metricas/camada_semantica.py` nos 4 KPIs globais, nas abas P1–P5 e no Text-to-SQL | Views `consumo.*` anulam `soma_salarios_admissao` e `qtd_salarios_admissao` quando $< 5$; `exportar_json.py` publica apenas a média e o denominador em `metra.json` |
 
 ### Consumidores finais declarados no grafo do `dbt docs` (`exposures`)
@@ -181,7 +207,7 @@ Na auditoria automatizada sobre as `49.178` movimentações do recorte do Centro
 | **Finalidade** | Pesquisa e ensino acadêmico em Engenharia de Dados na disciplina Banco de Dados 2 (FCTE / Universidade de Brasília — UnB, oferta 2026/2, Squad G4), voltados exclusivamente à produção de estatísticas agregadas do mercado de trabalho formal (P1 a P5). | Escopo restrito à avaliação acadêmica; vedado qualquer uso para perfilamento individual ou decisão automatizada sobre titulares. |
 | **Base legal** | **Dados pessoais (quase-identificadores):** **Art. 7º, inciso IV e § 3º da LGPD** (realização de estudos por órgão de pesquisa sobre dados de acesso público divulgados oficialmente pelo MTE, garantida, sempre que possível, a anonimização/agregação). **Dado sensível (`raca_cor`):** **Art. 11, inciso II, alínea "c" da LGPD** (estudos por órgão de pesquisa — UnB, art. 5º, XVIII — sem consentimento do titular, com supressão de pequenos grupos na publicação). | Ressalva institucional: o enquadramento técnico-acadêmico da disciplina não substitui parecer jurídico formal da Procuradoria/Encarregado (DPO) da UnB para usos fora do escopo didático. |
 | **Minimização** | O painel (`src/app/dashboard.py`), o validador Text-to-SQL (`src/app/text_to_sql.py`), a base isolada (`data/metra_consumo.duckdb`) e o JSON público (`docs/assets/dados/metra.json`) expõem apenas indicadores agregados, sem `id_movimentacao`, `id_ingestao`, `numero_linha`, município nem CBO no consumo externo. | Validado por `tests/test_busca_e_text2sql.py`, `tests/test_controle_acesso.py` e `tests/test_exportar_json.py`. |
-| **Pequenos grupos e ataques por diferença** | Nas views `consumo.*`, grupos com `admissoes + desligamentos < 5` são omitidos (`739` de `2.420` em `setor_mensal` e `29.775` de `41.101` em `perfil_mensal`), salários com `qtd_salarios_admissao < 5` são anulados (`403` grupos em `setor_mensal`) e os eixos demográficos não são cruzados entre si. | A auditoria em `src/lgpd/descarte.py` mediu o risco residual de ataque por diferença: na amostra, `1` de `148` pares `(competencia, sigla_uf)` tem exatamente 1 seção CNAE omitida (`9` têm resíduo total entre 1 e 4), e `1.864` partições de `perfil_mensal` têm exatamente 1 categoria demográfica omitida. |
+| **Pequenos grupos e ataques por diferença** | Nas views `consumo.*`, grupos com `admissoes + desligamentos < 5` são omitidos (`739` de `2.420` em `setor_mensal` e `3.562` de `7.757` em `perfil_anual`), salários com `qtd_salarios_admissao < 5` são anulados (`403` grupos em `setor_mensal`) e os eixos demográficos não são cruzados entre si. | A auditoria em `src/lgpd/descarte.py` mediu o risco residual de ataque por diferença: na amostra, `1` de `148` pares `(competencia, sigla_uf)` tem exatamente 1 seção CNAE omitida (`9` têm resíduo total entre 1 e 4), e `361` partições de `perfil_anual` têm exatamente 1 categoria demográfica omitida (eram `1.864` no grão mensal). |
 | **Prazo de retenção** | **Até 30 (trinta) dias corridos** após a publicação oficial das menções finais e encerramento do prazo recursal do semestre letivo 2026/2 da UnB (**data-limite máxima: `31/12/2026`**), nos termos dos arts. 15, I e 16 da LGPD. | Após o prazo, todos os artefatos com microdados individuais devem ser descartados, mantendo-se apenas agregados com supressão $k \ge 5$ quando necessários para fins estatísticos. |
 | **Descarte executado** | Script `src/lgpd/descarte.py` executado com remoção física verificada dos artefatos de microdados (`metra_analitico.duckdb`, `metra.duckdb`, `lake/parquet`, `lake/delta`, `cdc/eventos.log` e `cdc/replay.sqlite3`), preservando apenas a base agregada `metra_consumo.duckdb` ($k \ge 5$) e comprovando `microdados_individuais_residuais = 0`. | Evidência real versionada em [`docs/adr/evidencias/0008-lgpd-descarte.json`](https://github.com/unb-bd2-2026-2-grupo-4/METRA/blob/main/docs/adr/evidencias/0008-lgpd-descarte.json) e suíte `tests/test_lgpd_descarte.py`. |
 | **Repositório público** | Contém a amostra pública `data/caged_centro_oeste_amostra.csv` (`49.178` linhas extraídas dos microdados abertos do MTE) para reprodutibilidade da avaliação da disciplina. | O script classifica a amostra como `versionado_git_amostra`: sua remoção definitiva após o encerramento da disciplina exige `git rm` seguido de reescrita do histórico Git (`git filter-repo`), além da exclusão local com `--incluir-amostra`. |
@@ -222,7 +248,7 @@ Uma conexão DuckDB `read_only` impede escrita, mas não recorta linhas nem colu
 |---|---|
 | `consumo.setor_mensal` | competência × UF × seção CNAE (P1, P2 e P4) |
 | `consumo.geografia_mensal` | competência × UF × capital/interior (P3) |
-| `consumo.perfil_mensal` | competência × UF × capital/interior × seção × categoria de um eixo demográfico por vez (P5) |
+| `consumo.perfil_anual` | ano × UF × capital/interior × seção × categoria de um eixo demográfico por vez (P5) |
 | `consumo.calendario` | competência, com `tem_dados` |
 
 A macro `publicar_grupos` (`dbt_metra/macros/consumo.sql`) recompõe as medidas pela camada semântica e aplica a supressão com o limite da variável `metra_limite_publicacao` (5):
@@ -265,7 +291,7 @@ A leitura do detalhe é uma contagem, para que nem a demonstração imprima regi
 ### Limites
 
 - **Proteção por arquivo, não por usuário.** O controle vale para quem recebe só a base de consumo. Quem tem acesso ao sistema de arquivos com `data/metra_analitico.duckdb`, ao lake ou ao PostgreSQL continua lendo o detalhe; a separação desses ambientes é operacional.
-- **Ataques por diferença.** A supressão é aplicada em cada view, isoladamente. Um grupo omitido pode ser estimado subtraindo, do total de um recorte publicado, os grupos publicados de outro (por exemplo, a geografia de uma UF menos os setores publicados dessa UF). A auditoria quantitativa em `src/lgpd/descarte.py` ([evidência JSON](https://github.com/unb-bd2-2026-2-grupo-4/METRA/blob/main/docs/adr/evidencias/0008-lgpd-descarte.json)) mostra que, na amostra, `1` de `148` pares `(competencia, sigla_uf)` possui exatamente 1 seção CNAE omitida (`9` possuem resíduo total entre 1 e 4 movimentações) e `1.864` partições de `perfil_mensal` possuem exatamente 1 categoria demográfica omitida; por isso a política de governança veda a recomposição cruzada entre coleções distintas.
+- **Ataques por diferença.** A supressão é aplicada em cada view, isoladamente. Um grupo omitido pode ser estimado subtraindo, do total de um recorte publicado, os grupos publicados de outro (por exemplo, a geografia de uma UF menos os setores publicados dessa UF). A auditoria quantitativa em `src/lgpd/descarte.py` ([evidência JSON](https://github.com/unb-bd2-2026-2-grupo-4/METRA/blob/main/docs/adr/evidencias/0008-lgpd-descarte.json)) mostra que, na amostra, `1` de `148` pares `(competencia, sigla_uf)` possui exatamente 1 seção CNAE omitida (`9` possuem resíduo total entre 1 e 4 movimentações) e `361` partições de `perfil_anual` possuem exatamente 1 categoria demográfica omitida (eram `1.864` no grão mensal); por isso a política de governança veda a recomposição cruzada entre coleções distintas.
 - **Amostra do repositório.** `data/caged_centro_oeste_amostra.csv` continua público no repositório; o controle de acesso não muda isso.
 
 ## Operação e freshness
@@ -297,11 +323,11 @@ consulta tabelas da Gold. Views ausentes ou incompatíveis fazem a execução fa
 |---|---|
 | `consumo.setor_mensal` | `competencia`, `sigla_uf`, `codigo_secao` |
 | `consumo.geografia_mensal` | `competencia`, `sigla_uf`, `is_capital` |
-| `consumo.perfil_mensal` | `competencia`, `sigla_uf`, `is_capital`, `codigo_secao`, `eixo`, `codigo_categoria` |
+| `consumo.perfil_anual` | `ano`, `sigla_uf`, `is_capital`, `codigo_secao`, `eixo`, `codigo_categoria` |
 | `consumo.calendario` | `competencia` |
 
-Tipos: `competencia` é `DATE`, primeiro dia do mês, entre 2023 e 2026;
-`sigla_uf` é DF/GO/MT/MS; `codigo_secao` é A–U ou Z; `is_capital` é `BOOLEAN`.
+Tipos: `competencia` é `DATE`, primeiro dia do mês, entre 2023 e 2026, e `ano`
+(só nos perfis, que são anuais) é `INTEGER` no mesmo intervalo; `sigla_uf` é DF/GO/MT/MS; `codigo_secao` é A–U ou Z; `is_capital` é `BOOLEAN`.
 Na view de perfis, `eixo` é `sexo`, `raca_cor`, `escolaridade` ou `faixa_etaria`,
 `codigo_categoria` é inteiro e `categoria` é seu rótulo textual não nulo. Os eixos
 seguem a P5 e não representam filtros demográficos combinados.
@@ -322,15 +348,17 @@ meses inicial e final e com pelo menos um mês observado. `tem_dados` indica dad
 na origem, independentemente da supressão. Meses sem dados permanecem no calendário;
 não inventar linhas de indicadores com zero para preencher ausências.
 
-### Contrato JSON v1 com o consumidor
+### Contrato JSON v2 com o consumidor
 
 Destino versionado: `docs/assets/dados/metra.json`. O objeto contém:
 
-- `versao_schema`: inteiro `1`;
+- `versao_schema`: inteiro `2` (no v1, os perfis eram mensais, com `competencia`);
 - `recorte`: anos, UFs e ressalva sobre cobertura e supressão;
-- `metricas`: metadados do catálogo semântico, indexados pelo nome da métrica;
+- `metricas`: metadados do catálogo semântico, indexados pelo nome da métrica, com os sinônimos;
+- `dimensoes`: dimensões de consulta da camada semântica, com rótulo, sinônimos e coleções;
 - `setores`, `geografia`, `perfis`: listas de registros, com as dimensões da tabela
-  acima; perfis incluem também `categoria`;
+  acima; setores e geografia são mensais (`competencia`), e perfis são anuais (`ano`)
+  e incluem também `categoria`;
 - `calendario`: lista de objetos com `competencia` e `tem_dados`.
 
 Cada registro de indicadores expõe somente `admissoes`, `desligamentos`, `saldo`,
@@ -388,9 +416,11 @@ faz retry por conta própria. Banco ocupado também segue o retry do asset.
 
 1. As views `consumo.*` são materializadas e validadas pelo `dbt build` e pelo controle de acesso (`src/acesso/base_consumo.py`).
 2. O asset `exportar_json_consumo` (`src/consumo/exportar_json.py`) exporta `docs/assets/dados/metra.json`, conferindo chaves, supressão ($k \ge 5$) e SHA-256.
-3. O JSON gerado passa pelos testes Python e Node (`test_exportar_json.py`, `test_consumo_js.cjs`, `test_agente_pages_js.cjs`) e é versionado via PR.
+3. O JSON gerado passa pelos testes Python e Node (`test_exportar_json.py`, `test_consumo_js.cjs`, `test_agente_pages_js.cjs`, `test_agente_semantico_js.cjs`) e é versionado via PR.
 4. Após revisão e merge na `main`, o workflow `deploy-docs.yml` publica o MkDocs no GitHub Pages com o painel e o agente atualizados.
 5. Abrir [Painel Público e Agente (Pages)](consumo-json.md) e conferir os filtros, gráficos, agente e cobertura publicada.
+
+**Base do JSON publicado.** O `metra.json` versionado é gerado da **base completa** (14,75 milhões de movimentações), agregada pelas views de consumo; os microdados nunca entram no arquivo. A amostra do repositório (0,33% da base) deixava 27% das movimentações dos perfis P5 suprimidas; na base completa, os grupos publicados cobrem 99,99% das movimentações e dos salários dos perfis e 100% dos de setores e geografia. O fluxo do zero e a CI continuam usando a amostra. Para regenerar o arquivo publicado, coloque os CSVs completos em `data/` com nomes `caged_*.csv` (a carga Bronze os usa no lugar da amostra) e execute o job `pipeline_metra`; o JSON tem cerca de 6,3 MB (0,6 MB com gzip, como o Pages o serve), dentro do limite do ADR-0008.
 
 Não há commit, push ou credencial GitHub dentro do asset. O schedule atualiza o
 arquivo local; a publicação pública só muda após o PR. O SLA proposto de 24 horas

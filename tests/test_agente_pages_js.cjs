@@ -7,7 +7,7 @@ const agente = require("../docs/javascripts/metra-agente.js");
 
 function fixtureDados() {
   return {
-    versao_schema: 1,
+    versao_schema: 2,
     recorte: {
       anos: [2023, 2024, 2025, 2026],
       ufs: ["DF", "GO", "MS", "MT"],
@@ -37,9 +37,9 @@ function fixtureDados() {
       { competencia: "2023-01-01", sigla_uf: "GO", is_capital: false, admissoes: 80, desligamentos: 60, saldo: 20, salario_medio_admissao: 2000, qtd_salarios_admissao: 80, indice_fluxos_pareados_pct: 85.71 },
     ],
     perfis: [
-      { competencia: "2024-01-01", sigla_uf: "DF", is_capital: true, codigo_secao: "G", eixo: "sexo", codigo_categoria: 1, categoria: "Homem", admissoes: 10, desligamentos: 5, saldo: 5, salario_medio_admissao: 3000, qtd_salarios_admissao: 10, indice_fluxos_pareados_pct: 66.67 },
-      { competencia: "2024-01-01", sigla_uf: "DF", is_capital: true, codigo_secao: "G", eixo: "sexo", codigo_categoria: 3, categoria: "Mulher", admissoes: 10, desligamentos: 6, saldo: 4, salario_medio_admissao: 2400, qtd_salarios_admissao: 10, indice_fluxos_pareados_pct: 75.0 },
-      { competencia: "2024-01-01", sigla_uf: "DF", is_capital: true, codigo_secao: "G", eixo: "raca_cor", codigo_categoria: 1, categoria: "Branca", admissoes: 12, desligamentos: 8, saldo: 4, salario_medio_admissao: 2800, qtd_salarios_admissao: 12, indice_fluxos_pareados_pct: 80.0 },
+      { ano: 2024, sigla_uf: "DF", is_capital: true, codigo_secao: "G", eixo: "sexo", codigo_categoria: 1, categoria: "Homem", admissoes: 10, desligamentos: 5, saldo: 5, salario_medio_admissao: 3000, qtd_salarios_admissao: 10, indice_fluxos_pareados_pct: 66.67 },
+      { ano: 2024, sigla_uf: "DF", is_capital: true, codigo_secao: "G", eixo: "sexo", codigo_categoria: 3, categoria: "Mulher", admissoes: 10, desligamentos: 6, saldo: 4, salario_medio_admissao: 2400, qtd_salarios_admissao: 10, indice_fluxos_pareados_pct: 75.0 },
+      { ano: 2024, sigla_uf: "DF", is_capital: true, codigo_secao: "G", eixo: "raca_cor", codigo_categoria: 1, categoria: "Branca", admissoes: 12, desligamentos: 8, saldo: 4, salario_medio_admissao: 2800, qtd_salarios_admissao: 12, indice_fluxos_pareados_pct: 80.0 },
     ],
     calendario: [
       ...Array.from({ length: 12 }, (_, i) => ({ competencia: `2023-${String(i + 1).padStart(2, "0")}-01`, tem_dados: true })),
@@ -196,9 +196,14 @@ test("guardrails bloqueiam SQL injection, LGPD, ataque por diferença, fora de e
 test("snapshot real docs/assets/dados/metra.json responde P1-P5 sem NaN e concilia KPIs", () => {
   const caminho = path.join(__dirname, "../docs/assets/dados/metra.json");
   const dados = JSON.parse(fs.readFileSync(caminho, "utf8"));
+  // O snapshot pode vir da amostra (CI) ou da base completa (publicado): os KPIs
+  // precisam bater com a soma independente das linhas de geografia.
   const kpis = agente.calcularKpisRecorte(dados, {});
-  assert.equal(kpis.admissoes, 25325);
-  assert.equal(kpis.saldo, 1472);
+  const soma = (campo) => dados.geografia.reduce((total, r) => total + r[campo], 0);
+  assert.ok(kpis.admissoes > 0);
+  assert.equal(kpis.admissoes, soma("admissoes"));
+  assert.equal(kpis.saldo, soma("saldo"));
+  assert.equal(kpis.saldo, kpis.admissoes - kpis.desligamentos);
 
   const perguntas = [
     "Qual setor econômico mais contratou e demitiu no Distrito Federal nos últimos 12 meses?",

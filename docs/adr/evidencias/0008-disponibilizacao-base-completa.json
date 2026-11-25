@@ -1,0 +1,113 @@
+{
+  "executado_em_utc": "2026-11-25T20:09:01.362622+00:00",
+  "ambiente": {
+    "python": "3.14.8",
+    "duckdb": "1.5.6",
+    "sistema": "macOS-26.5-arm64-arm-64bit-Mach-O",
+    "threads_duckdb": 1,
+    "aquecimento_descartado": 1,
+    "repeticoes_validas": 7
+  },
+  "fonte": {
+    "arquivo": "docs/assets/dados/metra.json",
+    "sha256_lf": "c3d56a793edd627f786f35c38f5d46d79042a9ae5c31e86be2d6ddc6d131ef1a",
+    "registros": {
+      "setores": 2901,
+      "geografia": 259,
+      "perfis": 12936,
+      "calendario": 37
+    },
+    "total_registros": 16133
+  },
+  "alternativas": {
+    "A_csv_agendado": {
+      "tamanho_bruto_bytes": 1534008,
+      "tamanho_gzip_bytes": 529164,
+      "escrita": {
+        "rodadas": [
+          7.994,
+          7.884,
+          7.634,
+          7.324,
+          7.697,
+          7.044,
+          7.134
+        ],
+        "mediana_ms": 7.634,
+        "p95_ms": 7.994
+      },
+      "leitura_e_consulta_python": {
+        "rodadas": [
+          3.04,
+          2.997,
+          3.008,
+          3.032,
+          2.941,
+          2.962,
+          3.002
+        ],
+        "mediana_ms": 3.002,
+        "p95_ms": 3.04
+      }
+    },
+    "B_json_pages_e_agente_js": {
+      "tamanho_bruto_bytes": 6308171,
+      "tamanho_gzip_bytes": 599774,
+      "tamanho_compacto_bytes": 4571150,
+      "tamanho_compacto_gzip_bytes": 576996,
+      "escrita": {
+        "rodadas": [
+          24.33,
+          25.302,
+          23.831,
+          24.49,
+          23.791,
+          24.542,
+          24.285
+        ],
+        "mediana_ms": 24.33,
+        "p95_ms": 25.302
+      },
+      "motor_execucao": "Node.js v24.19.0 (leitura local, V8 JSON.parse e agente JS P1-P5)",
+      "leitura_parse_e_p1_a_p5": {
+        "rodadas": [
+          20.252,
+          15.641,
+          14.465,
+          13.488,
+          12.901,
+          12.756,
+          12.816
+        ],
+        "mediana_ms": 13.488,
+        "p95_ms": 20.252
+      }
+    },
+    "C_duckdb_sql_referencia_bi": {
+      "consulta_sql_p1_e_p3_duckdb": {
+        "rodadas": [
+          0.574,
+          0.473,
+          0.452,
+          0.435,
+          0.427,
+          0.427,
+          0.422
+        ],
+        "mediana_ms": 0.435,
+        "p95_ms": 0.574
+      },
+      "restricoes_metabase_documentadas": "Não sobe um servidor Metabase completo sem infraestrutura externa: exige JVM + banco de metadados (~1 a 2 GB de RAM em repouso), driver comunitário adicional para DuckDB e hospedagem pública paga ou túnel para terceiros."
+    }
+  },
+  "paridade_p3_identica": true,
+  "tolerancia_absoluta_salario_p3": 1e-06,
+  "p3_consolidado_observado": {
+    "saldo_capital": 227894,
+    "saldo_interior": 252911,
+    "n_capital": 3180740,
+    "n_interior": 4332855,
+    "salario_capital": 2061.99,
+    "salario_interior": 1994.28
+  }
+}

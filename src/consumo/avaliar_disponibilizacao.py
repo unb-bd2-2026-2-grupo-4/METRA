@@ -101,8 +101,8 @@ def _popular_duckdb_consumo(dados: dict[str, Any], conn: duckdb.DuckDBPyConnecti
     )
 
     conn.execute("""
-        CREATE TABLE consumo.perfil_mensal (
-            competencia DATE, sigla_uf VARCHAR, is_capital BOOLEAN, codigo_secao VARCHAR,
+        CREATE TABLE consumo.perfil_anual (
+            ano INTEGER, sigla_uf VARCHAR, is_capital BOOLEAN, codigo_secao VARCHAR,
             eixo VARCHAR, codigo_categoria INTEGER, categoria VARCHAR,
             admissoes INTEGER, desligamentos INTEGER, saldo INTEGER,
             soma_salarios_admissao DOUBLE, qtd_salarios_admissao INTEGER,
@@ -110,10 +110,10 @@ def _popular_duckdb_consumo(dados: dict[str, Any], conn: duckdb.DuckDBPyConnecti
         )
     """)
     conn.executemany(
-        "INSERT INTO consumo.perfil_mensal VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO consumo.perfil_anual VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [
             (
-                date.fromisoformat(r["competencia"]), r["sigla_uf"], r["is_capital"], r["codigo_secao"],
+                r["ano"], r["sigla_uf"], r["is_capital"], r["codigo_secao"],
                 r["eixo"], r["codigo_categoria"], r["categoria"],
                 r["admissoes"], r["desligamentos"], r["saldo"],
                 (r["salario_medio_admissao"] * r["qtd_salarios_admissao"])
@@ -136,7 +136,7 @@ def _popular_duckdb_consumo(dados: dict[str, Any], conn: duckdb.DuckDBPyConnecti
 def _medir_alternativa_csv(
     conn: duckdb.DuckDBPyConnection, tmp: Path, repeticoes: int
 ) -> tuple[dict[str, Any], dict[str, Any]]:
-    tabelas = ("setor_mensal", "geografia_mensal", "perfil_mensal", "calendario")
+    tabelas = ("setor_mensal", "geografia_mensal", "perfil_anual", "calendario")
     pasta_csv = tmp / "csv"
     pasta_csv.mkdir(parents=True, exist_ok=True)
     caminhos = {t: pasta_csv / f"{t}.csv" for t in tabelas}
@@ -354,8 +354,8 @@ def _paridade_p3(a: dict[str, Any], b: dict[str, Any], c: dict[str, Any]) -> boo
 def avaliar(fonte: Path, repeticoes: int = 7, threads: int = 1) -> dict[str, Any]:
     bruto = fonte.read_bytes().replace(b"\r\n", b"\n")
     dados = json.loads(bruto.decode("utf-8"))
-    if dados.get("versao_schema") != 1:
-        raise ValueError("Esperado snapshot JSON v1 em docs/assets/dados/metra.json.")
+    if dados.get("versao_schema") != 2:
+        raise ValueError("Esperado snapshot JSON v2 (perfis anuais) em docs/assets/dados/metra.json.")
 
     with tempfile.TemporaryDirectory(prefix="metra_disp_") as tmp_str:
         tmp = Path(tmp_str)

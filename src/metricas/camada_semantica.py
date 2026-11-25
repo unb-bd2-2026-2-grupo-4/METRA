@@ -29,6 +29,7 @@ import yaml
 
 RAIZ = Path(__file__).resolve().parents[2]
 ARQUIVO_METRICAS_PADRAO = RAIZ / "dbt_metra" / "models" / "semantic" / "metricas.yml"
+ARQUIVO_PROJETO_DBT = RAIZ / "dbt_metra" / "dbt_project.yml"
 ORIGENS = ("evento", "agregado")
 
 # Listas brancas para consultas montadas a partir de entrada externa.
@@ -64,6 +65,18 @@ class Metrica:
     unidade: str
     formato: str
     ressalva: str
+    sinonimos: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class DimensaoConsulta:
+    """Dimensão pela qual o canal público agrupa métricas, com o vocabulário da pergunta."""
+
+    nome: str
+    label: str
+    colecoes: tuple[str, ...]
+    sinonimos: tuple[str, ...]
+    eixo: str | None = None
 
 
 def _arquivo_metricas() -> Path:
@@ -76,18 +89,37 @@ def _carregar(caminho: str) -> dict[str, Any]:
         dados = yaml.safe_load(arquivo)
     medidas: dict[str, dict[str, Any]] = {}
     recorte = None
+    dimensoes: list[dict[str, Any]] = []
     for sm in dados.get("semantic_models", []):
         for medida in sm.get("measures", []):
             medidas[medida["name"]] = medida
         meta = (sm.get("config") or {}).get("meta") or {}
         recorte = recorte or meta.get("recorte_padrao")
+        dimensoes.extend(meta.get("dimensoes_consulta") or [])
     metricas = {mt["name"]: mt for mt in dados.get("metrics", [])}
-    return {"medidas": medidas, "metricas": metricas, "recorte_padrao": recorte}
+    return {"medidas": medidas, "metricas": metricas, "recorte_padrao": recorte,
+            "dimensoes_consulta": dimensoes}
 
 
 def definicao() -> dict[str, Any]:
-    """Definição carregada (medidas, métricas e recorte padrão)."""
+    """Definição carregada (medidas, métricas, recorte padrão e dimensões de consulta)."""
     return _carregar(str(_arquivo_metricas()))
+
+
+@lru_cache(maxsize=1)
+def salario_maximo_valido() -> int:
+    """Teto do salário válido (R$), da variável metra_salario_maximo_valido do dbt_project.yml.
+
+    É o mesmo valor que a Silver usa em salario_valido; consumidores que leem a origem
+    sem passar pela Silver (src/analise.py, gabaritos de conferência) usam esta função.
+    """
+    with open(ARQUIVO_PROJETO_DBT, encoding="utf-8") as arquivo:
+        return int(yaml.safe_load(arquivo)["vars"]["metra_salario_maximo_valido"])
+
+
+def condicao_salario_valido(coluna: str = "salario_mensal") -> str:
+    """Condição SQL de salário válido: positivo e até o teto."""
+    return f"{coluna} > 0 and {coluna} <= {salario_maximo_valido()}"
 
 
 def _nome_ref(ref: Any) -> str:
@@ -158,8 +190,23 @@ def catalogo() -> dict[str, Metrica]:
             unidade=meta.get("unidade", ""),
             formato=meta.get("formato", ""),
             ressalva=meta.get("ressalva", ""),
+            sinonimos=tuple(meta.get("sinonimos") or ()),
         )
     return saida
+
+
+def catalogo_dimensoes() -> dict[str, DimensaoConsulta]:
+    """Dimensões consultáveis no canal público, com coleções e sinônimos."""
+    return {
+        d["nome"]: DimensaoConsulta(
+            nome=d["nome"],
+            label=d["label"],
+            colecoes=tuple(d["colecoes"]),
+            sinonimos=tuple(d["sinonimos"]),
+            eixo=d.get("eixo"),
+        )
+        for d in definicao()["dimensoes_consulta"]
+    }
 
 
 def _filtros_sql(filtros: Mapping[str, Any] | None) -> list[str]:

@@ -35,7 +35,7 @@ def tentativas(analitico: Path) -> list[Tentativa]:
     detalhe = "select count(distinct id_movimentacao) from {}"
     return [
         Tentativa("consumidor", "agregado por setor", "select count(*) from consumo.setor_mensal", True),
-        Tentativa("consumidor", "perfis um eixo por vez", "select count(*) from consumo.perfil_mensal", True),
+        Tentativa("consumidor", "perfis um eixo por vez", "select count(*) from consumo.perfil_anual", True),
         Tentativa("consumidor", "detalhe da Gold", detalhe.format("gold.fct_movimentacao"), False),
         Tentativa("consumidor", "anexar o banco analítico", f"attach '{analitico}' as analitico (read_only)", False),
         Tentativa("consumidor", "ler o lake Parquet", f"select count(*) from {leitura_parquet('movimentacao')}", False),

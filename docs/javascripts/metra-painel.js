@@ -15,6 +15,7 @@
     ["P3 · Capitais vs. Interior", "Qual é a diferença no saldo líquido e no salário médio entre as capitais e o interior?"],
     ["P4 · Rotatividade e Salário", "Os setores com maior rotatividade praticam salários médios mais baixos?"],
     ["P5 · Diferença por sexo", "Qual a diferença salarial entre homens e mulheres?"],
+    ["Consulta livre · Ranking", "Qual setor paga o maior salário em Goiás?"],
     ["Bloqueio LGPD", "Listar CPF e salário de cada trabalhador"],
   ];
 
@@ -613,8 +614,8 @@
       const resp = await fetch(new URL(raiz.dataset.fonte, document.baseURI));
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       dados = await resp.json();
-      if (dados.versao_schema !== 1 || !Array.isArray(dados.setores) || !Array.isArray(dados.geografia) || !Array.isArray(dados.perfis)) {
-        throw new Error("Contrato JSON v1 incompatível");
+      if (![1, 2].includes(dados.versao_schema) || !Array.isArray(dados.setores) || !Array.isArray(dados.geografia) || !Array.isArray(dados.perfis)) {
+        throw new Error("Contrato JSON incompatível (esperado v1 ou v2)");
       }
     } catch (erro) {
       raiz.replaceChildren(el("div", { className: "metra-callout metra-callout-warn", textContent: `Não foi possível carregar o snapshot público (${erro.message}).` }));
@@ -713,6 +714,22 @@
             el("h4", { className: "metra-card-title", textContent: "Média sazonal" }),
             criarTabelaMediaSazonal(resp.dadosAnalise.resumoMensal)
           );
+        }
+      } else if (resp.intencao === "consulta_semantica") {
+        // Colunas declaradas pela resposta, formatadas pelo formato da métrica no catálogo semântico.
+        const formatos = { moeda: fmtMoeda, percentual: (v) => fmtPct(v), inteiro: (v) => fmtInt(v) };
+        boxResultadoAgente.append(criarTabela(
+          resp.dadosAnalise.colunas.map((c) => ({
+            ...c,
+            fmt: c.key === "saldo" ? (v) => fmtInt(v, true) : formatos[c.formato],
+          })),
+          resp.dadosAnalise.linhas
+        ));
+        if (resp.dadosAnalise.totalGrupos > resp.dadosAnalise.linhas.length) {
+          boxResultadoAgente.append(el("p", {
+            className: "metra-source-note",
+            textContent: `Exibindo ${resp.dadosAnalise.linhas.length} de ${resp.dadosAnalise.totalGrupos} grupos publicados.`,
+          }));
         }
       }
 

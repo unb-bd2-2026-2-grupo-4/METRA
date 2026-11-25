@@ -79,6 +79,51 @@ semantic_models:
       meta:
         # Recorte de negócio comum aos marts e a todas as respostas publicadas.
         recorte_padrao: "is_identificado and is_centro_oeste and ano between 2023 and 2026"
+        # Dimensões pelas quais o canal público agrupa as métricas, com o vocabulário
+        # que as identifica numa pergunta e as coleções do metra.json que as contêm.
+        # Os eixos demográficos só existem em perfis e nunca se cruzam entre si.
+        dimensoes_consulta:
+          - nome: codigo_secao
+            label: "Seção CNAE"
+            colecoes: [setores, perfis]
+            sinonimos: ["setor", "setores", "seção", "seções", "cnae", "atividade econômica", "atividades econômicas", "ramo", "ramos"]
+          - nome: sigla_uf
+            label: "UF"
+            colecoes: [geografia, setores, perfis]
+            sinonimos: ["uf", "ufs", "estado", "estados", "unidade da federação", "unidades da federação"]
+          - nome: is_capital
+            label: "Capital ou interior"
+            colecoes: [geografia, perfis]
+            sinonimos: ["capital", "capitais", "interior"]
+          - nome: competencia
+            label: "Mês"
+            # Perfis são publicados por ano: mês só existe em setores e geografia.
+            colecoes: [geografia, setores]
+            sinonimos: ["mês", "meses", "competência", "competências", "mensal", "mensais"]
+          - nome: ano
+            label: "Ano"
+            colecoes: [geografia, setores, perfis]
+            sinonimos: ["ano", "anos", "anual", "anuais"]
+          - nome: sexo
+            label: "Sexo"
+            colecoes: [perfis]
+            eixo: sexo
+            sinonimos: ["sexo", "sexos", "gênero", "gêneros"]
+          - nome: raca_cor
+            label: "Raça/cor"
+            colecoes: [perfis]
+            eixo: raca_cor
+            sinonimos: ["raça", "raças", "raça/cor", "cor ou raça", "etnia"]
+          - nome: escolaridade
+            label: "Escolaridade"
+            colecoes: [perfis]
+            eixo: escolaridade
+            sinonimos: ["escolaridade", "grau de instrução", "instrução", "formação", "nível de ensino"]
+          - nome: faixa_etaria
+            label: "Faixa etária"
+            colecoes: [perfis]
+            eixo: faixa_etaria
+            sinonimos: ["faixa etária", "faixas etárias", "idade", "idades"]
 
 metrics:
   - name: admissoes
@@ -92,6 +137,7 @@ metrics:
         unidade: "movimentações"
         formato: "inteiro"
         ressalva: "Movimentações, não pessoas distintas."
+        sinonimos: ["admissões", "admissão", "contratações", "contratação", "contratou", "contrataram", "contrata", "contratam", "contratados", "contratar", "vagas preenchidas"]
 
   - name: desligamentos
     label: "Desligamentos"
@@ -104,6 +150,7 @@ metrics:
         unidade: "movimentações"
         formato: "inteiro"
         ressalva: "Movimentações, não pessoas distintas."
+        sinonimos: ["desligamentos", "desligamento", "demissões", "demissão", "demitiu", "demitiram", "demite", "demitem", "demitidos", "dispensas"]
 
   - name: saldo
     label: "Saldo líquido"
@@ -116,6 +163,7 @@ metrics:
         unidade: "movimentações líquidas"
         formato: "inteiro"
         ressalva: "Fluxo líquido do período; não é estoque de vínculos."
+        sinonimos: ["saldo", "saldo líquido", "saldos", "geração de empregos", "gerou empregos", "gerou mais empregos", "criou empregos", "criou mais empregos", "empregos criados", "empregos gerados"]
 
   - name: qtd_salarios_admissao
     label: "Admissões com salário válido"
@@ -144,6 +192,7 @@ metrics:
         unidade: "R$ nominais"
         formato: "moeda"
         ressalva: "Nulo quando não há admissão com salário válido no recorte."
+        sinonimos: ["salário", "salários", "salário médio", "remuneração", "remunerações", "renda", "paga", "pagam", "pagou", "ganha", "ganham", "ganho", "mais bem pago", "mais bem pagos", "melhor pago", "melhores salários", "piores salários"]
 
   - name: soma_salarios_admissao
     label: "Soma dos salários de admissão"
@@ -173,3 +222,4 @@ metrics:
         unidade: "%"
         formato: "percentual"
         ressalva: "Aproximação por fluxos; não é taxa sobre estoque de vínculos (indisponível no CAGED)."
+        sinonimos: ["índice de fluxos", "fluxos pareados", "rotatividade", "turnover"]
