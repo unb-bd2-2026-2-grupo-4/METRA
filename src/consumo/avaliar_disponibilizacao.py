@@ -354,8 +354,8 @@ def _paridade_p3(a: dict[str, Any], b: dict[str, Any], c: dict[str, Any]) -> boo
 def avaliar(fonte: Path, repeticoes: int = 7, threads: int = 1) -> dict[str, Any]:
     bruto = fonte.read_bytes().replace(b"\r\n", b"\n")
     dados = json.loads(bruto.decode("utf-8"))
-    if dados.get("versao_schema") != 1:
-        raise ValueError("Esperado snapshot JSON v1 em docs/assets/dados/metra.json.")
+    if dados.get("versao_schema") != 2:
+        raise ValueError("Esperado snapshot JSON v2 (perfis anuais) em docs/assets/dados/metra.json.")
 
     with tempfile.TemporaryDirectory(prefix="metra_disp_") as tmp_str:
         tmp = Path(tmp_str)

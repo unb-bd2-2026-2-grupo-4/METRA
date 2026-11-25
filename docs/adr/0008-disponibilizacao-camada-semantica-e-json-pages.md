@@ -98,3 +98,18 @@ Reavaliar esta arquitetura e migrar para API paginada/backend analítico ou form
 1. O snapshot `docs/assets/dados/metra.json` ultrapassar **`15 MB` brutos** (ou **`1,5 MB` em gzip-6**), seja por ampliação para todo o Brasil ou inclusão de novos recortes;
 2. A soma de carregamento e primeira consulta (`p95`) no navegador exceder **`1.000 ms`** em conexão residencial padrão; ou
 3. O consumidor operacional exigir atualização intradiária (`SLA < 1 hora` sem etapa manual de PR) ou autenticação individual por perfil de usuário externo.
+
+### Verificação do gatilho com a base completa (25/11/2026)
+
+O snapshot passou a ser gerado da base completa (14.753.112 movimentações), agregada pelas views de consumo. No grão mensal dos perfis demográficos, o arquivo teria cerca de 43 MB brutos e 3,1 MB em gzip, acima do limiar 1. Por isso, os perfis passaram a ser publicados por ano (contrato JSON v2; setores e geografia seguem mensais), já que a P5 e o agente só filtram perfis por ano, UF e seção. O salário válido também passou a ter teto de R$ 150.000: a base completa tem uma admissão de R$ 1 trilhão, que sozinha respondia por cerca de 98% da massa salarial.
+
+Medição com `python -m src.consumo.avaliar_disponibilizacao --saida docs/adr/evidencias/0008-disponibilizacao-base-completa.json` ([evidência](https://github.com/unb-bd2-2026-2-grupo-4/METRA/blob/main/docs/adr/evidencias/0008-disponibilizacao-base-completa.json)):
+
+| Medida | Amostra, v1 (24/11) | Base completa, v2 (25/11) | Limiar |
+|---|---|---|---|
+| Tamanho bruto | 5.194.966 B | 6.308.171 B | 15 MB |
+| Tamanho gzip-6 | 242.292 B | 599.774 B | 1,5 MB |
+| Leitura do JSON + P1–P5 (`p95`, Node) | 72,1 ms | 20,3 ms | 1.000 ms |
+| Registros (setores / geografia / perfis) | 1.681 / 259 / 11.326 | 2.901 / 259 / 12.936 | — |
+
+Os três limiares continuam atendidos, e a decisão se mantém. A paridade da P3 entre CSV, JS e DuckDB segue exata: saldo `+227.894` e salário médio `R$ 2.061,99` (`n = 3.180.740`) nas capitais, contra `+252.911` e `R$ 1.994,28` (`n = 4.332.855`) no interior. As duas medições foram feitas em máquinas diferentes (Windows na primeira, macOS na segunda), então os tempos não são diretamente comparáveis.
