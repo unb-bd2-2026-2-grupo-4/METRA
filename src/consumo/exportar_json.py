@@ -15,7 +15,7 @@ import duckdb
 from filelock import FileLock
 
 from src.metricas.camada_semantica import (
-    ANOS_VALIDOS, SECOES_CNAE_VALIDAS, UFS_VALIDAS, catalogo, colunas_select,
+    ANOS_VALIDOS, SECOES_CNAE_VALIDAS, UFS_VALIDAS, catalogo, catalogo_dimensoes, colunas_select,
 )
 
 RAIZ = Path(__file__).resolve().parents[2]
@@ -97,6 +97,9 @@ def _ler_publicacao(conn):
         "versao_schema": 1,
         "recorte": {"anos": sorted(ANOS_VALIDOS), "ufs": sorted(UFS_VALIDAS), "ressalva": RESSALVA},
         "metricas": {nome: asdict(definicoes[nome]) for nome in METRICAS},
+        # Vocabulário da camada semântica: o agente do Pages identifica métrica e
+        # dimensão de uma pergunta por esses sinônimos, sem lista própria.
+        "dimensoes": {nome: asdict(d) for nome, d in catalogo_dimensoes().items()},
     }
     for colecao, (view, dimensoes) in COLECOES.items():
         colunas = list(dimensoes) + (["categoria"] if colecao == "perfis" else [])
