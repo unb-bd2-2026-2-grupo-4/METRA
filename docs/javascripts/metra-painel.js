@@ -614,8 +614,8 @@
       const resp = await fetch(new URL(raiz.dataset.fonte, document.baseURI));
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       dados = await resp.json();
-      if (dados.versao_schema !== 1 || !Array.isArray(dados.setores) || !Array.isArray(dados.geografia) || !Array.isArray(dados.perfis)) {
-        throw new Error("Contrato JSON v1 incompatível");
+      if (![1, 2].includes(dados.versao_schema) || !Array.isArray(dados.setores) || !Array.isArray(dados.geografia) || !Array.isArray(dados.perfis)) {
+        throw new Error("Contrato JSON incompatível (esperado v1 ou v2)");
       }
     } catch (erro) {
       raiz.replaceChildren(el("div", { className: "metra-callout metra-callout-warn", textContent: `Não foi possível carregar o snapshot público (${erro.message}).` }));

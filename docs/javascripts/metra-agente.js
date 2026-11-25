@@ -181,6 +181,11 @@
     return { ano: Number(anoStr), mes: Number(mesStr) };
   }
 
+  // Setores e geografia são mensais (competencia); perfis são anuais (ano) desde o contrato v2.
+  function anoDoRegistro(r) {
+    return typeof r.ano === "number" ? r.ano : parseCompetencia(r.competencia).ano;
+  }
+
   function subtrairMesesCompetencia(comp, meses) {
     const { ano, mes } = parseCompetencia(comp);
     const total = ano * 12 + (mes - 1) - meses;
@@ -493,7 +498,7 @@
   function filtrarLinhasBase(linhas, filtros) {
     return linhas.filter((r) => {
       if (filtros.sigla_uf && r.sigla_uf !== filtros.sigla_uf) return false;
-      if (filtros.ano && parseCompetencia(r.competencia).ano !== Number(filtros.ano)) return false;
+      if (filtros.ano && anoDoRegistro(r) !== Number(filtros.ano)) return false;
       if (filtros.codigo_secao && r.codigo_secao !== filtros.codigo_secao) return false;
       return true;
     });
@@ -985,7 +990,7 @@
       case "sigla_uf": return [r.sigla_uf, r.sigla_uf];
       case "is_capital": return [String(r.is_capital), r.is_capital ? "Capitais" : "Interior"];
       case "competencia": return [r.competencia, r.competencia.slice(0, 7)];
-      case "ano": { const ano = String(parseCompetencia(r.competencia).ano); return [ano, ano]; }
+      case "ano": { const ano = String(anoDoRegistro(r)); return [ano, ano]; }
       default:
         if (dimensao?.eixo) return [String(r.codigo_categoria), r.categoria];
         return ["total", "Total"];

@@ -1,4 +1,4 @@
-/* Consumidor mínimo do contrato v1; o dashboard completo usa o mesmo JSON. */
+/* Consumidor mínimo do contrato v2 (perfis anuais); o dashboard completo usa o mesmo JSON. */
 (async () => {
   const raiz = document.getElementById("consumo-json");
   if (!raiz) return;
@@ -10,11 +10,11 @@
   const dimensoes = {
     setores: ["competencia", "sigla_uf", "codigo_secao"],
     geografia: ["competencia", "sigla_uf", "is_capital"],
-    perfis: ["competencia", "sigla_uf", "is_capital", "codigo_secao", "eixo", "codigo_categoria", "categoria"],
+    perfis: ["ano", "sigla_uf", "is_capital", "codigo_secao", "eixo", "codigo_categoria", "categoria"],
     calendario: ["competencia", "tem_dados"],
   };
   const rotulos = {
-    competencia: "Competência", sigla_uf: "UF", codigo_secao: "Seção CNAE",
+    competencia: "Competência", ano: "Ano", sigla_uf: "UF", codigo_secao: "Seção CNAE",
     is_capital: "Capital", eixo: "Eixo", codigo_categoria: "Código",
     categoria: "Categoria", tem_dados: "Há dados na origem",
   };
@@ -24,7 +24,7 @@
     const resposta = await fetch(new URL(raiz.dataset.fonte, document.baseURI));
     if (!resposta.ok) throw new Error(`HTTP ${resposta.status}`);
     const dados = await resposta.json();
-    if (dados.versao_schema !== 1 || !dados.metricas ||
+    if (dados.versao_schema !== 2 || !dados.metricas ||
         !Object.keys(dimensoes).every((nome) => Array.isArray(dados[nome])) ||
         !dados.calendario.length) {
       throw new Error("Contrato JSON incompatível");
@@ -44,8 +44,9 @@
       uf.disabled = colecao.value === "calendario";
       const metricas = colecao.value === "calendario" ? [] : Object.keys(dados.metricas);
       const colunas = [...dimensoes[colecao.value], ...metricas];
+      // Perfis são anuais: a competência escolhida seleciona o ano dela.
       const linhas = dados[colecao.value].filter((linha) =>
-        linha.competencia === competencia.value &&
+        ("ano" in linha ? linha.ano === Number(competencia.value.slice(0, 4)) : linha.competencia === competencia.value) &&
         (uf.disabled || !uf.value || linha.sigla_uf === uf.value));
       const cabecalho = document.createElement("tr");
       for (const coluna of colunas) {
