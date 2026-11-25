@@ -142,7 +142,7 @@ models:
     description: Salário mensal nominal em R$; zero quando ausente ou negativo na fonte.
     data_type: DECIMAL(16,2)
   - name: salario_valido
-    description: Verdadeiro quando salario_mensal > 0; critério para entrar em médias salariais.
+    description: Verdadeiro quando salario_mensal > 0 e não passa do teto metra_salario_maximo_valido (R$ 150.000); critério para entrar em médias salariais.
     data_type: BOOLEAN
   - name: horas_contratuais
     description: Horas semanais contratadas; zero quando ausentes ou negativas na fonte.
@@ -212,7 +212,7 @@ models:
   - metra_expression:
       name: stg_movimentacao_flag_salario
       arguments:
-        expression: salario_valido is not distinct from (salario_mensal > 0)
+        expression: "salario_valido is not distinct from (salario_mensal > 0 and salario_mensal <= {{ var('metra_salario_maximo_valido') }})"
   - metra_expression:
       name: stg_movimentacao_tipo_evento_coerente
       arguments:
