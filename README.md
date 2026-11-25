@@ -471,8 +471,9 @@ O asset `exportar_json_consumo`, incluído no job `pipeline_metra` e no seu sche
 mensal, exporta as views públicas `consumo.*` para `docs/assets/dados/metra.json`.
 O JSON fornece séries mensais de setor, geografia, perfis e calendário para P1–P5.
 As fórmulas vêm da camada semântica; a publicação é atômica e idempotente, com o
-retry compartilhado do Dagster. Uma página mínima no MkDocs lê o arquivo por
-JavaScript. O merge do PR com o JSON revisado aciona o deploy existente do Pages.
+retry compartilhado do Dagster. O painel público e o agente analítico no MkDocs
+consomem o arquivo por JavaScript. O merge do PR com o JSON revisado aciona o
+deploy existente do Pages. Acesse o [painel público e agente](docs/consumo-json.md).
 
 **Dependência de integração:** as views públicas são entregues pela frente de
 controle de acesso. Sem elas, o exportador e o pipeline completo falham, mantendo
@@ -535,7 +536,7 @@ Grafo completo e matriz de linhagem da fonte até o painel e o ETL reverso em [C
 
 ### Freshness e SLA da publicação (E4)
 
-Foi proposto a publicação e validação do snapshot no GitHub Pages em até **24 horas
+Foi proposta a publicação e validação do snapshot no GitHub Pages em até **24 horas
 corridas** após a extração Parquet bem-sucedida. Para medir o prazo, utilize o horário
 de `exportar_parquet` no Dagster e o da primeira conferência do SHA-256 do mesmo
 lote no Pages. A última competência observada indica a cobertura dos dados do Novo
