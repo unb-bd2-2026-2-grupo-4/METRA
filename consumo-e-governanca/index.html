@@ -1,0 +1,2911 @@
+
+<!doctype html>
+<html lang="pt" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="METRA (Monitoramento e Engenharia de dados do TRAbalho) | Projeto Integrado de Banco de Dados 2 (FCTE/UnB) - Squad G4">
+      
+      
+        <meta name="author" content="Squad G4">
+      
+      
+        <link rel="canonical" href="https://unb-bd2-2026-2-grupo-4.github.io/METRA/consumo-e-governanca/">
+      
+      
+        <link rel="prev" href="../orquestracao/">
+      
+      
+        <link rel="next" href="../freshness-sla/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.2">
+    
+    
+      
+        <title>Consumo e Governança - METRA (Monitoramento e Engenharia de dados do TRAbalho)</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.57a0d79d.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.fb2fffe2.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Poppins:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Poppins";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../stylesheets/extra.css">
+    
+      <link rel="stylesheet" href="../stylesheets/metra-painel.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="teal" data-md-color-accent="deep-purple">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#consumo-e-governanca" class="md-skip">
+          Pular para conteúdo
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Cabeçalho">
+    <a href=".." title="METRA (Monitoramento e Engenharia de dados do TRAbalho)" class="md-header__button md-logo" aria-label="METRA (Monitoramento e Engenharia de dados do TRAbalho)" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            METRA (Monitoramento e Engenharia de dados do TRAbalho)
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Consumo e Governança
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="teal" data-md-color-accent="deep-purple"  aria-label="Alternar para modo escuro"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Alternar para modo escuro" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="teal" data-md-color-accent="deep-purple"  aria-label="Alternar para modo claro"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Alternar para modo claro" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Buscar" placeholder="Buscar" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Pesquisar">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Limpar" aria-label="Limpar" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Inicializando busca
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/unb-bd2-2026-2-grupo-4/METRA" title="Ir para repositório" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    unb-bd2-2026-2-grupo-4/METRA
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Abas" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href=".." class="md-tabs__link">
+          
+  
+  
+  Visão Geral
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../consumo-json/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Painel Público e Agente
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../arquitetura/" class="md-tabs__link">
+          
+  
+  
+  Engenharia de Dados
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../adr/0001-modelagem-sistema-origem/" class="md-tabs__link">
+          
+  
+  
+  Governança & Decisões
+
+        </a>
+      </li>
+    
+  
+
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navegação" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="METRA (Monitoramento e Engenharia de dados do TRAbalho)" class="md-nav__button md-logo" aria-label="METRA (Monitoramento e Engenharia de dados do TRAbalho)" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    METRA (Monitoramento e Engenharia de dados do TRAbalho)
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/unb-bd2-2026-2-grupo-4/METRA" title="Ir para repositório" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    unb-bd2-2026-2-grupo-4/METRA
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_1" id="__nav_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Visão Geral
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Visão Geral
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Início
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dominio/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Domínio e Gestão
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../consumo-json/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Painel Público e Agente
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engenharia de Dados
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Engenharia de Dados
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../arquitetura/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Arquitetura da Plataforma
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../camada-bronze/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Camada Bronze
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../relacionamentos/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Relacionamento entre as Bases
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cdc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Captura de Mudanças (CDC)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../camada-parquet/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extração para Parquet e Delta
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../camada-analitica-dbt/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Camada Analítica e Qualidade dbt
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../orquestracao/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Orquestração com Dagster
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consumo e Governança
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consumo e Governança
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Índice">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Índice
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#camada-semantica-catalogo-unico-de-metricas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Camada semântica: catálogo único de métricas
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Camada semântica: catálogo único de métricas">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#correspondencia-com-as-perguntas-publicadas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Correspondência com as perguntas publicadas
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#catalogo-de-dados-dbt-docs-no-pages-e-linhagem-da-fonte-ao-painel-e-ao-etl-reverso" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Catálogo de dados (dbt docs no Pages) e linhagem da fonte ao painel e ao ETL reverso
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Catálogo de dados (dbt docs no Pages) e linhagem da fonte ao painel e ao ETL reverso">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#grafo-de-linhagem-ponta-a-ponta-da-fonte-ao-painel-e-ao-etl-reverso" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Grafo de linhagem ponta a ponta (da fonte ao painel e ao ETL reverso)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#matriz-de-linhagem-da-fonte-ate-o-painel-e-o-etl-reverso" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Matriz de linhagem da fonte até o painel e o ETL reverso
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#consumidores-finais-declarados-no-grafo-do-dbt-docs-exposures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Consumidores finais declarados no grafo do dbt docs (exposures)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#privacidade-e-governanca-lgpd-dados-tratados-base-legal-retencao-e-descarte" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Privacidade e governança LGPD: dados tratados, base legal, retenção e descarte
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Privacidade e governança LGPD: dados tratados, base legal, retenção e descarte">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#execucao-do-script-de-auditoria-e-descarte-lgpd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Execução do script de auditoria e descarte LGPD
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#controle-de-acesso" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Controle de acesso
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Controle de acesso">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#demonstracao" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Demonstração
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#limites" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Limites
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#operacao-e-freshness" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Operação e freshness
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#etl-reverso-json-publico" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ETL reverso: JSON público
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ETL reverso: JSON público">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#contrato-de-entrada-com-a-frente-de-acesso" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Contrato de entrada com a frente de acesso
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#contrato-json-v1-com-o-consumidor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Contrato JSON v1 com o consumidor
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#execucao-idempotencia-e-falhas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Execução, idempotência e falhas
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#revisao-e-publicacao" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Revisão e publicação
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#checklist-para-fechar-com-a-equipe" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Checklist para fechar com a equipe
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../freshness-sla/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Freshness e SLA
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Governança & Decisões
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Governança & Decisões
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_1" id="__nav_4_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decisões de Arquitetura (ADR)
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Decisões de Arquitetura (ADR)
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0001-modelagem-sistema-origem/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0001: Origem Transacional OLTP
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0002-simplificacao-arquitetural-duckdb/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0002: Simplificação com DuckDB
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0003-compressao-parquet/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0003: Compressão Parquet
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0004-cdc-decodificacao-logica/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0004: Estratégia de CDC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0005-modelagem-analitica-dbt/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0005: Modelagem Analítica e Qualidade
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0006-orquestracao-com-dagster/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0006: Adoção do Dagster para o Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0007-busca-semantica-e-consumo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0007: Busca Semântica CBO e Text-to-SQL
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/0008-disponibilizacao-camada-semantica-e-json-pages/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ADR 0008: Disponibilização Semântica e JSON
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../uso-de-ia/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Governança e IA
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_3" id="__nav_4_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Diário de Bordo
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Diário de Bordo
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diario/semana-01/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Semana 01
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diario/semana-02/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Semana 02
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diario/semana-03/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Semana 03
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diario/semana-04/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Semana 04
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diario/semana-05/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Semana 05
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diario/semana-06/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Semana 06
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diario/semana-07/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Semana 07
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diario/semana-08/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Semana 08
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diario/semana-09/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Semana 09
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diario/semana-10/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Semana 10
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diario/semana-11/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Semana 11
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diario/semana-12/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Semana 12
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diario/semana-13/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Semana 13
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diario/semana-14/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Semana 14
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diario/retrospectiva/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Retrospectiva do Ciclo de Vida
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Índice">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Índice
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#camada-semantica-catalogo-unico-de-metricas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Camada semântica: catálogo único de métricas
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Camada semântica: catálogo único de métricas">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#correspondencia-com-as-perguntas-publicadas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Correspondência com as perguntas publicadas
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#catalogo-de-dados-dbt-docs-no-pages-e-linhagem-da-fonte-ao-painel-e-ao-etl-reverso" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Catálogo de dados (dbt docs no Pages) e linhagem da fonte ao painel e ao ETL reverso
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Catálogo de dados (dbt docs no Pages) e linhagem da fonte ao painel e ao ETL reverso">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#grafo-de-linhagem-ponta-a-ponta-da-fonte-ao-painel-e-ao-etl-reverso" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Grafo de linhagem ponta a ponta (da fonte ao painel e ao ETL reverso)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#matriz-de-linhagem-da-fonte-ate-o-painel-e-o-etl-reverso" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Matriz de linhagem da fonte até o painel e o ETL reverso
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#consumidores-finais-declarados-no-grafo-do-dbt-docs-exposures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Consumidores finais declarados no grafo do dbt docs (exposures)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#privacidade-e-governanca-lgpd-dados-tratados-base-legal-retencao-e-descarte" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Privacidade e governança LGPD: dados tratados, base legal, retenção e descarte
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Privacidade e governança LGPD: dados tratados, base legal, retenção e descarte">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#execucao-do-script-de-auditoria-e-descarte-lgpd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Execução do script de auditoria e descarte LGPD
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#controle-de-acesso" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Controle de acesso
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Controle de acesso">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#demonstracao" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Demonstração
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#limites" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Limites
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#operacao-e-freshness" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Operação e freshness
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#etl-reverso-json-publico" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ETL reverso: JSON público
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ETL reverso: JSON público">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#contrato-de-entrada-com-a-frente-de-acesso" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Contrato de entrada com a frente de acesso
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#contrato-json-v1-com-o-consumidor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Contrato JSON v1 com o consumidor
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#execucao-idempotencia-e-falhas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Execução, idempotência e falhas
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#revisao-e-publicacao" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Revisão e publicação
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#checklist-para-fechar-com-a-equipe" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Checklist para fechar com a equipe
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="consumo-e-governanca">Consumo e governança</h1>
+<p><strong>Documento de integração atualizado em 23/11/2026.</strong> O repositório já contém ingestão, OLTP, exportação Parquet/Delta, camadas Silver e Gold com 176 testes dbt de qualidade, SCD tipo 2 da CBO (<code>gold.dim_cbo_historico</code>), orquestração Dagster (com retry, schedule e backfill), a integração da Busca Semântica CBO + Assistente Text-to-SQL Governado no painel Streamlit (<code>src/app/dashboard.py</code>, validada na <a href="../adr/0007-busca-semantica-e-consumo/">ADR-0007</a>), a camada semântica única de métricas (<code>dbt_metra/models/semantic/metricas.yml</code>), o controle de acesso por views de consumo agregadas e base isolada (<code>data/metra_consumo.duckdb</code>), o enquadramento de governança LGPD com script de descarte executado (<code>src/lgpd/descarte.py</code>) e o ETL reverso para JSON público (<code>src/consumo/exportar_json.py</code>).</p>
+<h2 id="camada-semantica-catalogo-unico-de-metricas">Camada semântica: catálogo único de métricas</h2>
+<p>Cada métrica tem <strong>uma única definição versionada</strong>, em <a href="https://github.com/unb-bd2-2026-2-grupo-4/METRA/blob/main/dbt_metra/models/semantic/metricas.yml"><code>dbt_metra/models/semantic/metricas.yml</code></a>, no formato de <code>semantic_models</code> e <code>metrics</code> do dbt. O dbt valida esse arquivo a cada <code>parse</code>/<code>build</code>, e ele aparece no <code>manifest.json</code> e no <code>dbt docs</code>. Todos os pontos de consumo compilam o SQL da métrica a partir dele, sem fórmula própria:</p>
+<table>
+<thead>
+<tr>
+<th>Consumidor</th>
+<th>Como lê a definição</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Marts da Gold (<code>fct_setor_mensal</code>, <code>fct_geografia_mensal</code>, <code>fct_perfil_mensal</code>) e análises <code>p1</code>–<code>p5</code></td>
+<td>Macro dbt <code>metrica(nome, origem)</code> (<code>dbt_metra/macros/metricas.sql</code>), que lê o grafo do dbt</td>
+</tr>
+<tr>
+<td>Painel Streamlit, busca CBO e assistente Text-to-SQL</td>
+<td><code>src.metricas.camada_semantica.expressao()</code> / <code>montar_consulta()</code></td>
+</tr>
+<tr>
+<td>Exportação JSON e ETL reverso (E4)</td>
+<td><code>src.metricas.camada_semantica.consultar()</code></td>
+</tr>
+</tbody>
+</table>
+<p>Medidas aditivas, com o mesmo nome das colunas dos marts, sobre <code>gold.fct_movimentacao</code> (uma linha por movimentação, recorte <code>is_identificado and is_centro_oeste and ano between 2023 and 2026</code>):</p>
+<table>
+<thead>
+<tr>
+<th>Medida</th>
+<th>Agregação sobre os eventos</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>admissoes</code></td>
+<td><code>count</code> de <code>saldo_movimentacao = 1</code></td>
+</tr>
+<tr>
+<td><code>desligamentos</code></td>
+<td><code>count</code> de <code>saldo_movimentacao = -1</code></td>
+</tr>
+<tr>
+<td><code>saldo</code></td>
+<td><code>sum(saldo_movimentacao)</code></td>
+</tr>
+<tr>
+<td><code>soma_salarios_admissao</code></td>
+<td><code>sum</code> do salário das admissões com <code>salario_valido</code></td>
+</tr>
+<tr>
+<td><code>qtd_salarios_admissao</code></td>
+<td><code>count</code> das admissões com <code>salario_valido</code></td>
+</tr>
+</tbody>
+</table>
+<p>Métricas publicadas:</p>
+<table>
+<thead>
+<tr>
+<th>Métrica</th>
+<th>Tipo</th>
+<th>Definição</th>
+<th>Unidade e ressalva</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Admissões</td>
+<td>simples</td>
+<td>medida <code>admissoes</code></td>
+<td>Movimentações, não pessoas distintas</td>
+</tr>
+<tr>
+<td>Desligamentos</td>
+<td>simples</td>
+<td>medida <code>desligamentos</code></td>
+<td>Movimentações</td>
+</tr>
+<tr>
+<td>Saldo líquido</td>
+<td>simples</td>
+<td>medida <code>saldo</code> (admissões − desligamentos)</td>
+<td>Fluxo líquido; não é estoque de vínculos</td>
+</tr>
+<tr>
+<td>Admissões com salário válido</td>
+<td>simples</td>
+<td>medida <code>qtd_salarios_admissao</code></td>
+<td>Denominador da média; deve acompanhar o valor exibido</td>
+</tr>
+<tr>
+<td>Salário médio de admissão</td>
+<td>razão</td>
+<td><code>soma_salarios_admissao</code> / <code>qtd_salarios_admissao</code></td>
+<td>R$ nominais; nulo quando não há admissão com salário válido</td>
+</tr>
+<tr>
+<td>Índice de fluxos pareados (turnover proxy)</td>
+<td>derivada</td>
+<td><code>200 × least(admissoes, desligamentos) / (admissoes + desligamentos)</code> (<a href="../adr/0007-busca-semantica-e-consumo/">ADR-0007</a>)</td>
+<td>0 a 100%; não é taxa sobre estoque de vínculos (indisponível no CAGED)</td>
+</tr>
+</tbody>
+</table>
+<p>A métrica tem duas origens. Sobre <strong>eventos</strong> (<code>gold.fct_movimentacao</code>), cada medida aplica sua agregação. Sobre <strong>agregados</strong> (marts ou CTEs que já trazem as medidas), a recomposição é sempre <code>sum(&lt;medida&gt;)</code>. Por isso o salário médio é sempre a razão das somas, e nunca a média simples de médias. Com <code>janela=</code>, a mesma métrica é recomposta sobre uma janela nomeada; a P5 usa isso para a média do recorte.</p>
+<p>Recortes analíticos (série mensal, capital/interior, disparidade por sexo, raça/cor, escolaridade e faixa etária) são as mesmas métricas agrupadas por dimensão. Categorias não informadas permanecem identificadas; não se atribuem valores demográficos ausentes. A disparidade é uma associação descritiva, sem inferir causalidade nem probabilidade individual de recolocação.</p>
+<p><strong>Garantias testadas:</strong></p>
+<ul>
+<li><code>tests/test_camada_semantica.py</code> confere a definição, o SQL compilado e os valores calculados à mão. Também <strong>falha se algum consumidor voltar a escrever uma fórmula de métrica à mão</strong>.</li>
+<li><code>tests/test_dbt_quality.py</code> confere que o macro dbt e o compilador Python geram <strong>SQL idêntico</strong> nos marts e nas cinco análises.</li>
+<li><code>tests/test_gold_integracao.py</code> confere na Gold real que a mesma métrica dá o mesmo valor a partir dos eventos e de cada mart, e que os KPIs do painel batem com a camada semântica.</li>
+</ul>
+<p>Ficam de fora da regra, de propósito, os gabaritos independentes: os scripts de medição em <code>src/qualidade/</code>, o avaliador da ADR-0007 e as referências dos testes de conciliação. Eles recalculam os números por conta própria justamente para conferir a camada semântica.</p>
+<h3 id="correspondencia-com-as-perguntas-publicadas">Correspondência com as perguntas publicadas</h3>
+<table>
+<thead>
+<tr>
+<th>Pergunta</th>
+<th>Recorte necessário</th>
+<th>Tratamento implementado no consumo</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>P1: setores no DF nos últimos 12 meses</td>
+<td>UF DF, seção CNAE e janela de 12 competências</td>
+<td>Âncora na última competência disponível (ou no ano filtrado), exibindo o intervalo e o número de competências no painel</td>
+</tr>
+<tr>
+<td>P2: sazonalidade</td>
+<td>Série mensal por ano</td>
+<td>Distingue meses sem dados (<code>NULL</code>) de zero observado (<code>0</code>) e calcula médias sazonais apenas sobre anos completos (12 meses)</td>
+</tr>
+<tr>
+<td>P3: capitais versus interior</td>
+<td>Município identificado, flag de capital, ano (2023–2026) e competência</td>
+<td>Série anual (2023–2026), consolidado (<code>Total</code>) e recorte por UF conciliados com <code>python3 -m src.analise</code></td>
+</tr>
+<tr>
+<td>P4: turnover e salário</td>
+<td>Setor, competência, salário válido e fluxos mensais</td>
+<td>Usa o índice de fluxos pareados (<code>indice_fluxos_pareados_pct</code>) e a correlação de Pearson com <code>salario_medio_admissao</code> como aproximação explícita (<a href="../adr/0007-busca-semantica-e-consumo/">ADR-0007</a>)</td>
+</tr>
+<tr>
+<td>P5: perfil e remuneração</td>
+<td>Sexo, raça/cor, idade e escolaridade</td>
+<td>Associação descritiva com nota metodológica explícita de que fluxos observados não estimam chance individual de recolocação</td>
+</tr>
+</tbody>
+</table>
+<h2 id="catalogo-de-dados-dbt-docs-no-pages-e-linhagem-da-fonte-ao-painel-e-ao-etl-reverso">Catálogo de dados (<code>dbt docs</code> no Pages) e linhagem da fonte ao painel e ao ETL reverso</h2>
+<p>O catálogo completo do projeto (<strong>5 fontes Parquet</strong>, <strong>4 modelos Silver</strong>, <strong>1 snapshot SCD Tipo 2</strong>, <strong>11 modelos Gold/Time Spine</strong>, <strong>4 views públicas de Consumo</strong>, <strong>7 métricas da camada semântica</strong>, <strong>5 análises P1–P5</strong>, <strong>4 exposures de consumo final</strong> e <strong>210 testes declarativos dbt</strong>) é compilado em um portal estático interativo por <code>src/catalogo/gerar_dbt_docs.py</code> (<code>dbt docs generate --static</code>) e publicado automaticamente no GitHub Pages pelo workflow <code>.github/workflows/deploy-docs.yml</code>.</p>
+<ul>
+<li><strong>Catálogo interativo <code>dbt docs</code> (DAG e dicionário de colunas):</strong> <a href="../assets/dbt-docs/index.html" target="_blank" rel="noopener">Abrir portal <code>dbt docs</code> do METRA em tela cheia (<code>assets/dbt-docs/index.html</code>)</a></li>
+<li><strong>Manifesto auditável de catálogo e linhagem versionado no repositório:</strong> <a href="https://github.com/unb-bd2-2026-2-grupo-4/METRA/blob/main/docs/assets/dbt-docs/linhagem.json"><code>docs/assets/dbt-docs/linhagem.json</code></a></li>
+</ul>
+<h3 id="grafo-de-linhagem-ponta-a-ponta-da-fonte-ao-painel-e-ao-etl-reverso">Grafo de linhagem ponta a ponta (da fonte ao painel e ao ETL reverso)</h3>
+<pre class="mermaid"><code>flowchart LR
+    subgraph L1["1. Fontes Oficiais"]
+        F1["Novo CAGED (CSVs MTE)"]
+        F2["IBGE Localidades (API REST)"]
+        F3["IBGE CNAE 2.0 (API REST)"]
+        F4["CBO 2002 (Catálogo MTE)"]
+    end
+
+    subgraph L2["2. Bronze (PostgreSQL 16)"]
+        B0["bronze.arquivos_ingeridos"]
+        B1["bronze.caged_movimentacao"]
+        B2["bronze.ibge_municipio"]
+        B3["bronze.ibge_cnae_subclasse"]
+        B4["bronze.cbo_ocupacao"]
+    end
+
+    subgraph L3["3. OLTP 3FN &amp; CDC (PostgreSQL 16)"]
+        O1["oltp.movimentacao"]
+        O2["oltp.municipio"]
+        O3["oltp.cnae_secao / cnae_subclasse"]
+        O4["oltp.cbo_2002"]
+        CDC["WAL Lógico (pg_recvlogical -&gt; replay.sqlite3)"]
+    end
+
+    subgraph L4["4. Lake Aberto (Parquet &amp; Delta)"]
+        P1["lake.movimentacao (ano=AAAA/*.parquet)"]
+        P2["lake.municipio (*.parquet)"]
+        P3["lake.cnae_secao / cnae_subclasse (*.parquet)"]
+        P4["lake.cbo_2002 (*.parquet)"]
+        DL["Delta Lake (data/lake/delta/movimentacao)"]
+    end
+
+    subgraph L5["5. Silver (DuckDB dbt)"]
+        S1["silver.stg_movimentacao"]
+        S2["silver.stg_municipio"]
+        S3["silver.stg_cnae"]
+        S4["silver.stg_cbo"]
+    end
+
+    subgraph L6["6. Gold, SCD2 &amp; Camada Semântica"]
+        G_SCD["snapshots.snp_cbo -&gt; gold.dim_cbo_historico"]
+        G_DIM["gold.dim_competencia / dim_municipio / dim_cbo / dim_cnae / dim_perfil_demografico"]
+        G_FCT["gold.fct_movimentacao"]
+        G_AGG["gold.fct_setor_mensal / fct_geografia_mensal / fct_perfil_mensal"]
+        SEM["Camada Semântica (metricas.yml / camada_semantica.py)"]
+    end
+
+    subgraph L7["7. Controle de Acesso (k &gt;= 5)"]
+        V_CON["consumo.setor_mensal / geografia_mensal / perfil_mensal / calendario"]
+        DB_CON["Base Isolada (data/metra_consumo.duckdb)"]
+    end
+
+    subgraph L8["8. Consumidores Finais (Exposures dbt)"]
+        EXP1["Painel Streamlit (src/app/dashboard.py :8501)"]
+        EXP2["Busca Vetorial CBO 384d &amp; Assistente Text-to-SQL"]
+        EXP3["ETL Reverso (exportar_json.py -&gt; metra.json -&gt; Pages)"]
+    end
+
+    F1 --&gt; B0 &amp; B1 --&gt; O1 --&gt; P1 --&gt; S1
+    F2 --&gt; B2 --&gt; O2 --&gt; P2 --&gt; S2
+    F3 --&gt; B3 --&gt; O3 --&gt; P3 --&gt; S3
+    F4 --&gt; B4 --&gt; O4 --&gt; P4 --&gt; S4
+    O1 -. "WAL" .-&gt; CDC
+    P1 --&gt; DL
+    S4 --&gt; G_SCD
+    S1 &amp; S2 &amp; S3 &amp; S4 --&gt; G_DIM &amp; G_FCT
+    G_FCT --&gt; G_AGG
+    G_FCT &amp; G_AGG --&gt; SEM
+    G_AGG &amp; G_DIM &amp; SEM --&gt; V_CON
+    V_CON --&gt; DB_CON
+    G_DIM &amp; G_SCD &amp; G_FCT &amp; G_AGG &amp; SEM --&gt; EXP1 &amp; EXP2
+    V_CON &amp; DB_CON &amp; SEM --&gt; EXP3</code></pre>
+<h3 id="matriz-de-linhagem-da-fonte-ate-o-painel-e-o-etl-reverso">Matriz de linhagem da fonte até o painel e o ETL reverso</h3>
+<table>
+<thead>
+<tr>
+<th>Domínio / Atributo</th>
+<th>1. Fonte → 2. Bronze → 3. OLTP (<code>PostgreSQL 16</code>)</th>
+<th>4. Lake (<code>Parquet</code>/<code>Delta</code>) → 5. Silver (<code>DuckDB</code>)</th>
+<th>6. Gold, SCD2 e Camada Semântica (<code>dbt</code>)</th>
+<th>7. Consumo Interno (Painel Streamlit e Text-to-SQL)</th>
+<th>8. Controle de Acesso e ETL Reverso (<code>metra.json</code> no Pages)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Linhagem física do lote</strong> (<code>id_ingestao</code>, <code>numero_linha</code>, <code>sha256</code>)</td>
+<td>CSV CAGED → <code>bronze.arquivos_ingeridos</code> + <code>bronze.caged_movimentacao</code> → <code>oltp.movimentacao</code></td>
+<td><code>lake.movimentacao</code> (+ tabela Delta) → <code>silver.stg_movimentacao</code></td>
+<td>Preservada em <code>gold.fct_movimentacao</code> para auditoria até a linha do CSV bruto</td>
+<td>Bloqueada no validador <code>validar_sql_seguro</code> (LGPD) e omitida nas telas públicas</td>
+<td>Omitida das views <code>consumo.*</code>, de <code>metra_consumo.duckdb</code> e de <code>metra.json</code></td>
+</tr>
+<tr>
+<td><strong>Tempo e cobertura</strong> (<code>ano</code>, <code>mes</code>, <code>competencia</code>, <code>tem_dados</code>)</td>
+<td>Campos <code>ano</code>/<code>mes</code> do CAGED → <code>bronze.caged_movimentacao</code> → <code>oltp.movimentacao</code></td>
+<td>Partição <code>ano=AAAA/</code> em <code>lake.movimentacao</code> → <code>stg_movimentacao.competencia</code> (<code>DATE</code>)</td>
+<td><code>gold.dim_competencia</code>, <code>gold.metricflow_time_spine</code> e chave temporal dos 3 marts mensais</td>
+<td>Filtro de Ano, janela móvel de 12 meses (P1), curva sazonal (P2) e série anual 2023–2026 (P3)</td>
+<td><code>consumo.calendario</code> → <code>metra_consumo.duckdb</code> → coleção <code>calendario</code> em <code>docs/assets/dados/metra.json</code></td>
+</tr>
+<tr>
+<td><strong>Geografia e recorte capital/interior</strong> (<code>id_municipio</code>, <code>sigla_uf</code>, <code>is_capital</code>)</td>
+<td>API IBGE Localidades → <code>bronze.ibge_municipio</code> → <code>oltp.municipio</code> (com sentinela <code>9999999</code>)</td>
+<td><code>lake.municipio</code> → <code>silver.stg_municipio</code> (<code>is_identificado</code>, <code>is_centro_oeste</code>)</td>
+<td><code>gold.dim_municipio</code>, <code>gold.fct_movimentacao</code> e <code>gold.fct_geografia_mensal</code></td>
+<td>Filtro de UF na sidebar, aba <strong>Capitais vs. Interior (P3)</strong> e recorte geográfico por CBO</td>
+<td><code>consumo.geografia_mensal</code> (supressão $k \ge 5$, sem <code>id_municipio</code>) → coleção <code>geografia</code> em <code>metra.json</code></td>
+</tr>
+<tr>
+<td><strong>Ocupação e histórico SCD2</strong> (<code>codigo_cbo</code>, <code>titulo_ocupacao</code>, <code>id_versao_cbo</code>)</td>
+<td>Catálogo CBO 2002 (MTE) → <code>bronze.cbo_ocupacao</code> → <code>oltp.cbo_2002</code></td>
+<td><code>lake.cbo_2002</code> → <code>silver.stg_cbo</code> (<code>codigo_grande_grupo</code>, <code>is_cadastro_oficial</code>)</td>
+<td><code>snapshots.snp_cbo</code> → <code>gold.dim_cbo_historico</code> (SCD2) e <code>gold.dim_cbo</code> (vigente)</td>
+<td>Índice vetorial híbrido 384d (<code>IndiceVetorialCBO</code>) e drill-down por cargo nas abas P1–P5</td>
+<td>Omitida das views <code>consumo.*</code> e do JSON público para evitar reidentificação por profissão rara</td>
+</tr>
+<tr>
+<td><strong>Atividade econômica</strong> (<code>codigo_cnae_subclasse</code>, <code>codigo_secao</code>, <code>descricao_secao</code>)</td>
+<td>API IBGE CNAE 2.0 → <code>bronze.ibge_cnae_subclasse</code> → <code>oltp.cnae_secao</code> + <code>oltp.cnae_subclasse</code></td>
+<td><code>lake.cnae_secao</code> + <code>lake.cnae_subclasse</code> → join em <code>silver.stg_cnae</code></td>
+<td><code>gold.dim_cnae</code>, <code>gold.fct_setor_mensal</code> e <code>gold.fct_perfil_mensal</code></td>
+<td>Filtro de Setor (Seção A–U), ranking setorial (P1) e matriz de rotatividade × salário (P4)</td>
+<td><code>consumo.setor_mensal</code> e <code>consumo.perfil_mensal</code> ($k \ge 5$, apenas <code>codigo_secao</code>) → coleções <code>setores</code> e <code>perfis</code> em <code>metra.json</code></td>
+</tr>
+<tr>
+<td><strong>Perfil sociodemográfico</strong> (<code>sexo</code>, <code>raca_cor</code>, <code>grau_instrucao</code>, <code>idade</code>)</td>
+<td>Microdados CAGED → <code>bronze.caged_movimentacao</code> → <code>oltp.movimentacao</code></td>
+<td><code>lake.movimentacao</code> → <code>silver.stg_movimentacao</code> (validação de domínios e limites de idade 10–120)</td>
+<td><code>gold.dim_perfil_demografico</code> (<code>id_perfil_demografico</code> e faixas etárias) e <code>gold.fct_perfil_mensal</code></td>
+<td>Aba <strong>Perfil Demográfico (P5)</strong> e assistente Text-to-SQL (cruzamento com UF, ano, setor e CBO)</td>
+<td><code>consumo.perfil_mensal</code> (1 eixo por vez, sem cruzar eixos, $k \ge 5$) → coleção <code>perfis</code> em <code>metra.json</code></td>
+</tr>
+<tr>
+<td><strong>Fluxos e remuneração</strong> (<code>saldo_movimentacao</code>, <code>salario_mensal</code>, <code>salario_valido</code>)</td>
+<td>Microdados CAGED → <code>bronze.caged_movimentacao</code> → <code>oltp.movimentacao</code></td>
+<td><code>lake.movimentacao</code> → <code>silver.stg_movimentacao</code> (<code>tipo_evento</code>, <code>salario_valido</code>)</td>
+<td>Medidas e métricas em <code>dbt_metra/models/semantic/metricas.yml</code> (<code>admissoes</code>, <code>desligamentos</code>, <code>saldo</code>, <code>soma_salarios_admissao</code>, <code>qtd_salarios_admissao</code>, <code>salario_medio_admissao</code>, <code>indice_fluxos_pareados_pct</code>)</td>
+<td>Compiladas por <code>src/metricas/camada_semantica.py</code> nos 4 KPIs globais, nas abas P1–P5 e no Text-to-SQL</td>
+<td>Views <code>consumo.*</code> anulam <code>soma_salarios_admissao</code> e <code>qtd_salarios_admissao</code> quando $&lt; 5$; <code>exportar_json.py</code> publica apenas a média e o denominador em <code>metra.json</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="consumidores-finais-declarados-no-grafo-do-dbt-docs-exposures">Consumidores finais declarados no grafo do <code>dbt docs</code> (<code>exposures</code>)</h3>
+<p>Para que o grafo de linhagem do <code>dbt docs</code> não termine nos modelos SQL e exiba os consumidores reais da camada de apresentação e do ETL reverso, o arquivo <a href="https://github.com/unb-bd2-2026-2-grupo-4/METRA/blob/main/dbt_metra/models/consumo/_exposures.yml"><code>dbt_metra/models/consumo/_exposures.yml</code></a> registra quatro <em>exposures</em>:</p>
+<ol>
+<li><strong><code>exposure.metra.painel_streamlit</code></strong> (<code>type: dashboard</code>): aplicação Streamlit (<code>src/app/dashboard.py</code>, porta <code>8501</code>), conectada às 5 dimensões, ao histórico SCD2 (<code>dim_cbo_historico</code>), às 4 tabelas fato da Gold e às métricas da camada semântica;</li>
+<li><strong><code>exposure.metra.assistente_text_to_sql_e_busca_cbo</code></strong> (<code>type: application</code>): índice vetorial CBO de 384 dimensões (<code>src/app/busca_cbo.py</code>) e assistente Text-to-SQL (<code>src/app/text_to_sql.py</code>);</li>
+<li><strong><code>exposure.metra.base_consumo_isolada</code></strong> (<code>type: application</code>): banco <code>data/metra_consumo.duckdb</code> publicado pelo asset <code>base_consumo</code> (<code>src/acesso/base_consumo.py</code>) a partir das quatro views <code>consumo.*</code>;</li>
+<li><strong><code>exposure.metra.etl_reverso_json_publico</code></strong> (<code>type: application</code>): exportador <code>src/consumo/exportar_json.py</code> (asset <code>exportar_json_consumo</code>) que alimenta <code>docs/assets/dados/metra.json</code> e a página interativa <a href="../consumo-json/">Resumo mensal publicado</a>.</li>
+</ol>
+<p>Para regenerar localmente o portal estático do <code>dbt docs</code> e o manifesto de linhagem:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>python<span class="w"> </span>-m<span class="w"> </span>src.catalogo.gerar_dbt_docs
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>python<span class="w"> </span>-m<span class="w"> </span>unittest<span class="w"> </span>discover<span class="w"> </span>-s<span class="w"> </span>tests<span class="w"> </span>-p<span class="w"> </span><span class="s1">'test_catalogo_linhagem.py'</span><span class="w"> </span>-v
+</code></pre></div>
+<p><code>id_ingestao</code> e <code>numero_linha</code> permitem voltar à origem da movimentação; <code>manifest.json</code> descreve as dependências dbt e <code>run_results.json</code> registra o resultado da execução. Esses artefatos estão integrados ao grafo de linhagem do Dagster em <code>dagster_metra/definitions.py</code> (ver <a href="../orquestracao/">Orquestração com Dagster</a>). O replay CDC SQLite existente (<code>src/cdc/04_reprocessar.py</code>) demonstra a captura e deduplicação a partir do WAL do PostgreSQL e permanece desacoplado da carga em lote da Silver.</p>
+<h2 id="privacidade-e-governanca-lgpd-dados-tratados-base-legal-retencao-e-descarte">Privacidade e governança LGPD: dados tratados, base legal, retenção e descarte</h2>
+<p>A fonte pública do Novo CAGED (MTE) não contém identificadores diretos (não há nome civil, CPF, RG, PIS/PASEP, NIT, CTPS nem CNPJ do empregador). No entanto, cada registro de movimentação nas camadas internas (<code>bronze.caged_movimentacao</code>, <code>oltp.movimentacao</code>, <code>data/lake/parquet/movimentacao/</code>, <code>data/lake/delta/movimentacao/</code>, <code>silver.stg_movimentacao</code> e <code>gold.fct_movimentacao</code>) combina <strong>quase-identificadores</strong> (<code>id_municipio</code>, <code>competencia</code>, <code>ano</code>, <code>mes</code>, <code>codigo_cbo</code>, <code>codigo_cnae_subclasse</code>, <code>idade</code>, <code>codigo_sexo</code>, <code>codigo_grau_instrucao</code>, <code>salario_mensal</code>, <code>horas_contratuais</code>, <code>tipo_movimentacao</code>, <code>saldo_movimentacao</code>, <code>id_ingestao</code> e <code>numero_linha</code>) e o atributo <strong><code>raca_cor</code> (<code>codigo_raca_cor</code>)</strong>.</p>
+<p>Na auditoria automatizada sobre as <code>49.178</code> movimentações do recorte do Centro-Oeste em <code>gold.fct_movimentacao</code> (<code>src/lgpd/descarte.py</code>), existem <strong><code>49.134</code> combinações distintas</strong> de município × competência × CBO × subclasse CNAE × idade × perfil demográfico, das quais <strong><code>49.091</code> (<code>99,91%</code>) são únicas ($k = 1$)</strong> e <strong><code>100,0%</code> possuem $k &lt; 5$</strong>. Por isso, a ausência de CPF não torna o microdado anonimizado: combinações raras permitem identificação indireta (art. 5º, I da <a href="https://www2.camara.leg.br/legin/fed/lei/2018/lei-13709-14-agosto-2018-787077-normaatualizada-pl.html">Lei nº 13.709/2018 — LGPD</a>), e <code>raca_cor</code>, quando vinculada a pessoa identificável, constitui <strong>dado pessoal sensível</strong> sobre origem racial ou étnica (art. 5º, II da LGPD).</p>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Enquadramento e implementação no METRA</th>
+<th>Evidência e governança operacional</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Dados nomeados</strong></td>
+<td><strong>Identificadores diretos:</strong> nenhum na origem. <strong>Quase-identificadores (art. 5º, I):</strong> <code>id_municipio</code>, <code>competencia</code> (<code>ano</code>/<code>mes</code>), <code>codigo_cbo</code>, <code>codigo_cnae_subclasse</code>, <code>idade</code>, <code>codigo_sexo</code>, <code>codigo_grau_instrucao</code>, <code>salario_mensal</code>, <code>horas_contratuais</code>, <code>tipo_movimentacao</code>, <code>saldo_movimentacao</code>, <code>id_ingestao</code>, <code>numero_linha</code>. <strong>Dado pessoal sensível (art. 5º, II):</strong> <code>raca_cor</code> (<code>codigo_raca_cor</code>).</td>
+<td>Inventário formal codificado em <code>ENQUADRAMENTO_LGPD</code> (<code>src/lgpd/descarte.py</code>) e testado em <code>tests/test_lgpd_descarte.py</code>.</td>
+</tr>
+<tr>
+<td><strong>Finalidade</strong></td>
+<td>Pesquisa e ensino acadêmico em Engenharia de Dados na disciplina Banco de Dados 2 (FCTE / Universidade de Brasília — UnB, oferta 2026/2, Squad G4), voltados exclusivamente à produção de estatísticas agregadas do mercado de trabalho formal (P1 a P5).</td>
+<td>Escopo restrito à avaliação acadêmica; vedado qualquer uso para perfilamento individual ou decisão automatizada sobre titulares.</td>
+</tr>
+<tr>
+<td><strong>Base legal</strong></td>
+<td><strong>Dados pessoais (quase-identificadores):</strong> <strong>Art. 7º, inciso IV e § 3º da LGPD</strong> (realização de estudos por órgão de pesquisa sobre dados de acesso público divulgados oficialmente pelo MTE, garantida, sempre que possível, a anonimização/agregação). <strong>Dado sensível (<code>raca_cor</code>):</strong> <strong>Art. 11, inciso II, alínea "c" da LGPD</strong> (estudos por órgão de pesquisa — UnB, art. 5º, XVIII — sem consentimento do titular, com supressão de pequenos grupos na publicação).</td>
+<td>Ressalva institucional: o enquadramento técnico-acadêmico da disciplina não substitui parecer jurídico formal da Procuradoria/Encarregado (DPO) da UnB para usos fora do escopo didático.</td>
+</tr>
+<tr>
+<td><strong>Minimização</strong></td>
+<td>O painel (<code>src/app/dashboard.py</code>), o validador Text-to-SQL (<code>src/app/text_to_sql.py</code>), a base isolada (<code>data/metra_consumo.duckdb</code>) e o JSON público (<code>docs/assets/dados/metra.json</code>) expõem apenas indicadores agregados, sem <code>id_movimentacao</code>, <code>id_ingestao</code>, <code>numero_linha</code>, município nem CBO no consumo externo.</td>
+<td>Validado por <code>tests/test_busca_e_text2sql.py</code>, <code>tests/test_controle_acesso.py</code> e <code>tests/test_exportar_json.py</code>.</td>
+</tr>
+<tr>
+<td><strong>Pequenos grupos e ataques por diferença</strong></td>
+<td>Nas views <code>consumo.*</code>, grupos com <code>admissoes + desligamentos &lt; 5</code> são omitidos (<code>739</code> de <code>2.420</code> em <code>setor_mensal</code> e <code>29.775</code> de <code>41.101</code> em <code>perfil_mensal</code>), salários com <code>qtd_salarios_admissao &lt; 5</code> são anulados (<code>403</code> grupos em <code>setor_mensal</code>) e os eixos demográficos não são cruzados entre si.</td>
+<td>A auditoria em <code>src/lgpd/descarte.py</code> mediu o risco residual de ataque por diferença: na amostra, <code>1</code> de <code>148</code> pares <code>(competencia, sigla_uf)</code> tem exatamente 1 seção CNAE omitida (<code>9</code> têm resíduo total entre 1 e 4), e <code>1.864</code> partições de <code>perfil_mensal</code> têm exatamente 1 categoria demográfica omitida.</td>
+</tr>
+<tr>
+<td><strong>Prazo de retenção</strong></td>
+<td><strong>Até 30 (trinta) dias corridos</strong> após a publicação oficial das menções finais e encerramento do prazo recursal do semestre letivo 2026/2 da UnB (<strong>data-limite máxima: <code>31/12/2026</code></strong>), nos termos dos arts. 15, I e 16 da LGPD.</td>
+<td>Após o prazo, todos os artefatos com microdados individuais devem ser descartados, mantendo-se apenas agregados com supressão $k \ge 5$ quando necessários para fins estatísticos.</td>
+</tr>
+<tr>
+<td><strong>Descarte executado</strong></td>
+<td>Script <code>src/lgpd/descarte.py</code> executado com remoção física verificada dos artefatos de microdados (<code>metra_analitico.duckdb</code>, <code>metra.duckdb</code>, <code>lake/parquet</code>, <code>lake/delta</code>, <code>cdc/eventos.log</code> e <code>cdc/replay.sqlite3</code>), preservando apenas a base agregada <code>metra_consumo.duckdb</code> ($k \ge 5$) e comprovando <code>microdados_individuais_residuais = 0</code>.</td>
+<td>Evidência real versionada em <a href="https://github.com/unb-bd2-2026-2-grupo-4/METRA/blob/main/docs/adr/evidencias/0008-lgpd-descarte.json"><code>docs/adr/evidencias/0008-lgpd-descarte.json</code></a> e suíte <code>tests/test_lgpd_descarte.py</code>.</td>
+</tr>
+<tr>
+<td><strong>Repositório público</strong></td>
+<td>Contém a amostra pública <code>data/caged_centro_oeste_amostra.csv</code> (<code>49.178</code> linhas extraídas dos microdados abertos do MTE) para reprodutibilidade da avaliação da disciplina.</td>
+<td>O script classifica a amostra como <code>versionado_git_amostra</code>: sua remoção definitiva após o encerramento da disciplina exige <code>git rm</code> seguido de reescrita do histórico Git (<code>git filter-repo</code>), além da exclusão local com <code>--incluir-amostra</code>.</td>
+</tr>
+<tr>
+<td><strong>Modelo externo</strong></td>
+<td>Nenhum provedor ou LLM externo recebe dados do banco: o índice vetorial CBO (<code>384d</code>) e o tradutor Text-to-SQL operam 100% localmente (<em>in-process</em>).</td>
+<td>Nenhuma transferência internacional ou compartilhamento de dados com terceiros durante a execução da plataforma.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="execucao-do-script-de-auditoria-e-descarte-lgpd">Execução do script de auditoria e descarte LGPD</h3>
+<p>O módulo <code>src/lgpd/descarte.py</code> inventaria os artefatos de <code>data/</code>, calcula o hash SHA-256 antes da remoção, audita o risco de reidentificação e de ataque por diferença nas views <code>consumo.*</code> e executa (ou simula) o descarte dos microdados individuais:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># 1. Simular o descarte (dry-run) sobre o diretório data/ local sem apagar arquivos</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>python<span class="w"> </span>-m<span class="w"> </span>src.lgpd.descarte<span class="w"> </span>--simular
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1"># 2. Executar a auditoria na Gold real e o descarte real verificável em ambiente isolado, gerando a evidência JSON</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>python<span class="w"> </span>-m<span class="w"> </span>src.lgpd.descarte<span class="w"> </span>--demonstrar-descarte<span class="w"> </span>--saida<span class="w"> </span>docs/adr/evidencias/0008-lgpd-descarte.json
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="c1"># 3. Executar o descarte físico em um diretório de dados ao término do prazo de retenção</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>python<span class="w"> </span>-m<span class="w"> </span>src.lgpd.descarte<span class="w"> </span>--executar<span class="w"> </span>--diretorio-dados<span class="w"> </span>data
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="c1"># 4. Executar os testes automatizados de governança e descarte LGPD</span>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>python<span class="w"> </span>-m<span class="w"> </span>unittest<span class="w"> </span>discover<span class="w"> </span>-s<span class="w"> </span>tests<span class="w"> </span>-p<span class="w"> </span><span class="s1">'test_lgpd_descarte.py'</span><span class="w"> </span>-v
+</code></pre></div>
+<p>Para descartar também os volumes do PostgreSQL e do Dagster gerados pelos contêineres Docker no encerramento do prazo de retenção, combine o script com:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>docker<span class="w"> </span>compose<span class="w"> </span>--profile<span class="w"> </span>completo<span class="w"> </span>--profile<span class="w"> </span>dagster<span class="w"> </span>--profile<span class="w"> </span>painel<span class="w"> </span>--profile<span class="w"> </span>ingestao<span class="w"> </span>down<span class="w"> </span>--volumes<span class="w"> </span>--remove-orphans
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>python<span class="w"> </span>-m<span class="w"> </span>src.lgpd.descarte<span class="w"> </span>--executar<span class="w"> </span>--incluir-agregados
+</code></pre></div>
+<h2 id="controle-de-acesso">Controle de acesso</h2>
+<p>Uma conexão DuckDB <code>read_only</code> impede escrita, mas não recorta linhas nem colunas: quem abre <code>data/metra_analitico.duckdb</code> lê <code>gold.fct_movimentacao</code>, com uma linha por movimentação. O DuckDB também não tem usuários nem <code>GRANT</code>. Por isso, o acesso é separado em duas camadas.</p>
+<p><strong>1. Views de consumo agregadas</strong> (<code>dbt_metra/models/consumo/</code>, schema <code>consumo</code>): as únicas relações publicadas para consumidores externos.</p>
+<table>
+<thead>
+<tr>
+<th>View</th>
+<th>Grão</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>consumo.setor_mensal</code></td>
+<td>competência × UF × seção CNAE (P1, P2 e P4)</td>
+</tr>
+<tr>
+<td><code>consumo.geografia_mensal</code></td>
+<td>competência × UF × capital/interior (P3)</td>
+</tr>
+<tr>
+<td><code>consumo.perfil_mensal</code></td>
+<td>competência × UF × capital/interior × seção × categoria de um eixo demográfico por vez (P5)</td>
+</tr>
+<tr>
+<td><code>consumo.calendario</code></td>
+<td>competência, com <code>tem_dados</code></td>
+</tr>
+</tbody>
+</table>
+<p>A macro <code>publicar_grupos</code> (<code>dbt_metra/macros/consumo.sql</code>) recompõe as medidas pela camada semântica e aplica a supressão com o limite da variável <code>metra_limite_publicacao</code> (5):</p>
+<ul>
+<li>grupos com <code>admissoes + desligamentos &lt; 5</code> são omitidos;</li>
+<li>com menos de 5 salários válidos (inclusive zero), <code>soma_salarios_admissao</code> e <code>qtd_salarios_admissao</code> ficam nulas juntas, e os fluxos permanecem;</li>
+<li>os eixos demográficos não se cruzam: cruzar sexo, raça/cor, escolaridade e idade criaria grupos menores.</li>
+</ul>
+<p>As views expõem só dimensões agregadas e medidas aditivas: nenhum identificador de movimentação, município ou CBO. Os testes em <code>_consumo__models.yml</code> fixam as colunas e os tipos de cada view, conferem o limite e a supressão salarial, e um teste singular confere que setores e geografia publicam exatamente os grupos liberados da Gold, com os mesmos fluxos. Sem a supressão na macro, três testes falham.</p>
+<p><strong>2. Base de consumo isolada</strong> (<code>src/acesso/base_consumo.py</code>): o asset <code>base_consumo</code> do Dagster copia as quatro views para <code>data/metra_consumo.duckdb</code> a cada execução do <code>pipeline_metra</code>, com troca atômica. O consumidor externo abre só esse arquivo, por <code>conectar_consumidor()</code>: somente leitura, com <code>enable_external_access = false</code> e <code>lock_configuration = true</code>. O detalhe não está no arquivo, e a configuração travada impede alcançá-lo por <code>ATTACH</code>, <code>read_parquet</code> ou <code>COPY</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Perfil</th>
+<th>Abre</th>
+<th>Pode</th>
+<th>Não pode</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Consumidor externo (JSON público, Pages, agente)</td>
+<td><code>data/metra_consumo.duckdb</code></td>
+<td>ler <code>consumo.*</code></td>
+<td>ler a Gold, anexar o banco analítico, ler o lake, exportar arquivos, alterar a configuração ou escrever</td>
+</tr>
+<tr>
+<td>Analista interno (painel Streamlit, dbt, Dagster)</td>
+<td><code>data/metra_analitico.duckdb</code> em <code>read_only</code></td>
+<td>ler Silver, Gold e consumo</td>
+<td>escrever (só o pipeline escreve)</td>
+</tr>
+</tbody>
+</table>
+<p>O painel Streamlit continua sendo uma ferramenta interna: lê a Gold detalhada e protege o detalhe com o validador do Text-to-SQL, não com esta base.</p>
+<h3 id="demonstracao">Demonstração</h3>
+<p><code>python -m src.acesso.demonstrar_acesso</code> executa cada tentativa e falha se algum resultado divergir do esperado. Ela roda ao fim do serviço <code>pipeline</code> do perfil <code>completo</code>, então o fluxo do zero (<code>sh scripts/metra-do-zero.sh</code>) também falha se um acesso negado passar. Saída sobre a amostra:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>[    ok    ] consumidor agregado por setor         PERMITIDO (1681,)
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>[    ok    ] consumidor perfis um eixo por vez     PERMITIDO (11326,)
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>[    ok    ] consumidor detalhe da Gold            NEGADO    CatalogException: Catalog Error: Table with name "gold.fct_movimentacao" does not exist ...
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>[    ok    ] consumidor anexar o banco analítico   NEGADO    PermissionException: Permission Error: Cannot access file ".../metra_analitico.duckdb" ...
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>[    ok    ] consumidor ler o lake Parquet         NEGADO    PermissionException: Permission Error: Cannot access file ".../lake/parquet/movimentacao/**/*.parquet" ...
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>[    ok    ] consumidor religar o acesso externo   NEGADO    InvalidInputException: Invalid Input Error: Cannot change configuration option "enable_external_access" ...
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>[    ok    ] consumidor exportar para arquivo      NEGADO    PermissionException: Permission Error: Cannot access file "consumo.csv" ...
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>[    ok    ] analista   detalhe da Gold            PERMITIDO (49178,)
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>[    ok    ] analista   alterar a Gold             NEGADO    InvalidInputException: Invalid Input Error: Cannot execute statement of type "DELETE" ...
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>Controle de acesso conforme o esperado.
+</code></pre></div>
+<p>A leitura do detalhe é uma contagem, para que nem a demonstração imprima registros individuais.</p>
+<h3 id="limites">Limites</h3>
+<ul>
+<li><strong>Proteção por arquivo, não por usuário.</strong> O controle vale para quem recebe só a base de consumo. Quem tem acesso ao sistema de arquivos com <code>data/metra_analitico.duckdb</code>, ao lake ou ao PostgreSQL continua lendo o detalhe; a separação desses ambientes é operacional.</li>
+<li><strong>Ataques por diferença.</strong> A supressão é aplicada em cada view, isoladamente. Um grupo omitido pode ser estimado subtraindo, do total de um recorte publicado, os grupos publicados de outro (por exemplo, a geografia de uma UF menos os setores publicados dessa UF). A auditoria quantitativa em <code>src/lgpd/descarte.py</code> (<a href="https://github.com/unb-bd2-2026-2-grupo-4/METRA/blob/main/docs/adr/evidencias/0008-lgpd-descarte.json">evidência JSON</a>) mostra que, na amostra, <code>1</code> de <code>148</code> pares <code>(competencia, sigla_uf)</code> possui exatamente 1 seção CNAE omitida (<code>9</code> possuem resíduo total entre 1 e 4 movimentações) e <code>1.864</code> partições de <code>perfil_mensal</code> possuem exatamente 1 categoria demográfica omitida; por isso a política de governança veda a recomposição cruzada entre coleções distintas.</li>
+<li><strong>Amostra do repositório.</strong> <code>data/caged_centro_oeste_amostra.csv</code> continua público no repositório; o controle de acesso não muda isso.</li>
+</ul>
+<h2 id="operacao-e-freshness">Operação e freshness</h2>
+<p>O consumo deve apontar para uma execução validada. A meta proposta é de até 24 horas entre a extração concluída e a publicação validada do mesmo lote. O procedimento e a evidência estão em <a href="../freshness-sla/">Freshness e SLA</a>.</p>
+<h2 id="etl-reverso-json-publico">ETL reverso: JSON público</h2>
+<p>O asset <code>exportar_json_consumo</code> publica um snapshot do histórico disponível para
+o <a href="../consumo-json/">Painel Público e Agente (Pages)</a> conforme a decisão registrada na
+<a href="../adr/0008-disponibilizacao-camada-semantica-e-json-pages/">ADR-0008</a>. O canal
+permite inspecionar contratação, saldo, sazonalidade e disparidades por recorte,
+além de responder às perguntas P1–P5 via agente JavaScript (<code>docs/javascripts/metra-agente.js</code>).
+O agente opera sobre as dimensões publicadas, explica o método de cálculo e
+recusa solicitações de SQL literal, detalhe individual ou ocupação CBO.</p>
+<p><strong>Estado:</strong> views <code>consumo.*</code>, exportador idempotente (<code>src/consumo/exportar_json.py</code>),
+snapshot real (<code>docs/assets/dados/metra.json</code>), painel público (<code>docs/javascripts/metra-painel.js</code>)
+e agente em linguagem natural integrados e cobertos por testes automatizados.</p>
+<h3 id="contrato-de-entrada-com-a-frente-de-acesso">Contrato de entrada com a frente de acesso</h3>
+<p>Os nomes abaixo são o contrato proposto para integração com Lucas, ainda sujeito à
+validação pela equipe. As views devem ser modelos dbt no schema <code>consumo</code>, com
+os mesmos nomes usados no grafo Dagster. O exportador não cria essas views e não
+consulta tabelas da Gold. Views ausentes ou incompatíveis fazem a execução falhar.</p>
+<table>
+<thead>
+<tr>
+<th>View</th>
+<th>Chave única / dimensões</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>consumo.setor_mensal</code></td>
+<td><code>competencia</code>, <code>sigla_uf</code>, <code>codigo_secao</code></td>
+</tr>
+<tr>
+<td><code>consumo.geografia_mensal</code></td>
+<td><code>competencia</code>, <code>sigla_uf</code>, <code>is_capital</code></td>
+</tr>
+<tr>
+<td><code>consumo.perfil_mensal</code></td>
+<td><code>competencia</code>, <code>sigla_uf</code>, <code>is_capital</code>, <code>codigo_secao</code>, <code>eixo</code>, <code>codigo_categoria</code></td>
+</tr>
+<tr>
+<td><code>consumo.calendario</code></td>
+<td><code>competencia</code></td>
+</tr>
+</tbody>
+</table>
+<p>Tipos: <code>competencia</code> é <code>DATE</code>, primeiro dia do mês, entre 2023 e 2026;
+<code>sigla_uf</code> é DF/GO/MT/MS; <code>codigo_secao</code> é A–U ou Z; <code>is_capital</code> é <code>BOOLEAN</code>.
+Na view de perfis, <code>eixo</code> é <code>sexo</code>, <code>raca_cor</code>, <code>escolaridade</code> ou <code>faixa_etaria</code>,
+<code>codigo_categoria</code> é inteiro e <code>categoria</code> é seu rótulo textual não nulo. Os eixos
+seguem a P5 e não representam filtros demográficos combinados.</p>
+<p>As três views de indicadores fornecem <code>admissoes</code>, <code>desligamentos</code>, <code>saldo</code>,
+<code>soma_salarios_admissao</code> (decimal) e <code>qtd_salarios_admissao</code>. Essas medidas têm os
+nomes da camada semântica e devem ser produzidas pelas suas macros. Cada grupo
+ocorre uma vez; códigos não informados permanecem categorias explícitas.</p>
+<p>Na origem, omitir grupos com <code>admissoes + desligamentos &lt; 5</code>. Para menos de cinco
+salários válidos, incluindo zero, tornar <strong>ambas</strong> as medidas salariais nulas,
+mantendo os fluxos. O exportador verifica esse contrato e recusa grupos inseguros;
+não executa uma segunda política de supressão e não usa a Gold como alternativa.
+O índice de fluxos é calculado pela camada semântica, não pela regra de supressão.</p>
+<p>O calendário fornece <code>competencia</code> e <code>tem_dados</code> booleano, sem lacunas entre seus
+meses inicial e final e com pelo menos um mês observado. <code>tem_dados</code> indica dados
+na origem, independentemente da supressão. Meses sem dados permanecem no calendário;
+não inventar linhas de indicadores com zero para preencher ausências.</p>
+<h3 id="contrato-json-v1-com-o-consumidor">Contrato JSON v1 com o consumidor</h3>
+<p>Destino versionado: <code>docs/assets/dados/metra.json</code>. O objeto contém:</p>
+<ul>
+<li><code>versao_schema</code>: inteiro <code>1</code>;</li>
+<li><code>recorte</code>: anos, UFs e ressalva sobre cobertura e supressão;</li>
+<li><code>metricas</code>: metadados do catálogo semântico, indexados pelo nome da métrica;</li>
+<li><code>setores</code>, <code>geografia</code>, <code>perfis</code>: listas de registros, com as dimensões da tabela
+  acima; perfis incluem também <code>categoria</code>;</li>
+<li><code>calendario</code>: lista de objetos com <code>competencia</code> e <code>tem_dados</code>.</li>
+</ul>
+<p>Cada registro de indicadores expõe somente <code>admissoes</code>, <code>desligamentos</code>, <code>saldo</code>,
+<code>qtd_salarios_admissao</code>, <code>salario_medio_admissao</code> e <code>indice_fluxos_pareados_pct</code>, além
+das dimensões. Datas são strings <code>YYYY-MM-DD</code>; contagens são inteiros; médias e
+índices são números, ou <code>null</code> para o salário suprimido. O índice já está na escala
+0–100. Não publicar o numerador salarial, identificadores individuais ou outros
+campos, mesmo que existam na view. Não converter <code>null</code> ou ausência de grupo em zero.</p>
+<p>Os cálculos usam <code>colunas_select()</code> da camada semântica, sobre as medidas da view.
+O JSON mantém a precisão numérica do resultado; arredondamento visual é tarefa do
+consumidor. As coleções cobrem os recortes de P1–P5 no universo publicado. Supressões
+podem tornar os totais parciais e as comparações diferentes das análises internas.
+Não somar diferentes coleções ou eixos. Não inferir valores suprimidos por diferença.</p>
+<h3 id="execucao-idempotencia-e-falhas">Execução, idempotência e falhas</h3>
+<p>O job <code>pipeline_metra</code> inclui o exportador, com dependências nas quatro views de
+consumo. O schedule existente roda no dia 5, às 6h em <code>America/Sao_Paulo</code>; o daemon
+precisa estar ativo e o schedule habilitado. Para executar só a exportação:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>docker<span class="w"> </span>compose<span class="w"> </span>--profile<span class="w"> </span>dagster<span class="w"> </span>run<span class="w"> </span>--build<span class="w"> </span>--rm<span class="w"> </span>dagster-webserver<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span>dagster<span class="w"> </span>job<span class="w"> </span>execute<span class="w"> </span>-m<span class="w"> </span>dagster_metra.definitions<span class="w"> </span>-j<span class="w"> </span>exportar_json_consumo_job
+</code></pre></div>
+<p>Alternativa local, no ambiente Python do pipeline:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>python<span class="w"> </span>-m<span class="w"> </span>src.consumo.exportar_json
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>python<span class="w"> </span>-m<span class="w"> </span>src.consumo.exportar_json<span class="w"> </span>--banco<span class="w"> </span>/caminho/analitico.duckdb<span class="w"> </span>--destino<span class="w"> </span>/tmp/metra.json
+</code></pre></div>
+<p>O banco respeita <code>METRA_DUCKDB</code> (relativo a <code>dbt_metra/</code>); o destino respeita
+<code>METRA_JSON_DESTINO</code> (relativo ao diretório de execução, quando não absoluto).
+No Compose o destino é <code>/app/publicacao/metra.json</code>, montado no diretório versionado.
+O banco é aberto somente para leitura, numa transação, com acesso externo desabilitado.
+Essa restrição do exportador não substitui o controle de acesso da frente de Lucas.</p>
+<p>A chave idempotente é a combinação das dimensões de cada coleção. Toda execução
+reconstrói o histórico completo e substitui o snapshot, incorporando correções de
+meses antigos sem duplicar linhas. Mesmo conteúdo gera bytes e SHA-256 iguais;
+o horário da execução fica só nos metadados do Dagster, junto com contagens,
+competências, destino e tamanho. O horário não representa a data de atualização
+da fonte nem o instante da publicação no Pages.</p>
+<p>Um lock serializa exportações ao mesmo destino. A escrita usa temporário no mesmo
+diretório e substituição atômica após validação, preservando a versão anterior em
+caso de falha. O Dagster reutiliza a política de três retries com espera inicial de
+10 segundos, backoff exponencial e jitter. Erros não são engolidos; esgotadas as
+tentativas, o run falha e precisa ser inspecionado. A execução direta pela CLI não
+faz retry por conta própria. Banco ocupado também segue o retry do asset.</p>
+<h3 id="revisao-e-publicacao">Revisão e publicação</h3>
+<ol>
+<li>As views <code>consumo.*</code> são materializadas e validadas pelo <code>dbt build</code> e pelo controle de acesso (<code>src/acesso/base_consumo.py</code>).</li>
+<li>O asset <code>exportar_json_consumo</code> (<code>src/consumo/exportar_json.py</code>) exporta <code>docs/assets/dados/metra.json</code>, conferindo chaves, supressão ($k \ge 5$) e SHA-256.</li>
+<li>O JSON gerado passa pelos testes Python e Node (<code>test_exportar_json.py</code>, <code>test_consumo_js.cjs</code>, <code>test_agente_pages_js.cjs</code>) e é versionado via PR.</li>
+<li>Após revisão e merge na <code>main</code>, o workflow <code>deploy-docs.yml</code> publica o MkDocs no GitHub Pages com o painel e o agente atualizados.</li>
+<li>Abrir <a href="../consumo-json/">Painel Público e Agente (Pages)</a> e conferir os filtros, gráficos, agente e cobertura publicada.</li>
+</ol>
+<p>Não há commit, push ou credencial GitHub dentro do asset. O schedule atualiza o
+arquivo local; a publicação pública só muda após o PR. O SLA proposto de 24 horas
+até publicação depende também dessa etapa manual. O repositório preserva versões
+anteriores; remover o JSON atual não elimina dados do histórico Git.</p>
+<p>Verificar localmente com:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>python<span class="w"> </span>-m<span class="w"> </span>unittest<span class="w"> </span>discover<span class="w"> </span>-s<span class="w"> </span>tests<span class="w"> </span>-p<span class="w"> </span><span class="s1">'test_exportar_json.py'</span><span class="w"> </span>-v
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>python<span class="w"> </span>-m<span class="w"> </span>unittest<span class="w"> </span>discover<span class="w"> </span>-s<span class="w"> </span>tests<span class="w"> </span>-p<span class="w"> </span><span class="s1">'test_orquestracao.py'</span><span class="w"> </span>-v
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>node<span class="w"> </span>--test<span class="w"> </span>tests/test_consumo_js.cjs<span class="w"> </span>tests/test_agente_pages_js.cjs
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>mkdocs<span class="w"> </span>build<span class="w"> </span>--strict
+</code></pre></div>
+<p>As fixtures das views existem apenas nos testes. Nunca usar o JSON sintético como
+artefato público real. O consumidor mostra indisponibilidade enquanto a primeira
+publicação revisada não existir.</p>
+<h2 id="checklist-para-fechar-com-a-equipe">Checklist para fechar com a equipe</h2>
+<ul>
+<li>[x] Publicar Gold, dicionário e métricas com nomes definitivos e testes de reconciliação (176 testes dbt).</li>
+<li>[x] Centralizar a definição de cada métrica na camada semântica (<code>metricas.yml</code>), com marts, análises, painel, busca CBO e assistente compilando dela e teste que impede fórmula duplicada (E4).</li>
+<li>[x] Integrar painel Streamlit (<code>src/app/dashboard.py</code>), busca semântica CBO e consulta em linguagem natural conforme <a href="../adr/0007-busca-semantica-e-consumo/">ADR-0007</a>.</li>
+<li>[x] Demonstrar SCD tipo 2 (<code>snp_cbo</code> / <code>gold.dim_cbo_historico</code>), retry, schedule mensal e backfill no Dagster, com consumo em modo somente leitura após materialização da Gold.</li>
+<li>[x] Controle de acesso além de <code>read_only</code>: views <code>consumo.*</code> com supressão de grupos com menos de 5 movimentações, base de consumo isolada e demonstração de acesso permitido e negado ao detalhe (E4).</li>
+<li>[x] Validar base legal da LGPD, retenção, o limiar de pequenos grupos, os ataques por diferença e executar o script de descarte com evidências reais (<code>src/lgpd/descarte.py</code> e <code>docs/adr/evidencias/0008-lgpd-descarte.json</code>) (E4).</li>
+<li>[x] Implementar e demonstrar o caminho de ETL reverso com seu consumidor (<code>docs/assets/dados/metra.json</code> + painel e agente no GitHub Pages, ADR-0008) (E4).</li>
+<li>[x] Atualizar diários e registro de IA conforme as atividades da E4 ocorrerem; não antecipar evidências de execução futura.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Voltar para o topo
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "navigation.expand", "content.code.copy", "search.suggest", "search.highlight"], "search": "../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copiado para \u00e1rea de transfer\u00eancia", "clipboard.copy": "Copiar para \u00e1rea de transfer\u00eancia", "search.result.more.one": "mais 1 nesta p\u00e1gina", "search.result.more.other": "# mais nesta p\u00e1gina", "search.result.none": "Nenhum documento encontrado", "search.result.one": "1 documento encontrado", "search.result.other": "# documentos encontrados", "search.result.placeholder": "Digite para iniciar a busca", "search.result.term.missing": "Ausente", "select.version": "Selecione a vers\u00e3o"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.a5f9d56c.min.js"></script>
+      
+        <script src="../javascripts/consumo.js"></script>
+      
+        <script src="../javascripts/metra-agente.js"></script>
+      
+        <script src="../javascripts/metra-painel.js"></script>
+      
+    
+  </body>
+</html>

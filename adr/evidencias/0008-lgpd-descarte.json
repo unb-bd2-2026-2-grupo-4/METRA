@@ -1,0 +1,159 @@
+{
+  "protocolo": "ADR-0007 / E4 — Governança LGPD, Retenção, Pequenos Grupos e Execução de Descarte",
+  "auditoria_base_analitica_real": {
+    "limiar_k_anonimato": 5,
+    "risco_reidentificacao_microdado_gold": {
+      "total_movimentacoes_recorte": 49178,
+      "combinacoes_distintas_quase_identificadores": 49134,
+      "combinacoes_unicas_k1": 49091,
+      "combinacoes_abaixo_k5": 49134,
+      "proporcao_combinacoes_abaixo_k5_pct": 100.0
+    },
+    "efeito_supressao_views_consumo": {
+      "setor_mensal": {
+        "grupos_totais": 2420,
+        "grupos_publicados": 1681,
+        "grupos_omitidos_fluxo_menor_k": 739,
+        "grupos_com_salario_suprimido": 403
+      },
+      "geografia_mensal": {
+        "grupos_totais": 259,
+        "grupos_publicados": 259,
+        "grupos_omitidos_fluxo_menor_k": 0,
+        "grupos_com_salario_suprimido": 0
+      },
+      "perfil_mensal": {
+        "grupos_totais": 41101,
+        "grupos_publicados": 11326,
+        "grupos_omitidos_fluxo_menor_k": 29775
+      }
+    },
+    "auditoria_ataque_por_diferenca": {
+      "uf_competencia_total": 148,
+      "uf_competencia_com_exatamente_1_setor_omitido": 1,
+      "uf_competencia_com_residuo_entre_1_e_k_menos_1": 9,
+      "particoes_perfil_com_exatamente_1_categoria_omitida": 1864,
+      "mitigacao_adotada": "As views consumo.* impedem cruzamento entre múltiplos eixos demográficos e não expõem município nem CBO. Ainda assim, como a supressão primária (k >= 5) ocorre por view sem supressão complementar secundária, um consumidor que subtraia a soma de setores ou categorias publicadas do total da partição pode estimar resíduos quando apenas 1 célula foi omitida; por isso a regra de governança proíbe inferência por diferença entre coleções."
+    }
+  },
+  "execucao_real_descarte": {
+    "executado_em_utc": "2026-11-23T23:15:57Z",
+    "modo": "executar",
+    "diretorio_dados": "data/ (ambiente de homologação isolado)",
+    "enquadramento_lgpd": {
+      "controlador_academico": "Projeto Integrado de Banco de Dados 2 — Faculdade de Ciências e Tecnologias em Engenharia (FCTE / Universidade de Brasília — UnB), Oferta 2026/2, Squad G4",
+      "fonte_primaria": "Microdados públicos do Novo CAGED divulgados pelo Ministério do Trabalho e Emprego (MTE / PDET), recortados para a Região Centro-Oeste (DF, GO, MT, MS) entre 2023 e 2026",
+      "dados_nomeados": {
+        "identificadores_diretos": [],
+        "nota_identificadores_diretos": "A fonte pública do Novo CAGED não fornece nome civil, CPF, RG, PIS/PASEP, NIT, CTPS ou CNPJ do empregador.",
+        "quase_identificadores": [
+          "id_municipio",
+          "competencia",
+          "ano",
+          "mes",
+          "codigo_cbo",
+          "codigo_cnae_subclasse",
+          "idade",
+          "codigo_sexo",
+          "codigo_grau_instrucao",
+          "salario_mensal",
+          "horas_contratuais",
+          "tipo_movimentacao",
+          "saldo_movimentacao",
+          "id_ingestao",
+          "numero_linha"
+        ],
+        "dados_pessoais_sensiveis": [
+          "codigo_raca_cor",
+          "raca_cor"
+        ],
+        "justificativa_classificacao": "Embora desprovido de identificadores diretos, cada registro de movimentação combina município (IBGE 7 dígitos), mês/ano da contratação ou demissão, ocupação (CBO 6 dígitos), subclasse econômica (CNAE 7 dígitos), idade exata, sexo, escolaridade e salário nominal (art. 5º, I da LGPD — dado relacionado a pessoa natural identificável por combinação rara). O atributo raça/cor, quando vinculado a registro individual potencialmente reidentificável, constitui dado pessoal sensível sobre origem racial ou étnica (art. 5º, II da LGPD)."
+      },
+      "base_legal": {
+        "finalidade": "Pesquisa e ensino acadêmico em Engenharia de Dados, voltados exclusivamente à produção e validação de indicadores estatísticos agregados sobre o mercado de trabalho formal no Centro-Oeste (perguntas de gestão P1 a P5).",
+        "hipotese_dados_pessoais": "Art. 7º, inciso IV da Lei nº 13.709/2018 (LGPD) — realização de estudos por órgão de pesquisa, garantida, sempre que possível, a anonimização dos dados pessoais; combinado com o Art. 7º, § 3º (tratamento de dados de acesso público observados a finalidade, a boa-fé e o interesse público que justificaram sua disponibilização pelo MTE).",
+        "hipotese_dados_sensiveis": "Art. 11, inciso II, alínea 'c' da Lei nº 13.709/2018 (LGPD) — realização de estudos por órgão de pesquisa sem fornecimento de consentimento do titular, garantida, sempre que possível, a anonimização dos dados pessoais sensíveis (UnB enquadrada como órgão de pesquisa da administração indireta federal nos termos do art. 5º, XVIII da LGPD).",
+        "ressalva_institucional": "Este enquadramento documenta a conformidade técnico-acadêmica da disciplina Banco de Dados 2 (FCTE/UnB) e não substitui parecer jurídico formal do Encarregado (DPO) da UnB para usos administrativos ou externos ao escopo didático."
+      },
+      "retencao": {
+        "prazo_dias_apos_encerramento": 30,
+        "data_limite_maxima": "2026-12-31",
+        "regra_retencao": "Os artefatos locais com granularidade individual (PostgreSQL bronze/oltp, Parquet, Delta Lake, logs de CDC e bancos DuckDB analíticos) são retidos apenas durante o semestre letivo 2026/2 e por até 30 (trinta) dias corridos após a publicação final das menções e encerramento do prazo recursal da disciplina (art. 15, I e art. 16 da LGPD).",
+        "regra_pos_descarte": "Após o descarte dos microdados individuais, apenas artefatos puramente agregados e submetidos à supressão de pequenos grupos (k >= 5, como data/metra_consumo.duckdb e docs/assets/dados/metra.json) podem permanecer publicados para consulta estatística."
+      }
+    },
+    "resumo_descarte": {
+      "artefatos_descartados": 5,
+      "arquivos_fisicos_removidos": 7,
+      "bytes_liberados": 1646297,
+      "artefatos_preservados": 1,
+      "microdados_individuais_residuais": 0,
+      "verificacao_pos_descarte_ok": true
+    },
+    "artefatos_descartados": [
+      {
+        "id_artefato": "banco_analitico_duckdb",
+        "caminho": "data/metra_analitico.duckdb",
+        "categoria_lgpd": "microdados_individuais",
+        "tamanho_bytes": 798720,
+        "arquivos_contidos": 1,
+        "sha256_antes_do_descarte": "ccdca3171b9933dc84621ef32cd29b7d609a8a4be01087921268444945154b94",
+        "acao": "removido"
+      },
+      {
+        "id_artefato": "banco_analise_e2_duckdb",
+        "caminho": "data/metra.duckdb",
+        "categoria_lgpd": "microdados_individuais",
+        "tamanho_bytes": 798720,
+        "arquivos_contidos": 1,
+        "sha256_antes_do_descarte": "ccdca3171b9933dc84621ef32cd29b7d609a8a4be01087921268444945154b94",
+        "acao": "removido"
+      },
+      {
+        "id_artefato": "lake_parquet",
+        "caminho": "data/lake/parquet",
+        "categoria_lgpd": "microdados_individuais",
+        "tamanho_bytes": 24361,
+        "arquivos_contidos": 1,
+        "sha256_antes_do_descarte": null,
+        "acao": "removido"
+      },
+      {
+        "id_artefato": "lake_delta",
+        "caminho": "data/lake/delta",
+        "categoria_lgpd": "microdados_individuais",
+        "tamanho_bytes": 24397,
+        "arquivos_contidos": 2,
+        "sha256_antes_do_descarte": null,
+        "acao": "removido"
+      },
+      {
+        "id_artefato": "cdc_logs_e_estado",
+        "caminho": "data/cdc",
+        "categoria_lgpd": "microdados_individuais",
+        "tamanho_bytes": 99,
+        "arquivos_contidos": 2,
+        "sha256_antes_do_descarte": null,
+        "acao": "removido"
+      }
+    ],
+    "artefatos_preservados": [
+      {
+        "id_artefato": "base_consumo_isolada",
+        "caminho": "data/metra_consumo.duckdb",
+        "categoria_lgpd": "agregado_anonimizado_k5",
+        "tamanho_bytes": 536576,
+        "motivo_preservacao": "Base agregada com supressão de pequenos grupos (k >= 5), sem eventos individuais"
+      }
+    ],
+    "residuais_microdados": []
+  },
+  "verificacao_base_consumo_preservada": {
+    "tabelas_presentes": [
+      "consumo.setor_mensal"
+    ],
+    "contem_schema_gold_ou_silver": false,
+    "menor_volume_grupo_publicado": 5,
+    "respeita_limiar_k5": true
+  }
+}
