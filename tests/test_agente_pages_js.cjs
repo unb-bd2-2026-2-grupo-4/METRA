@@ -196,9 +196,14 @@ test("guardrails bloqueiam SQL injection, LGPD, ataque por diferença, fora de e
 test("snapshot real docs/assets/dados/metra.json responde P1-P5 sem NaN e concilia KPIs", () => {
   const caminho = path.join(__dirname, "../docs/assets/dados/metra.json");
   const dados = JSON.parse(fs.readFileSync(caminho, "utf8"));
+  // O snapshot pode vir da amostra (CI) ou da base completa (publicado): os KPIs
+  // precisam bater com a soma independente das linhas de geografia.
   const kpis = agente.calcularKpisRecorte(dados, {});
-  assert.equal(kpis.admissoes, 25325);
-  assert.equal(kpis.saldo, 1472);
+  const soma = (campo) => dados.geografia.reduce((total, r) => total + r[campo], 0);
+  assert.ok(kpis.admissoes > 0);
+  assert.equal(kpis.admissoes, soma("admissoes"));
+  assert.equal(kpis.saldo, soma("saldo"));
+  assert.equal(kpis.saldo, kpis.admissoes - kpis.desligamentos);
 
   const perguntas = [
     "Qual setor econômico mais contratou e demitiu no Distrito Federal nos últimos 12 meses?",
