@@ -36,8 +36,8 @@ def criar_views(banco):
             ) from base where admissoes + desligamentos >= 5;
             create view consumo.geografia_mensal as
                 select *, true as is_capital from consumo.setor_mensal where codigo_secao = 'A';
-            create view consumo.perfil_mensal as
-                select *, true as is_capital, eixo,
+            create view consumo.perfil_anual as
+                select * exclude (competencia), year(competencia)::integer as ano, true as is_capital, eixo,
                     ascii(codigo_secao)::integer as codigo_categoria,
                     'Categoria ' || codigo_secao as categoria
                 from consumo.setor_mensal cross join (values
@@ -88,11 +88,14 @@ class ExportarJsonTest(unittest.TestCase):
         self.assertNotEqual(media, (2000 + 4000) / 2)
         for registros in (dados[c] for c in COLECOES):
             self.assertTrue(all(set(r) <= set(METRICAS) | {
-                "competencia", "sigla_uf", "codigo_secao", "is_capital", "eixo",
+                "competencia", "ano", "sigla_uf", "codigo_secao", "is_capital", "eixo",
                 "codigo_categoria", "categoria",
             } for r in registros))
+        # v2: perfis anuais, sem competência; setores e geografia seguem mensais.
+        self.assertTrue(all(r["ano"] == 2025 and "competencia" not in r for r in dados["perfis"]))
+        self.assertTrue(all("competencia" in r for r in dados["setores"]))
         self.assertEqual(metadados["registros"]["setores"], 4)
-        self.assertEqual(dados["versao_schema"], 1)
+        self.assertEqual(dados["versao_schema"], 2)
         self.assertEqual(set(dados["metricas"]), set(METRICAS))
         self.assertEqual(os.stat(self.destino).st_mode & 0o777, 0o644)
         self.assertEqual(os.stat(self.destino.with_name(".metra.json.lock")).st_mode & 0o777, 0o666)
@@ -134,7 +137,7 @@ class ExportarJsonTest(unittest.TestCase):
         self.assertEqual(list(self.destino.parent.glob(".metra-*")), [])
 
     def test_views_ausentes_nao_usam_gold_nem_criam_banco(self):
-        self.alterar("drop view consumo.perfil_mensal")
+        self.alterar("drop view consumo.perfil_anual")
         with self.assertRaises(duckdb.Error):
             exportar(self.banco, self.destino)
         self.assertFalse(self.destino.exists())
@@ -149,6 +152,9 @@ class ExportarJsonTest(unittest.TestCase):
         exportar(self.banco, self.destino)
         anterior = self.destino.read_bytes()
         casos = [
+            # Primeiro, com setores e geografia ainda válidos: o ano fora do recorte nos perfis.
+            "create or replace view consumo.perfil_anual as select * exclude (competencia), 2022 as ano, true as is_capital, "
+            "'sexo' as eixo, 1 as codigo_categoria, 'Homem' as categoria from base where codigo_secao='A'",
             "create or replace view consumo.setor_mensal as select * from base",  # Sem supressão.
             "create or replace view consumo.setor_mensal as select * from base where codigo_secao='C'",
             "create or replace view consumo.setor_mensal as select * exclude (saldo) from base",
@@ -203,7 +209,7 @@ class ExportarJsonTest(unittest.TestCase):
             patch.object(RetryPolicy, "calculate_delay", return_value=0),
         ):
             fontes = [AssetSpec(AssetKey(["consumo", view])) for view in
-                      ("setor_mensal", "geografia_mensal", "perfil_mensal", "calendario")]
+                      ("setor_mensal", "geografia_mensal", "perfil_anual", "calendario")]
             resultado = materialize([*fontes, exportar_json_consumo_asset])
         self.assertTrue(resultado.success)
         self.assertEqual(len(chamadas), 2)

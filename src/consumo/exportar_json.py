@@ -23,8 +23,10 @@ DESTINO_PADRAO = RAIZ / "docs/assets/dados/metra.json"
 COLECOES = {
     "setores": ("setor_mensal", ("competencia", "sigla_uf", "codigo_secao")),
     "geografia": ("geografia_mensal", ("competencia", "sigla_uf", "is_capital")),
-    "perfis": ("perfil_mensal", (
-        "competencia", "sigla_uf", "is_capital", "codigo_secao", "eixo", "codigo_categoria",
+    # Perfis por ano (v2): a P5 só filtra por ano, UF e seção, e o grão mensal levava o
+    # arquivo a ~43 MB na base completa, acima do limite do ADR-0008.
+    "perfis": ("perfil_anual", (
+        "ano", "sigla_uf", "is_capital", "codigo_secao", "eixo", "codigo_categoria",
     )),
 }
 EIXOS = {"sexo", "raca_cor", "escolaridade", "faixa_etaria"}
@@ -37,7 +39,8 @@ RESSALVA = (
     "Somente grupos publicados pelas views de consumo. Grupos com menos de 5 "
     "movimentações são omitidos; medidas salariais com menos de 5 salários válidos "
     "não são divulgadas. Totais recompostos podem ser parciais. Não somar os "
-    "diferentes conjuntos nem os eixos demográficos entre si."
+    "diferentes conjuntos nem os eixos demográficos entre si. Perfis demográficos são "
+    "anuais; setores e geografia, mensais."
 )
 
 
@@ -48,7 +51,10 @@ def _competencia(valor):
 
 
 def _validar_registro(registro, dimensoes):
-    registro["competencia"] = _competencia(registro["competencia"])
+    if "competencia" in registro:
+        registro["competencia"] = _competencia(registro["competencia"])
+    if "ano" in registro and (type(registro["ano"]) is not int or registro["ano"] not in ANOS_VALIDOS):
+        raise ValueError(f"Ano inválido: {registro['ano']!r}; esperado inteiro do recorte.")
     if any(registro[d] is None for d in dimensoes):
         raise ValueError("Dimensão nula na view pública.")
     if registro["sigla_uf"] not in UFS_VALIDAS:
@@ -94,7 +100,7 @@ def _validar_registro(registro, dimensoes):
 def _ler_publicacao(conn):
     definicoes = catalogo()
     publicacao = {
-        "versao_schema": 1,
+        "versao_schema": 2,
         "recorte": {"anos": sorted(ANOS_VALIDOS), "ufs": sorted(UFS_VALIDAS), "ressalva": RESSALVA},
         "metricas": {nome: asdict(definicoes[nome]) for nome in METRICAS},
         # Vocabulário da camada semântica: o agente do Pages identifica métrica e
@@ -140,9 +146,11 @@ def _ler_publicacao(conn):
     if len(calendario) != (fim.year - inicio.year) * 12 + fim.month - inicio.month + 1:
         raise ValueError("Calendário público com lacunas entre competências.")
     observadas = {c["competencia"] for c in calendario if c["tem_dados"]}
+    anos_observados = {int(c[:4]) for c in observadas}
     for colecao in COLECOES:
-        if any(r["competencia"] not in observadas for r in publicacao[colecao]):
-            raise ValueError(f"{colecao}: competência sem dados no calendário.")
+        if any(r["competencia"] not in observadas if "competencia" in r else r["ano"] not in anos_observados
+               for r in publicacao[colecao]):
+            raise ValueError(f"{colecao}: competência ou ano sem dados no calendário.")
     publicacao["calendario"] = calendario
     return publicacao
 
