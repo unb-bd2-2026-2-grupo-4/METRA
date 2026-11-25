@@ -9,6 +9,7 @@ que já executa o dbt de verdade.
 import datetime
 from pathlib import Path
 import re
+import unicodedata
 import unittest
 
 import duckdb
@@ -17,6 +18,7 @@ import yaml
 from src.metricas.camada_semantica import (
     MetricaDesconhecida,
     catalogo,
+    catalogo_dimensoes,
     colunas_select,
     definicao,
     expressao,
@@ -219,6 +221,55 @@ class SemFormulaDuplicadaTest(unittest.TestCase):
                     achados.append(f"{arquivo.relative_to(ROOT)}:{linha} {descricao}")
         self.assertEqual(achados, [], "Use src.metricas.camada_semantica / metrica() em vez de:\n"
                          + "\n".join(achados))
+
+
+def _normalizar(termo):
+    """Mesma normalização do agente do Pages: minúsculas e sem acentos."""
+    sem_acento = unicodedata.normalize("NFD", termo.lower())
+    return " ".join("".join(c for c in sem_acento if not unicodedata.combining(c)).split())
+
+
+class VocabularioTest(unittest.TestCase):
+    """O agente do Pages só entende o que o vocabulário da camada semântica declara."""
+
+    METRICAS_CONVERSACIONAIS = (
+        "admissoes", "desligamentos", "saldo", "salario_medio_admissao", "indice_fluxos_pareados_pct",
+    )
+
+    def test_metricas_conversacionais_tem_sinonimos(self):
+        cat = catalogo()
+        for nome in self.METRICAS_CONVERSACIONAIS:
+            with self.subTest(metrica=nome):
+                self.assertTrue(cat[nome].sinonimos)
+        # Medidas técnicas não devem ser pedidas diretamente numa pergunta.
+        self.assertEqual(cat["soma_salarios_admissao"].sinonimos, ())
+
+    def test_dimensoes_apontam_para_colecoes_publicadas(self):
+        dims = catalogo_dimensoes()
+        self.assertEqual(
+            set(dims),
+            {"codigo_secao", "sigla_uf", "is_capital", "competencia", "ano",
+             "sexo", "raca_cor", "escolaridade", "faixa_etaria"},
+        )
+        for nome, dim in dims.items():
+            with self.subTest(dimensao=nome):
+                self.assertTrue(set(dim.colecoes) <= {"setores", "geografia", "perfis"})
+                self.assertTrue(dim.sinonimos)
+                # Eixo demográfico só existe em perfis, um por vez.
+                if dim.eixo:
+                    self.assertEqual(dim.colecoes, ("perfis",))
+                    self.assertEqual(dim.eixo, nome)
+
+    def test_nenhum_termo_identifica_duas_coisas(self):
+        donos = {}
+        itens = [(f"metrica {n}", m.sinonimos) for n, m in catalogo().items()]
+        itens += [(f"dimensao {n}", d.sinonimos) for n, d in catalogo_dimensoes().items()]
+        for dono, termos in itens:
+            for termo in termos:
+                chave = _normalizar(termo)
+                with self.subTest(termo=termo):
+                    self.assertNotIn(chave, donos, f"'{termo}' em {dono} e {donos.get(chave)}")
+                donos[chave] = dono
 
 
 if __name__ == "__main__":
