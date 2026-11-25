@@ -21,7 +21,7 @@ from src.app.banco_analitico import DBT_PROJECT_DIR, obter_caminho_duckdb
 
 RAIZ = Path(__file__).resolve().parents[2]
 CAMINHO_PADRAO_CONSUMO = RAIZ / "data" / "metra_consumo.duckdb"
-RELACOES_CONSUMO = ("setor_mensal", "geografia_mensal", "perfil_mensal", "calendario")
+RELACOES_CONSUMO = ("setor_mensal", "geografia_mensal", "perfil_anual", "calendario")
 
 
 def caminho_base_consumo() -> Path:

@@ -113,7 +113,7 @@ def caminho_banco_analitico() -> Path:
 @asset(
     name="exportar_json_consumo",
     deps=[AssetKey(["consumo", view]) for view in (
-        "setor_mensal", "geografia_mensal", "perfil_mensal", "calendario",
+        "setor_mensal", "geografia_mensal", "perfil_anual", "calendario",
     )],
     group_name="consumo",
     description="Publica o snapshot JSON das views agregadas para o GitHub Pages, sem acesso ao detalhe.",
