@@ -97,7 +97,8 @@ semantic_models:
             sinonimos: ["capital", "capitais", "interior"]
           - nome: competencia
             label: "Mês"
-            colecoes: [geografia, setores, perfis]
+            # Perfis são publicados por ano: mês só existe em setores e geografia.
+            colecoes: [geografia, setores]
             sinonimos: ["mês", "meses", "competência", "competências", "mensal", "mensais"]
           - nome: ano
             label: "Ano"

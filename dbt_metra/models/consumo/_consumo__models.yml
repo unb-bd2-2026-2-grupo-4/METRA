@@ -109,18 +109,18 @@ models:
       - name: qtd_salarios_admissao
         description: "Denominador de admissões com salário válido; NULL quando menor que 5 observações."
 
-  - name: perfil_mensal
+  - name: perfil_anual
     description: >
-      Fluxos por competência, UF, capital/interior, seção CNAE e categoria de um eixo
+      Fluxos por ano, UF, capital/interior, seção CNAE e categoria de um eixo
       demográfico por vez (P5), com a mesma supressão. Os eixos não se cruzam.
     data_tests:
       - metra_unique_combination:
           arguments:
-            columns: [competencia, sigla_uf, is_capital, codigo_secao, eixo, codigo_categoria]
+            columns: [ano, sigla_uf, is_capital, codigo_secao, eixo, codigo_categoria]
       - metra_column_types:
           arguments:
             expected:
-              competencia: DATE
+              ano: INTEGER
               sigla_uf: VARCHAR
               is_capital: BOOLEAN
               codigo_secao: VARCHAR
@@ -137,8 +137,8 @@ models:
       - *salario_suprimido_junto
       - *salario_publicavel
     columns:
-      - name: competencia
-        description: "Primeiro dia do mês de ocorrência da movimentação (DATE)."
+      - name: ano
+        description: "Ano de ocorrência das movimentações (INTEGER); os perfis são publicados por ano."
       - name: sigla_uf
         description: "Sigla da Unidade da Federação no Centro-Oeste (DF, GO, MT ou MS)."
       - name: is_capital
