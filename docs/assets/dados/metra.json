@@ -23,7 +23,20 @@
       "tipo": "simple",
       "unidade": "movimentações",
       "formato": "inteiro",
-      "ressalva": "Movimentações, não pessoas distintas."
+      "ressalva": "Movimentações, não pessoas distintas.",
+      "sinonimos": [
+        "admissões",
+        "admissão",
+        "contratações",
+        "contratação",
+        "contratou",
+        "contrataram",
+        "contrata",
+        "contratam",
+        "contratados",
+        "contratar",
+        "vagas preenchidas"
+      ]
     },
     "desligamentos": {
       "nome": "desligamentos",
@@ -32,7 +45,19 @@
       "tipo": "simple",
       "unidade": "movimentações",
       "formato": "inteiro",
-      "ressalva": "Movimentações, não pessoas distintas."
+      "ressalva": "Movimentações, não pessoas distintas.",
+      "sinonimos": [
+        "desligamentos",
+        "desligamento",
+        "demissões",
+        "demissão",
+        "demitiu",
+        "demitiram",
+        "demite",
+        "demitem",
+        "demitidos",
+        "dispensas"
+      ]
     },
     "saldo": {
       "nome": "saldo",
@@ -41,7 +66,19 @@
       "tipo": "simple",
       "unidade": "movimentações líquidas",
       "formato": "inteiro",
-      "ressalva": "Fluxo líquido do período; não é estoque de vínculos."
+      "ressalva": "Fluxo líquido do período; não é estoque de vínculos.",
+      "sinonimos": [
+        "saldo",
+        "saldo líquido",
+        "saldos",
+        "geração de empregos",
+        "gerou empregos",
+        "gerou mais empregos",
+        "criou empregos",
+        "criou mais empregos",
+        "empregos criados",
+        "empregos gerados"
+      ]
     },
     "salario_medio_admissao": {
       "nome": "salario_medio_admissao",
@@ -50,7 +87,26 @@
       "tipo": "ratio",
       "unidade": "R$ nominais",
       "formato": "moeda",
-      "ressalva": "Nulo quando não há admissão com salário válido no recorte."
+      "ressalva": "Nulo quando não há admissão com salário válido no recorte.",
+      "sinonimos": [
+        "salário",
+        "salários",
+        "salário médio",
+        "remuneração",
+        "remunerações",
+        "renda",
+        "paga",
+        "pagam",
+        "pagou",
+        "ganha",
+        "ganham",
+        "ganho",
+        "mais bem pago",
+        "mais bem pagos",
+        "melhor pago",
+        "melhores salários",
+        "piores salários"
+      ]
     },
     "qtd_salarios_admissao": {
       "nome": "qtd_salarios_admissao",
@@ -59,7 +115,8 @@
       "tipo": "simple",
       "unidade": "movimentações",
       "formato": "inteiro",
-      "ressalva": "Denominador do salário médio de admissão."
+      "ressalva": "Denominador do salário médio de admissão.",
+      "sinonimos": []
     },
     "indice_fluxos_pareados_pct": {
       "nome": "indice_fluxos_pareados_pct",
@@ -68,7 +125,159 @@
       "tipo": "derived",
       "unidade": "%",
       "formato": "percentual",
-      "ressalva": "Aproximação por fluxos; não é taxa sobre estoque de vínculos (indisponível no CAGED)."
+      "ressalva": "Aproximação por fluxos; não é taxa sobre estoque de vínculos (indisponível no CAGED).",
+      "sinonimos": [
+        "índice de fluxos",
+        "fluxos pareados",
+        "rotatividade",
+        "turnover"
+      ]
+    }
+  },
+  "dimensoes": {
+    "codigo_secao": {
+      "nome": "codigo_secao",
+      "label": "Seção CNAE",
+      "colecoes": [
+        "setores",
+        "perfis"
+      ],
+      "sinonimos": [
+        "setor",
+        "setores",
+        "seção",
+        "seções",
+        "cnae",
+        "atividade econômica",
+        "atividades econômicas",
+        "ramo",
+        "ramos"
+      ],
+      "eixo": null
+    },
+    "sigla_uf": {
+      "nome": "sigla_uf",
+      "label": "UF",
+      "colecoes": [
+        "geografia",
+        "setores",
+        "perfis"
+      ],
+      "sinonimos": [
+        "uf",
+        "ufs",
+        "estado",
+        "estados",
+        "unidade da federação",
+        "unidades da federação"
+      ],
+      "eixo": null
+    },
+    "is_capital": {
+      "nome": "is_capital",
+      "label": "Capital ou interior",
+      "colecoes": [
+        "geografia",
+        "perfis"
+      ],
+      "sinonimos": [
+        "capital",
+        "capitais",
+        "interior"
+      ],
+      "eixo": null
+    },
+    "competencia": {
+      "nome": "competencia",
+      "label": "Mês",
+      "colecoes": [
+        "geografia",
+        "setores",
+        "perfis"
+      ],
+      "sinonimos": [
+        "mês",
+        "meses",
+        "competência",
+        "competências",
+        "mensal",
+        "mensais"
+      ],
+      "eixo": null
+    },
+    "ano": {
+      "nome": "ano",
+      "label": "Ano",
+      "colecoes": [
+        "geografia",
+        "setores",
+        "perfis"
+      ],
+      "sinonimos": [
+        "ano",
+        "anos",
+        "anual",
+        "anuais"
+      ],
+      "eixo": null
+    },
+    "sexo": {
+      "nome": "sexo",
+      "label": "Sexo",
+      "colecoes": [
+        "perfis"
+      ],
+      "sinonimos": [
+        "sexo",
+        "sexos",
+        "gênero",
+        "gêneros"
+      ],
+      "eixo": "sexo"
+    },
+    "raca_cor": {
+      "nome": "raca_cor",
+      "label": "Raça/cor",
+      "colecoes": [
+        "perfis"
+      ],
+      "sinonimos": [
+        "raça",
+        "raças",
+        "raça/cor",
+        "cor ou raça",
+        "etnia"
+      ],
+      "eixo": "raca_cor"
+    },
+    "escolaridade": {
+      "nome": "escolaridade",
+      "label": "Escolaridade",
+      "colecoes": [
+        "perfis"
+      ],
+      "sinonimos": [
+        "escolaridade",
+        "grau de instrução",
+        "instrução",
+        "formação",
+        "nível de ensino"
+      ],
+      "eixo": "escolaridade"
+    },
+    "faixa_etaria": {
+      "nome": "faixa_etaria",
+      "label": "Faixa etária",
+      "colecoes": [
+        "perfis"
+      ],
+      "sinonimos": [
+        "faixa etária",
+        "faixas etárias",
+        "idade",
+        "idades"
+      ],
+      "eixo": "faixa_etaria"
     }
   },
   "setores": [
